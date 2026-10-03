@@ -1,28 +1,30 @@
 # Proposed management contract v1
 
-**Design proposal only. Not an endpoint implemented by Xodus today.** The names below are normative for a future adapter review, not evidence that commands exist. Runtime `xodus-service` IPC is separate.
+**Scoped producer/client implementation now exists; the complete game lifecycle remains a proposal.** The pinned canonical schema and actual client/provider evidence are in [native integration](NATIVE-INTEGRATION.md). The sections below retain the full intended lifecycle requirements; they do not claim that gated inventory/install/launch/update operations succeed today. Runtime `xodus-service` IPC is separate.
 
-Stable handoff: **protocol 1.0**, [envelope/evidence JSON Schema](contracts/management-v1.schema.json), [implementation ledger](IMPLEMENTATION-LEDGER.md). The schema fixes 1.0 frame structure and exposes reusable `$defs/productEvidence`; operation-specific plan/job/registry request/result schemas, temporal replay validation and a live validator are future adapter work. A negotiated future compatible minor needs its own updated schema; do not use this strict 1.0 schema to guess forward compatibility.
+Stable handoff: **protocol 1.0**, [canonical scoped JSON Schema](contracts/management-v1.schema.json), [implementation ledger](IMPLEMENTATION-LEDGER.md). The [original foundation proposal](contracts/foundation-v1.schema.json) is preserved. The producer fills strict operation schemas for implemented public-catalog/registry/activity/diagnostic operations and explicitly gates game lifecycle success. Native clients validate the expected command's result, not any success-shaped object. A future minor/operation extension needs its own agreed schema/consumer pin; never guess forward compatibility.
 
 ## Transport and negotiation
 
-Proposed entry: `xodus manage --protocol 1`, one JSON request per stdin line, one JSON response/event per stdout line (UTF-8, LF). stderr is redacted human diagnostics, never machine results. No interactive prompts. Max line size 1 MiB; unknown fields ignored only within a negotiated compatible minor; unknown required capabilities fail closed. Never place credentials in argv/stdout/stderr. A private local broker or inherited credential pipe carries secrets separately.
+Current scoped entry: `xodus-cli manage --protocol 1 --state-dir <absolute-private-directory>`, one JSON request per stdin line, one JSON response/event per stdout line (UTF-8, LF). stderr is redacted human diagnostics, never machine results; the native client drains/discards it. No interactive prompts. Max frame size 1 MiB; strict 1.0 rejects unknown envelope/parameter fields and incompatible versions. Never place credentials in argv/stdout/stderr. Backend-owned native authentication keeps its credential handoff separate.
 
 Authentication reuses the backend's existing macOS Keychain token abstraction as a single credential owner. Shipping manifests must disable `key-chain-file`/`.xodus-keyring.ron`. Hello must also expose non-secret **per-capability audience requirements**; the broker obtains scoped proofs for inventory/catalog/package/launch as required. Existing Xbox Live scopes and configurable XSTS relying party do not authorize arbitrary inventory APIs.
 
 First request:
 
 ```json
-{"kind":"request","protocol":{"major":1,"minor":0},"requestID":"req-001","command":"hello","params":{"client":"xodus-macos-app","clientVersion":"0.1.0"}}
+{"kind":"request","protocol":{"major":1,"minor":0},"requestID":"req-001","command":"hello","params":{"client":"xodus-macos-app","clientVersion":"0.2.0"}}
 ```
 
 ```json
-{"kind":"result","protocol":{"major":1,"minor":0},"requestID":"req-001","ok":true,"data":{"protocol":{"major":1,"minor":0},"backendVersion":"PROPOSED","runtimeFingerprint":"PROPOSED","capabilities":["inventory.snapshot","catalog.search","install.plan","jobs.snapshot","jobs.cancel","events.replay"],"sessionID":"session-001"}}
+{"kind":"result","protocol":{"major":1,"minor":0},"requestID":"req-001","ok":true,"data":{"protocol":{"major":1,"minor":0},"backendVersion":"fixture","runtimeFingerprint":null,"capabilities":[{"command":"inventory.snapshot","supported":false,"audience":null,"reason":"Authoritative PC inventory is not established."}],"sessionID":"fixture-session","schema":"urn:xodus:management:1.0","catalogCorpus":"observedPublicProducts"}}
 ```
 
-Major mismatch, missing required capabilities, wrong runtime pairing or failed hello disables integration with an explicit update instruction. Never assume pause, offline launch, delta updates or rollback just because an engine is present.
+This example is synthetic, not runtime certification. Capability entries are typed objects, not strings; a null runtime fingerprint is not a pretend version. Major/minor/schema mismatch or failed hello disables integration with an explicit update instruction. Unsupported operations remain disabled without disabling supported read-only catalog functions. Never assume pause, offline launch, delta updates or rollback just because an engine is present.
 
 ## Commands and ownership
+
+The exact implemented parameter/result shapes are in the canonical schema, not inferred from this forward-looking table. The scoped producer supports public-product metadata/search, catalog-refresh jobs, management-only registry snapshots and redacted diagnostics; sign-in uses separately agreed backend-owned native flow metadata. `auth.logout` takes `{}` and confirms `signedOut` only after successful credential/cache removal. No successful game-install/launch/update object is promised by the scoped implementation.
 
 | Command | Required input | Result/behavior |
 | --- | --- | --- |

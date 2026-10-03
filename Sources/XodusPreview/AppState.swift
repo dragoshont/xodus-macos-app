@@ -31,6 +31,9 @@ final class SheetInteraction: ObservableObject {
 
 @MainActor
 final class AppState: ObservableObject {
+    @Published var fixtureMode = CommandLine.arguments.contains("--fixture")
+        || CommandLine.arguments.contains("--export-preview")
+    @Published var showingAccount = false
     @Published var destination: Destination = .library
     @Published var query = ""
     @Published var sortByTitle = false
@@ -119,6 +122,7 @@ final class AppState: ObservableObject {
         navigate(.library)
         selectedGame = nil
         showingWelcome = false
+        showingAccount = false
         message = nil
     }
 }

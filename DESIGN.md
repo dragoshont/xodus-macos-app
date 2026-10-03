@@ -20,6 +20,8 @@ Center a fully rounded floating Library / Discover / Downloads capsule **over** 
 
 Floating overlay chrome has a **local dark color scheme and white foreground** for contrast against immersive images, including when offscreen snapshots omit compositor materials. The body remains adaptive light/dark. Reduced transparency uses opaque scheme-appropriate surfaces; older macOS uses normal materials as an explicitly labelled compatibility fallback, not "Liquid Glass." There is no fake CSS glass or private SDK import.
 
+The live development shell inherits this world without copying fixture game names or covers. It uses a labelled original landscape, a separate native account sheet, centered scoped search and centered unavailable/empty states. A native `NSSearchField` supplies the field editor, readable attributed placeholder and keyboard focus over immersive art. Checked real public products use honest native icon placeholders until rights-cleared title artwork exists. Four-facet detail does not turn catalog presence or saved sign-in into ownership. The original orbital-doorway app icon is reproducible with `tools/RenderAppIcon.swift`.
+
 | Role | Rule |
 | --- | --- |
 | Body text / separators | native primary/secondary / Divider |

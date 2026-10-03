@@ -6,12 +6,15 @@ import XodusCore
 @MainActor
 enum PreviewExporter {
     private static var started = false
+    private static var fixtureExport = true
 
     static func startIfRequested(state: AppState) {
-        guard !started, let flag = CommandLine.arguments.firstIndex(of: "--export-preview") else { return }
+        guard !started, let flag = CommandLine.arguments.firstIndex(of: "--export-preview")
+                ?? CommandLine.arguments.firstIndex(of: "--export-live") else { return }
         started = true
+        fixtureExport = CommandLine.arguments[flag] == "--export-preview"
         guard CommandLine.arguments.indices.contains(flag + 1) else {
-            fail("--export-preview requires an explicit output directory")
+            fail("Own-view export requires an explicit output directory")
         }
         let directory = URL(fileURLWithPath: CommandLine.arguments[flag + 1], isDirectory: true)
         do {
@@ -23,12 +26,12 @@ enum PreviewExporter {
     private static func exportScreen(_ index: Int, state: AppState, directory: URL) {
         let screens: [Destination] = [.library, .discover, .downloads]
         guard screens.indices.contains(index) else {
-            print("Exported 3 native fixture window views. No desktop or other app capture.")
+            print("Exported 3 native \(fixtureExport ? "fixture" : "disconnected live-shell") views. No desktop or other app capture.")
             exit(0)
         }
         let screen = screens[index]
         state.navigate(screen)
-        if screen == .downloads {
+        if fixtureExport && screen == .downloads {
             state.jobs = [
                 FixtureJob(gameID: Fixtures.games[2].id, phase: .verifying),
                 FixtureJob(gameID: Fixtures.games[1].id, phase: .failed)
@@ -36,7 +39,7 @@ enum PreviewExporter {
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             guard let window = NSApp.windows.first(where: {
-                $0.isVisible && $0.title.contains("Fixture Preview")
+                $0.isVisible && ($0.title == "Xodus" || $0.title.contains("Fixture Preview"))
             }), let view = window.contentView?.superview else {
                 fail("Native fixture window was not available for its own view export")
             }
@@ -50,7 +53,8 @@ enum PreviewExporter {
                 fail("AppKit native view export produced no PNG")
             }
             do {
-                let output = directory.appendingPathComponent("native-\(screen.rawValue.lowercased()).png")
+                let prefix = fixtureExport ? "native" : "live"
+                let output = directory.appendingPathComponent("\(prefix)-\(screen.rawValue.lowercased()).png")
                 try data.write(to: output)
                 print(output.path)
             } catch { fail("Native view export failed: \(error.localizedDescription)") }

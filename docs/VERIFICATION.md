@@ -1,6 +1,54 @@
-# Foundation verification
+# Verification evidence
 
 Recorded 2026-10-03. This is evidence for the **fixture foundation**, not live authentication, download, install or gameplay.
+
+## Native client implementation
+
+The subsequent native development app now opens a real management shell by default;
+the original demonstration requires `--fixture`. On the same isolated Mac,
+`sh tools/check.sh` passed **14 core + 118 management + 24 presentation = 156
+checks**, zero failures. The management checks use the immutable producer pin
+and sanitized corpus documented in [native integration](NATIVE-INTEGRATION.md),
+plus actual mock child processes; no Microsoft login or Keychain permission was
+approved by these checks.
+
+The checks cover strict request/result correlation, capability gating, split and
+oversized JSONL, truncated output, unknown IDs/shapes, process exit/EOF/timeouts,
+independent evidence and activity sequence/revision invariants. In-flight activity
+snapshots fence incoming events: the snapshot is applied first and newer buffered
+events are applied afterward, avoiding a legitimate live-event/snapshot race.
+Failed reconciliation retains the last verified jobs as non-current and disables
+mutation until an authoritative snapshot is restored.
+
+`sh tools/build_app.sh` also built the release `.app`, generated the original icon,
+copied required resource bundles and the GPL notice, and passed plist/ad-hoc
+signature verification. The packaged executable's resource/presentation check
+passed. This is a local development bundle, not a notarized release.
+
+Disconnected own-view Library/Discover/Downloads exports were inspected in a
+bounded correction/confirmation pass. The native search placeholder and centered
+empty states were corrected; no account data or desktop capture was involved.
+Exports still omit live compositor/backdrop effects.
+
+The published native-auth schema and sanitized fixtures are pinned at producer
+commit `b9cd60bf51cd4cb8e864318cd0c4316453b4b8df` (68 positive, ten negative,
+four independent evidence frames). Against the preserved native engine, a
+**seven-check read-only interoperability probe passed against both the preserved
+engine and its ad-hoc-signed embedded copy**: hello, unsupported
+runtime/plan gates, explicit invalid-credential failure, partial observed catalog,
+durable jobs snapshot, management-only installed registry and redacted diagnostics.
+`auth.status` returned **AUTH_INVALID**, not valid sign-in; this account gate was
+reported to the backend owner. No permission was approved and no authentication,
+logout, installation or game process was started.
+
+The verified unsigned input engine SHA256 is
+`3fd646ac3eb7bdd2acdbcc3ed3755d2f4e2722ea1a7b4798eae72acb7ac41fd7`;
+its locally ad-hoc-signed embedded copy is
+`39df33fbac4334df12de39fb2e345a1ac64eb9e4330bb7a1f78de59b6fc26976`.
+The packaged resource/presentation check passed. A successful real account login,
+owned inventory, game installation or gameplay is **not** claimed. Hosted CI
+evidence below remains evidence for its named foundation commit until the new
+revision's run is separately recorded.
 
 ## Actual Mac environment
 
@@ -39,6 +87,6 @@ This CLT has neither XCTest nor Swift Testing (`no such module`/unresolved depen
 
 Static SVG translucency is a **placement/composition concept**, not native Liquid Glass. Actual framework calls were verified separately by compile/run. Own-view AppKit exports omit compositor/backdrop effects: absent glass surfaces and transparent/black titlebar strips are export limitations, not evidence of live-window refraction or titlebar alpha fidelity. No desktop/other-app capture or new Screen Recording permission was used. The coordinator confirmed native Library/Discover navigation via Accessibility on the earlier fixture window; that does not replace complete current VoiceOver or live compositor testing.
 
-No real sign-in, ownership enumeration, catalog search API, package download, installation, durable recovery, runtime pairing download, gameplay, signed distribution or save preservation is implemented or tested. Actual macOS 14 runtime behavior is not verified merely because a macOS 14 deployment target compiles on macOS 27. Full VoiceOver, keyboard sheet focus return, both appearances, reduced-preference, localization/RTL, performance and resize matrices remain release gates. Hosted CI evidence above is for the named code commit, separate from local Mac verification; later revisions need their own workflow read.
+The native client and bounded read-only producer interoperability are verified as recorded above; successful account consent/provider authorization remains a separate gate. Owned-PC enumeration, game package download/installation, real game recovery, runtime pairing download, gameplay, notarized distribution and save preservation remain unavailable. Actual macOS 14 runtime behavior is not verified merely because a macOS 14 deployment target compiles on macOS 27. Full VoiceOver, keyboard sheet focus return, both appearances, reduced-preference, localization/RTL, performance and resize matrices remain release gates. Hosted CI evidence above is for the named code commit, separate from local Mac verification; later revisions need their own workflow read.
 
 Fixture jobs deliberately reset on relaunch. The fixed fixture evidence time and illustrative 24-hour access freshness gate are demonstrations, not a proven upstream authorization TTL.

@@ -28,7 +28,7 @@ Develop and verify native code on the user's Mac over trusted SSH, using isolate
 
 **Not promised in v1:** social features, achievements, cloud saves, checkout, cloud gaming, DLC management, all-PC-title support or a arbitrary runtime selector. Discover does not claim purchasability or ownership.
 
-**Today:** offline fixture preview, original mockups and specifications only. No authentication, network, package operations or gameplay. Demo jobs are deliberately non-durable so they cannot be mistaken for production installs.
+**Today:** native development app with a real management-process client, capability-gated account UI, partial public catalog and durable catalog-activity integration. Real provider interoperability is recorded separately in [native integration](docs/NATIVE-INTEGRATION.md), never inferred from mock checks. Owned-PC inventory, game installation and gameplay remain unavailable. An explicit offline `--fixture` mode retains the original demonstration; its non-durable jobs and invented titles never become live evidence.
 
 **User-decided:** original app code/docs/art use GPL-3.0-only, matching the user's stated Xodus licensing intent without assuming an "or later" grant.
 

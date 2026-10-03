@@ -1,4 +1,4 @@
-name: Fixture foundation checks
+name: Native app and management checks
 
 on:
   push:
@@ -12,7 +12,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check native fixture models and presentation
+      - name: Check native models, management interoperability and presentation
         run: sh tools/check.sh
       - name: Check editable SVG reproducibility
         run: |

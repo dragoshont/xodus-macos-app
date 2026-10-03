@@ -7,14 +7,20 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "XodusCore", targets: ["XodusCore"]),
+        .library(name: "XodusManagement", targets: ["XodusManagement"]),
         .executable(name: "XodusPreview", targets: ["XodusPreview"]),
-        .executable(name: "XodusFixtureChecks", targets: ["XodusFixtureChecks"])
+        .executable(name: "XodusFixtureChecks", targets: ["XodusFixtureChecks"]),
+        .executable(name: "XodusManagementChecks", targets: ["XodusManagementChecks"])
     ],
     targets: [
         .target(name: "XodusCore"),
-        .executableTarget(name: "XodusPreview", dependencies: ["XodusCore"],
+        .target(name: "XodusManagement", dependencies: ["XodusCore"],
+                resources: [.copy("Resources/management-v1.schema.json")]),
+        .executableTarget(name: "XodusPreview", dependencies: ["XodusCore", "XodusManagement"],
                           resources: [.copy("Resources/Artwork")]),
         .executableTarget(name: "XodusFixtureChecks", dependencies: ["XodusCore"],
-                          path: "Tests/FixtureChecks")
+                          path: "Tests/FixtureChecks"),
+        .executableTarget(name: "XodusManagementChecks", dependencies: ["XodusManagement"],
+                          path: "Tests/ManagementChecks", resources: [.copy("Fixtures")])
     ]
 )

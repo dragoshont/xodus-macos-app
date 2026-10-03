@@ -1,8 +1,23 @@
 # Public implementation ledger
 
-Baseline: foundation v0.2, 2026-10-03. This is the durable handoff for subsequent **separate, reviewable app/backend implementation branches**, not an instruction to turn the foundation into a live mega-PR.
+Baseline: foundation v0.2, 2026-10-03. This ledger records that foundation and the subsequently user-directed native implementation. App and backend remain separate workstreams with reviewable persisted milestones; a client milestone is not a complete consumer release.
 
-**Status vocabulary:** `implemented-fixture` means offline demonstration/checks only; `specified` means requirements/design/contract authored; `blocked-live` means an unresolved prerequisite prohibits live release; `planned-live` means work not yet implemented. No row below claims production authentication, inventory, download, install, update or gameplay.
+**Status vocabulary:** `implemented-fixture` means offline demonstration/checks only; `implemented-client` means native client code exists but provider evidence is tracked separately; `specified` means requirements/design/contract authored; `blocked-live` means an unresolved prerequisite prohibits live release; `planned-live` means work not yet implemented. No row below claims production inventory, game download/install/update or gameplay.
+
+## Active native implementation
+
+The user directed autonomous native development after foundation `44d7338`. This existing app worktree owns the client; the existing public Rust-fork workstream owns management and XAL auth. No duplicate auth provider or private runtime source is imported. [Native integration](NATIVE-INTEGRATION.md) records the exact producer/schema pin and actual evidence.
+
+| Work | Status | Implemented scope | Evidence / remaining gate |
+| --- | --- | --- | --- |
+| C-TRANSPORT | implemented-client | Codable1.0 models, producer-schema validation, bounded supervised stdin/stdout JSONL, correlated results, deadlines, EOF/nonzero handling and owned-process cleanup | 118 Mac management checks plus seven actual read-only engine checks; no gameplay implication |
+| C-ACCOUNT | implemented-client | Native status/sign-in/poll/cancel/logout UI, no tokens/redirects in Swift, commit/cancel-race messaging, explicit user action and capability checks | Published auth/schema pin passes; actual status reports AUTH_INVALID; provider-consent integration remains open |
+| C-CATALOG | implemented-client | Partial observed-public-products search, scoped cursor/cache revision, edition detail, no invented ownership/art | Public corpus only; full discovery and genuine owned-PC inventory remain blocked |
+| C-ACTIVITY | implemented-client | Real catalog-check enqueue/cancel/retry, fenced snapshot/revision/sequence reconciliation and terminal protection | Actual read-only snapshot verified; game installation/recovery remains separate |
+| C-INSTALLED | implemented-client | Typed actual managed-registry snapshot, recorded health, scoped Library and independent detail facet | Actual registry read verified; user-selected inspection/import and current filesystem checks remain ongoing |
+| C-BUNDLE | implemented-client | Release `.app`, required resources, original icon generator, local ad-hoc signing/plist verification | Mac bundle/resource/self-check/own-view evidence; no notarization/runtime certification/public distribution |
+
+Current client milestone: **14 core + 118 management + 24 presentation = 156 checks**, zero failures, plus seven actual engine read-only checks. Fixture arrays/jobs remain in a separate explicit `--fixture` mode. Any new provider pin or binary needs its own interoperability evidence before a row becomes `implemented-live`. The user requires the full real journey and coordinator-owned adversarial review/findings closure before final completion.
 
 ## Foundation delivered
 
@@ -12,7 +27,7 @@ Baseline: foundation v0.2, 2026-10-03. This is the durable handoff for subsequen
 | F-DOMAIN | implemented-fixture | `Sources/XodusCore`: typed access/installability/compatibility evidence, identity, disk plan and queue policy | `swift run XodusFixtureChecks`: 14 checks |
 | F-NATIVE | implemented-fixture | `Sources/XodusPreview`: native SwiftUI/AppKit, actual macOS26+ Glass, original image resources, scoped search and simulated flows | `swift run XodusPreview --self-check`: 15 checks; Mac build + bounded own-view/AX evidence in VERIFICATION |
 | F-DESIGN | specified | Nine original editable v0.2 SVG/PNG concepts, source/provenance, compact embedded art; unapproved v0.1 archived | Generator/XML/upload-budget checks; Figma revision status in design/README |
-| F-PROTOCOL | specified | `docs/BACKEND-CONTRACT.md`, `docs/contracts/management-v1.schema.json` | Proposed protocol **1.0**, JSON Schema is a contract artifact, not a live backend/validator |
+| F-PROTOCOL | specified | `docs/BACKEND-CONTRACT.md`, preserved `docs/contracts/foundation-v1.schema.json` | Original proposed protocol **1.0**; current canonical producer schema/client evidence is recorded separately above |
 | F-LICENSE | implemented-fixture | GPL-3.0-only grant + verbatim LICENSE; original assets/source included | Runtime/component redistribution remains separate, blocked before shipping |
 
 ## Proposed v1 implementation sequence
@@ -40,7 +55,7 @@ Dependencies are prerequisites, not a promise of execution order or access. D-ID
 
 ## Commands and evidence policy
 
-**Actual foundation command:** `sh tools/check.sh` builds and runs 29 dependency-free checks on the isolated Mac. `swift test` did not pass because XCTest/Testing are absent in that CLT; no fake test-framework shim is provided. Hosted workflow results must be read separately.
+**Actual native command:** `sh tools/check.sh` builds and runs core, management and presentation dependency-free checks on the isolated Mac. Foundation ran 29; the current client milestone runs 156. `swift test` did not pass because XCTest/Testing are absent in that CLT; no fake test-framework shim is provided. Hosted workflow results must be read separately.
 
 **Actual design commands:** `python3 tools/generate_mockups.py`; `swift tools/render_mockups.swift`; original art reproduction/export commands in design/README. Optional `swift run XodusPreview --export-preview <explicit-directory>` renders only this app's own views and exits; no desktop capture.
 

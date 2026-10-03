@@ -4,3 +4,5 @@
 *.xcuserstate
 *.tar
 *.tar.gz
+dist/
+integration-state/

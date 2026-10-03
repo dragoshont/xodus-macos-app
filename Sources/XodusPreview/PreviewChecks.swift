@@ -56,7 +56,17 @@ enum PreviewChecks {
         state.reset()
         check(state.jobs.isEmpty && !state.installed.contains(game.id),
               "Fixture reset clears queue and simulated installation")
-        print("15 preview checks, \(failures) failures. No backend connected.")
+        let live = LiveSession()
+        check(!state.fixtureMode, "Default application mode does not present fixture games")
+        check(live.products.isEmpty, "Live catalog never starts with invented titles")
+        check(live.authentication == nil, "Live account does not start with simulated sign-in")
+        check(live.activity.jobs.isEmpty, "Live activity does not start with simulated jobs")
+        check(!live.canSignIn, "Sign-in is disabled until backend capability negotiation")
+        check(!live.supports(.launch) && !live.supports(.plan), "Live gameplay and installation fail closed")
+        check(!live.signInPending && !live.accountBusy, "No unattended native sign-in begins")
+        check(live.diagnosticPreview == nil, "No diagnostics or raw engine text are captured at startup")
+        check(live.phase == .disconnected, "Presentation checks do not contact Xodus or Keychain")
+        print("24 preview checks, \(failures) failures. No backend connected.")
         return failures == 0
     }
 }

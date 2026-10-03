@@ -4,7 +4,7 @@ import AppKit
 @MainActor
 enum PreviewWindow {
     static func configure() {
-        for window in NSApp.windows where window.title.contains("Fixture Preview") {
+        for window in NSApp.windows where window.title == "Xodus" || window.title.contains("Fixture Preview") {
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
             window.styleMask.insert(.fullSizeContentView)

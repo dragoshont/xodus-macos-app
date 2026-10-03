@@ -1,8 +1,10 @@
 # Xodus for Mac
 
-A proposed Apple-native launcher for legitimately entitled Xbox PC games, powered by a future integration with the Xodus runtime.
+A native Mac launcher in development for legitimately entitled Xbox PC games, integrating with the Xodus management engine.
 
-**Current status: public design and engineering foundation, not a working game launcher.** The SwiftUI app is an explicitly labelled, offline, fixture-only prototype. It cannot sign in, enumerate a real library, download packages, install games, or launch games. All titles, artwork, account states, compatibility claims and progress shown in the prototype are invented demonstrations.
+**Current status: native development app, not a complete game launcher.** The default SwiftUI/AppKit app has a real, bounded management-process client and native account, partial public catalog, edition-detail and activity screens. Configure a trusted matching development engine; its negotiated capabilities determine which actions work. Authoritative owned-PC inventory, authorized game installation and certified gameplay remain unavailable. A saved Xbox Live sign-in is **not** proof of PC ownership or package access.
+
+The original offline demonstration is now an explicit `--fixture` mode. Its titles, access, compatibility and progress are invented and never populate the live app. See [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
 ![Original Library concept](design/previews/library.png)
 
@@ -15,7 +17,8 @@ A proposed Apple-native launcher for legitimately entitled Xbox PC games, powere
 | [Requirements](docs/REQUIREMENTS.md) | Traceable requirements and measurable acceptance criteria |
 | [UX flows](docs/UX-FLOWS.md) | Screens, cancellation, loading, degraded and recovery states |
 | [Architecture](docs/ARCHITECTURE.md) | SwiftUI/AppKit boundary, Rust adapter and trust model |
-| [Backend contract](docs/BACKEND-CONTRACT.md) | Proposed versioned JSON/JSONL management protocol |
+| [Backend contract](docs/BACKEND-CONTRACT.md) | Pinned scoped management protocol and future lifecycle requirements |
+| [Native integration](docs/NATIVE-INTEGRATION.md) | Actual native client, developer app bundle, limitations and producer pin |
 | [Research and decisions](docs/RESEARCH.md) | Evidence, leads, uncertainties and decision register |
 | [Milestones](docs/MILESTONES.md) | Release gates; prototype is not a production milestone |
 | [Implementation ledger](docs/IMPLEMENTATION-LEDGER.md) | Durable v1 work IDs, actual-vs-fixture status, dependencies, evidence and blockers |
@@ -23,7 +26,7 @@ A proposed Apple-native launcher for legitimately entitled Xbox PC games, powere
 
 Design collaboration: [nine editable v0.2 Figma mockups](https://www.figma.com/design/5iQu716UFImHjRxJkf0t8V?node-id=3-115) and [editable FigJam UX flow](https://www.figma.com/board/3MejlFaXHkogmJ3J5k79Gw). Revised Library/Discover renders were inspected; [import status](design/README.md) records static SVG fidelity limits and superseded v0.1. These are proposed designs, not implemented APIs, exact compositor effects or a wired Figma prototype.
 
-## Run the native fixture preview
+## Run the native development app
 
 On an Apple Silicon Mac with Swift 6 and Apple Command Line Tools:
 
@@ -32,24 +35,41 @@ swift run XodusFixtureChecks
 swift run XodusPreview
 ```
 
+The historical SwiftPM executable name remains `XodusPreview`; its default is now the live development shell, **not simulated gameplay**. Select a trusted engine with the native file picker in Settings, or provide `XODUS_BACKEND_PATH` for development. There is no interactive-CLI scraping, arbitrary Wine picker or credential handling in the Swift app.
+
+Build a double-clickable local `.app` with original icon and resource bundles:
+
+```sh
+sh tools/build_app.sh
+open dist/Xodus.app
+```
+
+The optional positional argument to `build_app.sh` is an explicit matching management-engine executable. The current backend re-executes that same binary for its private native-auth worker; no separate helper is invented. This produces an **ad-hoc-signed development app**, not a notarized/distributed installer or signed gameplay runtime. Runtime licensing and public distribution remain separate gates.
+
 The proposed deployment baseline is **macOS 14**, not a user-approved support commitment. On macOS 26+, the preview uses **real SwiftUI Liquid Glass** (`glassEffect`, `GlassEffectContainer`, glass buttons): a centered floating capsule menu and separate circular account control over original immersive imagery, with a transparent native titlebar. Older systems use explicitly availability-gated standard materials; reduced transparency uses opaque surfaces. SwiftUI/AppKit provides the modern Mac framework behavior without a UIKit rewrite or full Xcode.
 
 **Visual revision v0.2 supersedes the unapproved flat v0.1 concepts.** SVGs describe editable layout and intended glass placement, not live compositor refraction. Native own-view exports also cannot establish backdrop/refraction fidelity; the native implementation, not an SVG blur, owns system Glass.
 
-Choose **Library / Discover / Downloads**, search within the current scope, open a game, and use **Simulate install** or **Simulate next step**. Settings can inject empty, partial, stale, offline and cancelled-auth scenarios. Simulated jobs exist only in memory and reset on relaunch. The preview never contacts a service, invokes the runtime, opens an auth browser, or writes an installed-game registry.
+For the original offline design demonstration:
+
+```sh
+swift run XodusPreview --fixture
+```
+
+In that separate mode, choose **Library / Discover / Downloads**, search within the current scope, open an invented game, and use **Simulate install** or **Simulate next step**. Fixture Settings inject empty, partial, stale, offline and cancelled-auth scenarios. Simulated jobs exist only in memory and reset on relaunch. Fixture mode never contacts the engine, opens sign-in or writes a game registry; entering it disconnects the live engine first.
 
 ```sh
 swift run XodusPreview --self-check
 ```
 
-The first command checks core models; `--self-check` checks presentation state without opening a window. These dependency-free check executables work with Command Line Tools, which do not include XCTest/Swift Testing on the tested Mac. [Verification](docs/VERIFICATION.md) records the actual tested environment and commands, separately from future release criteria.
+Core, presentation and `swift run XodusManagementChecks` are dependency-free executables. Management checks use the producer's sanitized fixtures plus real mock child processes to exercise negotiation, framing, EOF/timeouts/exit failures, request correlation and activity reconciliation. They do not sign in or approve Keychain access. Command Line Tools do not include XCTest/Swift Testing on the tested Mac. [Verification](docs/VERIFICATION.md) records actual evidence separately from future release criteria.
 
-`sh tools/check.sh` runs the complete foundation check sequence. GitHub Actions repeats it on a hosted Mac and checks SVG regeneration; a workflow definition is not itself a claim that hosted CI has passed.
+`sh tools/check.sh` runs the complete native/management/fixture check sequence. GitHub Actions repeats it on a hosted Mac and checks SVG regeneration; a workflow definition is not itself a claim that a particular revision passed hosted CI.
 
-To render only this fixture app's own native view hierarchy (not the desktop or other apps), use `swift run XodusPreview --export-preview /tmp/xodus-fixture-preview`. It exports Library, Discover and Downloads PNGs and exits. This optional explicit export writes image artifacts only; it does not write game files.
+Own-view exports use `--export-preview <directory>` for fixtures or `--export-live <directory>` for a **disconnected**, non-account live shell. They export this app's Library, Discover and Downloads view hierarchy and exit; they do not capture the desktop/other apps or establish Glass-compositor fidelity.
 
 ## Boundaries and licensing
 
-The app is standalone: Heroic does not offer a proven shipping new-store plugin API. Existing Xodus runtime service IPC is **not** a launcher management protocol. A safe, stable backend, authoritative PC ownership inventory, package eligibility and exactly paired Xbox-capable runtime still need proof.
+The app is standalone: Heroic does not offer a proven shipping new-store plugin API. Existing Xodus runtime service IPC is **not** the management protocol. The scoped adapter does not resolve authoritative PC ownership, safe package installation or the exactly paired Xbox-capable gameplay runtime.
 
 No private runtime source, credentials, real account data, proprietary game covers, Apple assets or paid design assets are included. The original app source, documentation and mockups are licensed **GPL-3.0-only**, by the user's explicit choice; see [LICENSE](LICENSE) and [licensing boundaries](docs/LICENSING.md). Third-party runtime components/assets retain their own licenses. Dependency redistribution, signing/notarization and installer distribution remain pending. This license does not grant rights to Microsoft packages or runtime components.
