@@ -1,0 +1,20 @@
+name: Fixture foundation checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  native-fixtures:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check native fixture models and presentation
+        run: sh tools/check.sh
+      - name: Check editable SVG reproducibility
+        run: |
+          python3 tools/generate_mockups.py
+          git diff --exit-code -- design/screens
