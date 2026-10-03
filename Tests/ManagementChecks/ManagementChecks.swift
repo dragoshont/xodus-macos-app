@@ -14,7 +14,8 @@ enum ManagementChecks {
                CommandLine.arguments.indices.contains(stateIndex + 1) {
                 try await checks.probe(BackendConfiguration(
                     executable: URL(fileURLWithPath: CommandLine.arguments[index + 1]),
-                    stateDirectory: URL(fileURLWithPath: CommandLine.arguments[stateIndex + 1])))
+                    stateDirectory: URL(fileURLWithPath: CommandLine.arguments[stateIndex + 1])),
+                    discover: CommandLine.arguments.contains("--probe-discovery"))
             } else { try await checks.run() }
         } catch { await checks.check(false, "Check harness: \(safeMessage(error))") }
         exit(await checks.finish() ? 0 : 1)
@@ -55,13 +56,13 @@ actor Checks {
     func run() async throws {
         let validator = try ContractValidator()
         let positive = try fixture("positive").array ?? []
-        check(positive.count == 68, "Pinned producer corpus contains 68 positive frames")
+        check(positive.count == 71, "Pinned producer corpus contains 71 positive frames")
         for (index, frame) in positive.enumerated() {
             do { try validator.validate(frame); check(true, "Producer positive frame \(index + 1)") }
             catch { check(false, "Producer positive frame \(index + 1)") }
         }
         let negative = try fixture("negative").array ?? []
-        check(negative.count == 10, "Pinned producer corpus contains ten negative frames")
+        check(negative.count == 11, "Pinned producer corpus contains eleven negative frames")
         for item in negative {
             do {
                 guard let frame = item["frame"] else { throw ManagementError.invalidPayload }
@@ -84,6 +85,38 @@ actor Checks {
             let snapshot = try data.decode(InstalledSnapshot.self)
             check(snapshot.scope == "managementRegistryOnly" && snapshot.registryVersion.major == 1,
                   "Typed installed evidence remains explicitly scoped to its management registry")
+        }
+        guard let discoveryData = positive.first(where: { $0["data"]?["corpus"]?.string == "pcGamePassDiscovery" })?["data"],
+              let failedPage = positive.first(where: { $0["error"]?["details"]?["corpus"]?.string == "pcGamePassDiscovery" })?["error"]?["details"] else {
+            throw ManagementError.invalidPayload
+        }
+        let discovery = try discoveryData.decode(CatalogDiscovery.self)
+        check(discovery.products.first?.resolvedLanguage == "en" && discovery.failures.count == 1,
+              "Typed mixed discovery exposes actual source language and per-product failure")
+        try validator.validate(failedPage, definition: "failedDiscoveryData")
+        check(try failedPage.decode(CatalogDiscovery.self).products.isEmpty,
+              "All-failure details are distinct from success-shaped discovery")
+        do {
+            try validator.validate(failedPage, definition: "discoveryData")
+            check(false, "Empty all-failure page cannot validate as success")
+        } catch { check(true, "Empty all-failure page cannot validate as success") }
+        guard var pageObject = discoveryData.object,
+              var productObject = discoveryData["products"]?.array?.first?.object else {
+            throw ManagementError.invalidPayload
+        }
+        productObject["source"] = .string("syntheticPublicSource")
+        pageObject["products"] = .array([.object(productObject)])
+        try JSONValue.object(pageObject).decode(CatalogDiscovery.self)
+            .validatePublicScope(market: "US", language: "en-US", limit: 8)
+        check(true, "Same-base neutral metadata language is explicit and allowed")
+        for tag in ["en-GB", "fr"] {
+            productObject["resolvedLanguage"] = .string(tag)
+            pageObject["products"] = .array([.object(productObject)])
+            do {
+                try JSONValue.object(pageObject).decode(CatalogDiscovery.self)
+                    .validatePublicScope(market: "US", language: "en-US", limit: 8)
+                check(false, "Unrelated or other-region language is rejected")
+            } catch { check(true, "Unrelated or other-region language is rejected") }
         }
         let edges = try fixture("evidence-edge").array ?? []
         check(edges.count == 4, "Four independent evidence edge cases remain distinct")
@@ -133,6 +166,30 @@ actor Checks {
             check(false, "Credential parameter is rejected before transport")
         } catch { check(error as? ManagementError == .invalidRequest, "Credential parameter is rejected before transport") }
         await client.close()
+        let denied = try ManagementClient()
+        _ = try await denied.connect(mockConfiguration("keychain"))
+        do {
+            _ = try await denied.request(.authStatus)
+            check(false, "Keychain permission failure is not treated as invalid credentials")
+        } catch {
+            check(error as? ManagementError == .credentialStoreUnavailable,
+                  "Keychain permission failure is not treated as invalid credentials")
+        }
+        await denied.close()
+        let discoveryFailure = try ManagementClient()
+        _ = try await discoveryFailure.connect(mockConfiguration("discoveryfail"))
+        do {
+            _ = try await discoveryFailure.request(.discover, params: [
+                "market": .string("US"), "language": .string("en-US"), "limit": .integer(8), "cursor": .null
+            ])
+            check(false, "Transport preserves only schema-validated all-failure discovery details")
+        } catch let error as ManagementError {
+            if case .discoveryFailed(let page) = error {
+                check(page.products.isEmpty && !page.failures.isEmpty,
+                      "Transport preserves only schema-validated all-failure discovery details")
+            } else { check(false, "Transport preserves only schema-validated all-failure discovery details") }
+        }
+        await discoveryFailure.close()
         for scenario in ["prompt", "oversize", "partial", "mismatch", "wrongid", "wrongshape", "eof", "exit", "timeout"] {
             let bad = try ManagementClient()
             do {
@@ -144,7 +201,7 @@ actor Checks {
         }
     }
 
-    func probe(_ configuration: BackendConfiguration) async throws {
+    func probe(_ configuration: BackendConfiguration, discover: Bool = false) async throws {
         let client = try ManagementClient()
         do {
             let hello = try await client.connect(configuration)
@@ -157,8 +214,13 @@ actor Checks {
                     check(status.credentialStore == "macOSKeychain" && !status.entitlementAuthorized,
                           "Actual native Keychain status is not ownership proof")
                 } catch let error as ManagementError {
-                    guard case .backendError("AUTH_INVALID", _) = error else { throw error }
-                    check(true, "Actual auth.status explicitly rejects invalid saved credentials; no valid sign-in claimed")
+                    switch error {
+                    case .backendError("AUTH_INVALID", _):
+                        check(true, "Actual auth.status explicitly rejects invalid saved credentials; no valid sign-in claimed")
+                    case .credentialStoreUnavailable:
+                        check(true, "Actual auth.status reports inaccessible credential store; no permission or account assumed")
+                    default: throw error
+                    }
                 }
             }
             if hello.supports(.search) {
@@ -184,6 +246,30 @@ actor Checks {
             if hello.supports(.diagnostics) {
                 let report = try await client.request(.diagnostics)
                 check(report["redacted"] == .bool(true), "Actual diagnostic preview is explicitly redacted")
+            }
+            if discover {
+                guard hello.supports(.discover) else { throw ManagementError.capabilityMissing("catalog.discover") }
+                let first = try await client.request(.discover, params: [
+                    "market": .string("US"), "language": .string("en-US"), "limit": .integer(2), "cursor": .null
+                ], timeout: .seconds(45)).decode(CatalogDiscovery.self)
+                try first.validatePublicScope(market: "US", language: "en-US", limit: 2)
+                check(!first.products.isEmpty, "Actual source-backed PC discovery is partial and entitlement remains unknown")
+                guard let cursor = first.nextCursor else { throw ManagementError.invalidPayload }
+                let second = try await client.request(.discover, params: [
+                    "market": .string("US"), "language": .string("en-US"), "limit": .integer(2), "cursor": .string(cursor)
+                ], timeout: .seconds(45)).decode(CatalogDiscovery.self)
+                try second.validatePublicScope(market: "US", language: "en-US", limit: 2)
+                check(second.corpusRevision == first.corpusRevision
+                      && Set(first.products.map(\.id) + first.failures.map(\.id))
+                        .isDisjoint(with: Set(second.products.map(\.id) + second.failures.map(\.id))),
+                      "Actual discovery cursor advances with stable provenance and distinct identities")
+                guard let product = first.products.first else { throw ManagementError.invalidPayload }
+                let searched = try await client.request(.search, params: [
+                    "query": .string(product.title), "market": .string("US"), "language": .string("en-US"),
+                    "platform": .string("pc"), "limit": .integer(100), "cursor": .null
+                ]).decode(CatalogSearch.self)
+                check(searched.products.contains { $0.id == product.id },
+                      "Actual checked-catalog title search resolves a source-backed discovered product")
             }
             await client.close()
         } catch {
@@ -260,7 +346,8 @@ enum MockBackend {
         do {
             let frames = try fixture("positive").array ?? []
             var hello = frames.first(where: { $0["data"]?["schema"] != nil })?["data"]?.object ?? [:]
-            let supported: Set<ManagementCommand> = [.authStatus, .authLogout, .jobs]
+            let supported: Set<ManagementCommand> = scenario == "discoveryfail"
+                ? [.authStatus, .authLogout, .jobs, .discover] : [.authStatus, .authLogout, .jobs]
             hello["capabilities"] = .array(ManagementCommand.allCases.map { command in .object([
                 "command": .string(command.rawValue), "supported": .bool(supported.contains(command)),
                 "audience": .null, "reason": supported.contains(command) ? .null : .string("Fixture gate.")
@@ -276,6 +363,14 @@ enum MockBackend {
                     if scenario == "mismatch" { result["protocol"] = .object(["major": .integer(2), "minor": .integer(0)]) }
                     try emit(.object(result))
                 } else {
+                    if scenario == "discoveryfail", command == "catalog.discover" {
+                        guard var response = frames.first(where: {
+                            $0["error"]?["details"]?["corpus"]?.string == "pcGamePassDiscovery"
+                        })?.object else { exit(3) }
+                        response["requestID"] = request["requestID"]
+                        try emit(.object(response))
+                        continue
+                    }
                     if scenario == "eof" { exit(0) }
                     if scenario == "exit" { exit(7) }
                     if scenario == "timeout" { Thread.sleep(forTimeInterval: 5); continue }
@@ -287,6 +382,15 @@ enum MockBackend {
                             "audience": .null, "expiresAt": .null, "entitlementAuthorized": .bool(false)])
                     }
                     var response = result(request, data: scenario == "wrongshape" ? .object(hello) : data)
+                    if scenario == "keychain" {
+                        response.removeValue(forKey: "data")
+                        response["ok"] = .bool(false)
+                        response["error"] = .object([
+                            "code": .string("AUTH_INVALID"), "message": .string("Synthetic store failure."),
+                            "retryable": .bool(false),
+                            "details": .object(["category": .string("credentialStoreUnavailable")])
+                        ])
+                    }
                     if scenario == "wrongid" { response["requestID"] = .string("fixture-unexpected") }
                     try emit(.object(response))
                 }

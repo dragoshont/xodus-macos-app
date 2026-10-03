@@ -201,10 +201,19 @@ public actor ManagementClient {
         } else {
             guard let error = value["error"], let code = error["code"]?.string,
                   let retryable = error["retryable"]?.boolean else { throw ManagementError.invalidFrame }
+            let failure: ManagementError
+            if waiter.command == .discover, code == "PACKAGE_UNAVAILABLE" {
+                guard let details = error["details"] else { throw ManagementError.invalidPayload }
+                try validator.validate(details, definition: "failedDiscoveryData")
+                failure = .discoveryFailed(try details.decode(CatalogDiscovery.self))
+            } else if code == "AUTH_INVALID", error["details"]?["category"]?.string == "credentialStoreUnavailable",
+                      [.authStatus, .authBegin, .authCancel, .authLogout].contains(waiter.command) {
+                failure = .credentialStoreUnavailable
+            } else { failure = .backendError(code, retryable: retryable) }
             pending.removeValue(forKey: id)
             waiter.deadline.cancel()
             // The producer's human message/raw diagnostic text is deliberately not retained.
-            waiter.continuation.resume(throwing: ManagementError.backendError(code, retryable: retryable))
+            waiter.continuation.resume(throwing: failure)
         }
     }
 

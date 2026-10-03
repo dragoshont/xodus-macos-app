@@ -125,11 +125,11 @@ struct LiveSettingsView: View {
                     .foregroundStyle(.secondary)
             }
             Section("Advanced public catalog") {
-                Text("The current engine searches only public products it has checked, not a global or owned library.")
+                Text("Discover checks a bounded public PC Game Pass page. Search matches checked products, not the whole Store or an owned library.")
                     .foregroundStyle(.secondary)
                 TextField("Market (for example US)", text: $session.market)
                 TextField("Language (for example en-US)", text: $session.language)
-                Button("Refresh catalog scope") { Task { await session.search(state.query) } }
+                Button("Refresh catalog scope") { Task { await session.refreshCatalog(state.query) } }
                     .disabled(!session.isReady || session.searching)
                 TextField("Public Store product ID", text: $session.lookupID)
                     .onSubmit { Task { await session.lookupProduct() } }

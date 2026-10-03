@@ -2,6 +2,42 @@
 
 Recorded 2026-10-03. This is evidence for the **fixture foundation**, not live authentication, download, install or gameplay.
 
+## Bounded discovery and default application startup
+
+The discovery follow-up passed **14 core + 130 management + 24 presentation =
+168 checks**, zero failures. Canonical schema is now producer commit `790f5c4`,
+SHA256 `2ede71d5171cf4dc1659fedfc99187a90d904d9264119a22ee9f94064baef3d2`;
+the preserved discovery implementation/executable is `8718dcb`. Seventy-one
+positive, eleven negative and four evidence-edge fixtures remain sanitized.
+All-failure pages validate only against the explicit error definition; an empty
+page cannot masquerade as successful discovery. Source language and same-base
+neutral fallback, inaccessible-Keychain errors and scoped catalog invalidation
+are covered.
+
+**Ten actual engine checks passed**, including two source-backed anonymous PC Game
+Pass discovery pages with distinct identities/stable cursor, and actual title
+search in the resulting checked cache. This is not global Store search or owned
+inventory. The refined authentication result identifies an inaccessible
+credential store; no Keychain approval, credential replacement or sign-in was
+performed.
+
+The release app was rebuilt with that preserved engine, locally signed and
+resource-checked. Unsigned input SHA256 is
+`14dd06466a201ddb77fe7c2d6f9a57bbbb79788f03413989e5158d9053c864ad`;
+embedded local SHA256 is
+`62cb9564478d2a2bcee472b6f7d6865f5f3007a0314e30c7a06537523820f175`.
+Actual default LaunchServices entry (`open Xodus.app`, no live/backend flags or
+environment override) started the application and its own included-engine child.
+That PID/parent relationship establishes default embedded selection, not complete
+account UI behavior; the coordinator's bounded own-window AX confirmation is
+recorded separately when available. Missing/nonexecutable embedded engines show
+an actionable error and do not silently reuse saved developer binaries or fixtures.
+
+Hosted follow-up CI retrieval is currently blocked by a GitHub network timeout;
+local Mac evidence is not relabelled as hosted CI. Full Store search, genuine
+ownership, authorized install/update/play/recovery and coordinator-owned adversarial
+review/findings closure remain active completion prerequisites.
+
 ## Native client implementation
 
 The subsequent native development app now opens a real management shell by default;

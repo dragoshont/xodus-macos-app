@@ -10,14 +10,14 @@ The user directed autonomous native development after foundation `44d7338`. This
 
 | Work | Status | Implemented scope | Evidence / remaining gate |
 | --- | --- | --- | --- |
-| C-TRANSPORT | implemented-client | Codable1.0 models, producer-schema validation, bounded supervised stdin/stdout JSONL, correlated results, deadlines, EOF/nonzero handling and owned-process cleanup | 118 Mac management checks plus seven actual read-only engine checks; no gameplay implication |
+| C-TRANSPORT | implemented-client | Codable1.0 models, producer-schema validation, bounded supervised stdin/stdout JSONL, correlated results, deadlines, EOF/nonzero handling and owned-process cleanup | 130 Mac management checks plus ten actual bounded engine checks; no gameplay implication |
 | C-ACCOUNT | implemented-client | Native status/sign-in/poll/cancel/logout UI, no tokens/redirects in Swift, commit/cancel-race messaging, explicit user action and capability checks | Published auth/schema pin passes; actual status reports AUTH_INVALID; provider-consent integration remains open |
-| C-CATALOG | implemented-client | Partial observed-public-products search, scoped cursor/cache revision, edition detail, no invented ownership/art | Public corpus only; full discovery and genuine owned-PC inventory remain blocked |
+| C-CATALOG | implemented-client | Real bounded public PC Game Pass discovery, observed-products title search, strict provenance/cursor/locale/failure shapes and edition detail | Actual two-page/title-search probe; full Store search and genuine owned-PC inventory remain active gaps |
 | C-ACTIVITY | implemented-client | Real catalog-check enqueue/cancel/retry, fenced snapshot/revision/sequence reconciliation and terminal protection | Actual read-only snapshot verified; game installation/recovery remains separate |
 | C-INSTALLED | implemented-client | Typed actual managed-registry snapshot, recorded health, scoped Library and independent detail facet | Actual registry read verified; user-selected inspection/import and current filesystem checks remain ongoing |
 | C-BUNDLE | implemented-client | Release `.app`, required resources, original icon generator, local ad-hoc signing/plist verification | Mac bundle/resource/self-check/own-view evidence; no notarization/runtime certification/public distribution |
 
-Current client milestone: **14 core + 118 management + 24 presentation = 156 checks**, zero failures, plus seven actual engine read-only checks. Fixture arrays/jobs remain in a separate explicit `--fixture` mode. Any new provider pin or binary needs its own interoperability evidence before a row becomes `implemented-live`. The user requires the full real journey and coordinator-owned adversarial review/findings closure before final completion.
+Current discovery milestone: **14 core + 130 management + 24 presentation = 168 checks**, zero failures, plus ten actual bounded engine checks. Default LaunchServices entry starts the included engine with no mode/backend/env setup; normal own-window UI evidence remains separate. Fixture arrays/jobs remain in explicit `--fixture` mode. Any new provider pin or binary needs its own interoperability evidence before a row becomes `implemented-live`. The user requires the full real journey and coordinator-owned adversarial review/findings closure before final completion.
 
 ## Foundation delivered
 
@@ -55,7 +55,7 @@ Dependencies are prerequisites, not a promise of execution order or access. D-ID
 
 ## Commands and evidence policy
 
-**Actual native command:** `sh tools/check.sh` builds and runs core, management and presentation dependency-free checks on the isolated Mac. Foundation ran 29; the current client milestone runs 156. `swift test` did not pass because XCTest/Testing are absent in that CLT; no fake test-framework shim is provided. Hosted workflow results must be read separately.
+**Actual native command:** `sh tools/check.sh` builds and runs core, management and presentation dependency-free checks on the isolated Mac. Foundation ran 29; the current discovery milestone runs 168. `swift test` did not pass because XCTest/Testing are absent in that CLT; no fake test-framework shim is provided. Hosted workflow results must be read separately.
 
 **Actual design commands:** `python3 tools/generate_mockups.py`; `swift tools/render_mockups.swift`; original art reproduction/export commands in design/README. Optional `swift run XodusPreview --export-preview <explicit-directory>` renders only this app's own views and exits; no desktop capture.
 

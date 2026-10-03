@@ -19,12 +19,15 @@ final class LiveSession: ObservableObject {
     @Published private(set) var installedRefreshing = false
     @Published private(set) var installedError: String?
     @Published private(set) var nextCursor: String?
+    @Published private(set) var catalogCorpus = "observedPublicProducts"
+    @Published private(set) var discoveryFailures: [DiscoveryFailure] = []
+    @Published private(set) var discoveryCheckedAt: String?
     @Published var selectedProduct: CatalogProduct?
     @Published var errorMessage: String?
     @Published var catalogError: String?
     @Published var backendPath: String
-    @Published var market = "US"
-    @Published var language = "en-US"
+    @Published var market = "US" { didSet { if market != oldValue { invalidateCatalogScope() } } }
+    @Published var language = "en-US" { didSet { if language != oldValue { invalidateCatalogScope() } } }
     @Published var lookupID = ""
     @Published var diagnosticPreview: String?
     private var client: ManagementClient?
@@ -32,17 +35,26 @@ final class LiveSession: ObservableObject {
     private var authTask: Task<Void, Never>?
     private var generation = 0
     private var queryGeneration = 0
+    private var authenticationGeneration = 0
     private var currentQuery = ""
     private var cacheRevision: UInt64?
+    private var discoveryRevision: String?
 
     init() {
         let embedded = Bundle.main.resourceURL?.appendingPathComponent("XodusEngine/xodus-cli")
         let bundledPath = embedded.flatMap {
             FileManager.default.isExecutableFile(atPath: $0.path) ? $0.path : nil
         }
-        backendPath = ProcessInfo.processInfo.environment["XODUS_BACKEND_PATH"]
-            ?? bundledPath
-            ?? UserDefaults.standard.string(forKey: "Xodus.developerBackendPath") ?? ""
+        if let override = ProcessInfo.processInfo.environment["XODUS_BACKEND_PATH"], !override.isEmpty {
+            backendPath = override
+        } else if Bundle.main.bundleURL.pathExtension == "app" {
+            backendPath = bundledPath ?? ""
+            if bundledPath == nil {
+                errorMessage = "This app's included Xodus engine is missing or not executable. Rebuild or reinstall the matching development app; Advanced Settings can explicitly select a trusted development engine."
+            }
+        } else {
+            backendPath = bundledPath ?? UserDefaults.standard.string(forKey: "Xodus.developerBackendPath") ?? ""
+        }
     }
 
     var isReady: Bool { phase == .ready }
@@ -110,7 +122,9 @@ final class LiveSession: ObservableObject {
                         if self.activity.needsSnapshot && !self.activity.isReconciling {
                             try await self.reconcileActivity()
                         }
-                        if event.data.state == .completed { await self.search(self.currentQuery) }
+                        if event.data.state == .completed, self.catalogCorpus != "pcGamePassDiscovery" {
+                            await self.search(self.currentQuery)
+                        }
                     }
                 } catch {
                     guard let self, token == self.generation else { return }
@@ -128,6 +142,7 @@ final class LiveSession: ObservableObject {
 
     func disconnect() async {
         generation += 1
+        authenticationGeneration += 1
         queryGeneration += 1
         eventTask?.cancel()
         authTask?.cancel()
@@ -145,6 +160,10 @@ final class LiveSession: ObservableObject {
         activity = ActivityStore()
         nextCursor = nil
         cacheRevision = nil
+        catalogCorpus = "observedPublicProducts"
+        discoveryFailures = []
+        discoveryCheckedAt = nil
+        discoveryRevision = nil
         diagnosticPreview = nil
         phase = .disconnected
         searching = false
@@ -162,12 +181,14 @@ final class LiveSession: ObservableObject {
     func refreshAccount() async {
         guard isReady, supports(.authStatus), let client else { return }
         let token = generation
+        authenticationGeneration += 1
+        let authToken = authenticationGeneration
         do {
             let status = try await client.request(.authStatus).decode(AuthenticationStatus.self)
-            guard token == generation else { return }
+            guard token == generation, authToken == authenticationGeneration else { return }
             authentication = status
         } catch {
-            guard token == generation else { return }
+            guard token == generation, authToken == authenticationGeneration else { return }
             errorMessage = Self.describe(error)
         }
     }
@@ -200,6 +221,7 @@ final class LiveSession: ObservableObject {
 
     func beginSignIn() async {
         guard canSignIn, let client else { return }
+        authenticationGeneration += 1
         accountBusy = true
         errorMessage = nil
         let token = generation
@@ -221,7 +243,7 @@ final class LiveSession: ObservableObject {
     private func pollSignIn(flowID: String, generation token: Int) {
         authTask?.cancel()
         authTask = Task { [weak self] in
-            let deadline = Date().addingTimeInterval(600)
+            let deadline = ContinuousClock.now.advanced(by: .seconds(600))
             do {
                 while !Task.isCancelled {
                     try await Task.sleep(for: .seconds(1))
@@ -232,7 +254,7 @@ final class LiveSession: ObservableObject {
                     guard status.flow?.flowID == flowID else { throw ManagementError.invalidPayload }
                     self.authentication = status
                     if status.flow?.state != .pending { return }
-                    if Date() >= deadline {
+                    if ContinuousClock.now >= deadline {
                         await self.cancelSignIn()
                         self.errorMessage = "Sign-in timed out. Start again when you are ready."
                         return
@@ -250,6 +272,7 @@ final class LiveSession: ObservableObject {
     func cancelSignIn() async {
         guard let flow = authentication?.flow, flow.state == .pending, let client,
               supports(.authCancel), !accountBusy else { return }
+        authenticationGeneration += 1
         accountBusy = true
         authTask?.cancel()
         let token = generation
@@ -273,6 +296,7 @@ final class LiveSession: ObservableObject {
 
     func signOut() async {
         guard let client, isReady, supports(.authLogout), !accountBusy else { return }
+        authenticationGeneration += 1
         accountBusy = true
         authTask?.cancel()
         authentication = nil
@@ -303,6 +327,14 @@ final class LiveSession: ObservableObject {
             if token == generation, searchToken == queryGeneration { searching = false }
         }
         currentQuery = query
+        if !more {
+            products = []
+            nextCursor = nil
+            catalogCorpus = "observedPublicProducts"
+            discoveryFailures = []
+            discoveryCheckedAt = nil
+            discoveryRevision = nil
+        }
         searching = true
         catalogError = nil
         do {
@@ -312,29 +344,107 @@ final class LiveSession: ObservableObject {
                 "platform": .string("pc"), "limit": .integer(100), "cursor": cursor
             ]).decode(CatalogSearch.self)
             guard token == generation, searchToken == queryGeneration, !Task.isCancelled else { return }
-            guard result.products.allSatisfy({ product in
-                product.market == market && product.language.caseInsensitiveCompare(language) == .orderedSame
-                    && product.pcCatalogCandidate && product.source != "fixture"
-                    && Set(product.editions.map(\.id)).count == product.editions.count
-                    && product.editions.allSatisfy {
-                        $0.productID == product.id && $0.entitlement.kind == .unknown
-                    }
-            }) else {
+            guard Set(result.products.map(\.id)).count == result.products.count else {
                 throw ManagementError.invalidPayload
             }
+            for product in result.products { try product.validatePublicScope(market: market, language: language) }
             if more {
                 guard result.cacheRevision == cacheRevision,
-                      Set(products.map(\.id)).isDisjoint(with: Set(result.products.map(\.id))) else {
+                      Set(products.map(\.id)).isDisjoint(with: Set(result.products.map(\.id))),
+                      products.count + result.products.count <= 512 else {
                     throw ManagementError.backendError("REVISION_CONFLICT", retryable: true)
                 }
                 products += result.products
             } else { products = result.products }
             cacheRevision = result.cacheRevision
             nextCursor = result.nextCursor
+            catalogCorpus = result.corpus
+            discoveryFailures = []
+            discoveryCheckedAt = nil
+            discoveryRevision = nil
         } catch {
             guard token == generation, searchToken == queryGeneration else { return }
             catalogError = Self.describe(error)
         }
+    }
+
+    func refreshCatalog(_ query: String, more: Bool = false) async {
+        if query.isEmpty, supports(.discover) {
+            await browseDiscovery(more: more)
+        } else { await search(query, more: more) }
+    }
+
+    private func browseDiscovery(more: Bool) async {
+        guard isReady, supports(.discover), let client else { return }
+        guard validScope else { catalogError = "Use a two-letter market and a language such as en-US."; return }
+        if more && searching { return }
+        if more && (catalogCorpus != "pcGamePassDiscovery" || nextCursor == nil) { return }
+        queryGeneration += 1
+        let queryToken = queryGeneration, token = generation
+        let cursor = more ? nextCursor : nil
+        if !more {
+            products = []
+            nextCursor = nil
+            discoveryFailures = []
+            discoveryCheckedAt = nil
+            discoveryRevision = nil
+            catalogCorpus = "pcGamePassDiscovery"
+        }
+        currentQuery = ""
+        searching = true
+        catalogError = nil
+        defer { if token == generation, queryToken == queryGeneration { searching = false } }
+        do {
+            let page = try await client.request(.discover, params: [
+                "market": .string(market), "language": .string(language), "limit": .integer(8),
+                "cursor": cursor.map(JSONValue.string) ?? .null
+            ], timeout: .seconds(45)).decode(CatalogDiscovery.self)
+            guard token == generation, queryToken == queryGeneration, !Task.isCancelled else { return }
+            try applyDiscoveryPage(page, more: more, cursor: cursor)
+        } catch {
+            guard token == generation, queryToken == queryGeneration else { return }
+            if case let ManagementError.discoveryFailed(page) = error {
+                do { try applyDiscoveryPage(page, more: more, cursor: cursor) }
+                catch { catalogError = Self.describe(error); return }
+            }
+            catalogError = Self.describe(error)
+        }
+    }
+
+    private func applyDiscoveryPage(_ page: CatalogDiscovery, more: Bool, cursor: String?) throws {
+        try page.validatePublicScope(market: market, language: language, limit: 8)
+        let existingIDs = Set(products.map(\.id) + discoveryFailures.map(\.id))
+        let incomingIDs = Set(page.products.map(\.id) + page.failures.map(\.id))
+        if more {
+            guard page.corpusRevision == discoveryRevision, existingIDs.isDisjoint(with: incomingIDs),
+                  existingIDs.count + incomingIDs.count <= 512, page.nextCursor != cursor else {
+                throw ManagementError.backendError("REVISION_CONFLICT", retryable: true)
+            }
+            products += page.products
+            discoveryFailures += page.failures
+        } else {
+            products = page.products
+            discoveryFailures = page.failures
+        }
+        nextCursor = page.nextCursor
+        discoveryRevision = page.corpusRevision
+        discoveryCheckedAt = page.checkedAt
+        catalogCorpus = page.corpus
+        cacheRevision = nil
+    }
+
+    private func invalidateCatalogScope() {
+        queryGeneration += 1
+        products = []
+        selectedProduct = nil
+        nextCursor = nil
+        cacheRevision = nil
+        discoveryRevision = nil
+        discoveryFailures = []
+        discoveryCheckedAt = nil
+        catalogCorpus = "observedPublicProducts"
+        catalogError = nil
+        searching = false
     }
 
     func lookupProduct() async {

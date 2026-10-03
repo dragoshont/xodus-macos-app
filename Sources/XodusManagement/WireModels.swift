@@ -6,6 +6,7 @@ public enum ManagementCommand: String, CaseIterable, Codable, Sendable {
     case hello, authStatus = "auth.status", authBegin = "auth.begin", authCancel = "auth.cancel"
     case authLogout = "auth.logout", inventory = "inventory.snapshot", search = "catalog.search"
     case product = "product.detail", plan = "install.plan", enqueue = "jobs.enqueue"
+    case discover = "catalog.discover"
     case pause = "jobs.pause", resume = "jobs.resume", cancel = "jobs.cancel", retry = "jobs.retry"
     case jobs = "jobs.snapshot", replay = "events.replay", installed = "installed.snapshot"
     case launch = "game.launch", update = "game.update", rollback = "game.rollback", remove = "game.remove"
@@ -16,6 +17,7 @@ public enum ManagementCommand: String, CaseIterable, Codable, Sendable {
         case .hello: "helloData"
         case .authStatus, .authLogout, .authBegin, .authCancel: "authData"
         case .search: "searchData"
+        case .discover: "discoveryData"
         case .product: "productData"
         case .enqueue, .cancel, .retry: "jobData"
         case .jobs: "jobsData"
@@ -123,7 +125,23 @@ public struct CatalogProduct: Codable, Equatable, Sendable, Identifiable {
     public let freshness: String
     public let editions: [ProductEvidence]
     public let pcCatalogCandidate: Bool
+    public let resolvedLanguage: String?
     public var id: String { productID }
+
+    public func validatePublicScope(market: String, language: String) throws {
+        guard self.market == market, self.language.caseInsensitiveCompare(language) == .orderedSame,
+              pcCatalogCandidate, source != "fixture",
+              Set(editions.map(\.id)).count == editions.count,
+              editions.allSatisfy({ $0.productID == id && $0.entitlement.kind == .unknown }) else {
+            throw ManagementError.invalidPayload
+        }
+        if let resolvedLanguage {
+            let actual = resolvedLanguage.lowercased(), requested = language.lowercased()
+            guard actual == requested || (!actual.contains("-") && requested.hasPrefix(actual + "-")) else {
+                throw ManagementError.invalidPayload
+            }
+        }
+    }
 }
 public struct CatalogSearch: Codable, Equatable, Sendable {
     public let products: [CatalogProduct]
@@ -134,6 +152,39 @@ public struct CatalogSearch: Codable, Equatable, Sendable {
 }
 public struct ProductResult: Codable, Sendable {
     public let product: CatalogProduct
+}
+
+public struct DiscoveryFailure: Codable, Equatable, Sendable, Identifiable {
+    public let productID: String
+    public let error: WireFailure
+    public var id: String { productID }
+}
+
+public struct CatalogDiscovery: Codable, Equatable, Sendable {
+    public let corpus: String
+    public let completeness: String
+    public let source: String
+    public let checkedAt: String
+    public let freshness: String
+    public let corpusRevision: String
+    public let products: [CatalogProduct]
+    public let failures: [DiscoveryFailure]
+    public let nextCursor: String?
+
+    public func validatePublicScope(market: String, language: String, limit: Int) throws {
+        let ids = products.map(\.id) + failures.map(\.id)
+        guard corpus == "pcGamePassDiscovery", completeness == "partial",
+              source == "MicrosoftGamePassSigls:v3", freshness == "live",
+              !ids.isEmpty, ids.count <= limit, Set(ids).count == ids.count else {
+            throw ManagementError.invalidPayload
+        }
+        if let nextCursor {
+            let prefix = "d1-\(corpusRevision)-"
+            guard nextCursor.hasPrefix(prefix), let offset = UInt64(nextCursor.dropFirst(prefix.count)),
+                  offset > 0 else { throw ManagementError.invalidPayload }
+        }
+        for product in products { try product.validatePublicScope(market: market, language: language) }
+    }
 }
 
 public struct JobProduct: Codable, Equatable, Sendable {

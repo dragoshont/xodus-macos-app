@@ -2,7 +2,7 @@
 
 A native Mac launcher in development for legitimately entitled Xbox PC games, integrating with the Xodus management engine.
 
-**Current status: native development app, not a complete game launcher.** The default SwiftUI/AppKit app has a real, bounded management-process client and native account, partial public catalog, edition-detail and activity screens. Configure a trusted matching development engine; its negotiated capabilities determine which actions work. Authoritative owned-PC inventory, authorized game installation and certified gameplay remain unavailable. A saved Xbox Live sign-in is **not** proof of PC ownership or package access.
+**Current status: native development app, not a complete game launcher.** The default SwiftUI/AppKit app has a real bounded management client, native account, source-backed partial PC Game Pass discovery, checked-catalog title search, edition detail, activity and scoped installed-registry status. A packaged development build includes its matching engine and connects normally without Terminal setup; negotiated capabilities determine which actions work. Full Store search, authoritative owned-PC inventory, authorized game installation and certified gameplay remain active implementation gaps. A saved Xbox Live sign-in is **not** proof of Microsoft Store PC ownership or package access.
 
 The original offline demonstration is now an explicit `--fixture` mode. Its titles, access, compatibility and progress are invented and never populate the live app. See [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
@@ -35,7 +35,7 @@ swift run XodusFixtureChecks
 swift run XodusPreview
 ```
 
-The historical SwiftPM executable name remains `XodusPreview`; its default is now the live development shell, **not simulated gameplay**. Select a trusted engine with the native file picker in Settings, or provide `XODUS_BACKEND_PATH` for development. There is no interactive-CLI scraping, arbitrary Wine picker or credential handling in the Swift app.
+The historical SwiftPM executable name remains `XodusPreview`; its default is now the live development shell, **not simulated gameplay**. Source-only development can select a trusted engine in Advanced Settings or explicitly use `XODUS_BACKEND_PATH`. A packaged build uses its included engine automatically; a missing/nonexecutable included engine shows an actionable error rather than silently using a saved external build or convincing fixtures. There is no interactive-CLI scraping, arbitrary Wine picker or credential handling in the Swift app.
 
 Build a double-clickable local `.app` with original icon and resource bundles:
 

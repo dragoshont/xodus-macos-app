@@ -76,9 +76,10 @@ public enum JSONValue: Codable, Equatable, Sendable {
 
 public enum ManagementError: Error, Equatable, Sendable, LocalizedError {
     case invalidFrame, invalidPayload, invalidRequest, frameTooLarge, truncatedFrame, unsupportedSchema
-    case backendUnavailable, startFailed, alreadyConnected, disconnected, outputOverflow
+    case backendUnavailable, startFailed, alreadyConnected, disconnected, outputOverflow, credentialStoreUnavailable
     case requestTimedOut, unexpectedResult, writeFailed, capabilityMissing(String)
     case backendStopped(Int32), backendError(String, retryable: Bool), invalidEvent
+    case discoveryFailed(CatalogDiscovery)
 
     public var errorDescription: String? {
         switch self {
@@ -91,6 +92,8 @@ public enum ManagementError: Error, Equatable, Sendable, LocalizedError {
         case .truncatedFrame: "The engine ended a response before it was complete. Reconnect to recover."
         case .unsupportedSchema: "The bundled management contract is unavailable or incompatible."
         case .backendUnavailable: "Choose an executable Xodus management build in Settings."
+        case .credentialStoreUnavailable:
+            "Xodus cannot access your Mac's Keychain. Review its native permission prompt or unlock the Keychain, then check status again. Your saved credentials were not replaced."
         case .startFailed: "The Xodus engine could not start. Check the selected build and state directory."
         case .alreadyConnected: "An engine is already connected."
         case .disconnected: "The Xodus connection ended. Reconnect before taking another action."
@@ -100,6 +103,7 @@ public enum ManagementError: Error, Equatable, Sendable, LocalizedError {
         case .capabilityMissing(let command): "This engine does not provide \(command)."
         case .backendStopped(let status): "The Xodus engine stopped (exit \(status)). Reconnect to recover."
         case .backendError(let code, _): "Xodus reported \(code). No success was assumed."
+        case .discoveryFailed: "The attempted public products could not be checked. Their failures are listed; no empty owned library or successful discovery was assumed."
         case .invalidEvent: "The activity stream is inconsistent. Reload the authoritative snapshot."
         }
     }

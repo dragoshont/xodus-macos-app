@@ -14,7 +14,16 @@ Closing the client first closes stdin for owned-child cleanup, waits for the eng
 
 Sign-out clears account-bound UI evidence before the operation and is shown as signed out only after the backend confirms removal. Engine/Keychain errors remain errors. A transport failure invalidates credentials/evidence in the UI rather than silently falling back to invented games.
 
-Catalog data is **observedPublicProducts**, with partial coverage, not full Microsoft discovery or an owned library. Request market/language, page cursor and cache revision stay bound together. Duplicate identities and contradictory product/edition scope are rejected. This public catalog cannot promote entitlement from unknown. Catalog checks are not game downloads; the activity UI names their actual operation.
+Discover now requests one bounded public **pcGamePassDiscovery** page at a time from the official Microsoft PC Game Pass feed. Request market/language, cursor and corpus revision remain bound together. Successful public products seed **observedPublicProducts** checked-catalog title search; that search is not full Microsoft Store search or an owned library. Duplicate identities and contradictory product/edition scope are rejected. This public catalog cannot promote entitlement from unknown. Catalog checks are not game downloads; the activity UI names their actual operation.
+
+Each attempted page item is either a product or a visible lookup failure. An
+all-failure response remains an error: only command-correlated
+`failedDiscoveryData` is retained, validated separately from successful discovery
+whose products cannot be empty. No arbitrary error payload or raw upstream message
+is displayed. The native request allows 45 seconds around the producer's
+30-second whole-page budget; there is no full-feed crawl. Requested locale remains
+the cache scope; exact language is preferred, or an explicit same-base neutral
+`resolvedLanguage` is shown. Unrelated/regional fallback is rejected.
 
 Activity snapshots fence a bounded set of incoming events until the authoritative
 watermark is applied, then replay newer buffered events in order. A gap triggers
@@ -32,17 +41,17 @@ backend contract, not permission for a blanket private-folder scan.
 
 ## Producer pin
 
-The native authentication implementation pin is `dragoshont/xodus-macos`, branch `dragoshont-xodus-launcher-management`, commit `b9cd60bf51cd4cb8e864318cd0c4316453b4b8df`.
+The current schema pin is `dragoshont/xodus-macos`, branch `dragoshont-xodus-launcher-management`, commit `790f5c40e69570324e7674638d487469a8aa8c8c`. It adds strict failed-page validation to the discovery implementation at `8718dcb3f1a5a573c685d95dc78c8d41e8e0bbed`; the preserved discovery executable is unchanged by the schema-only follow-up.
 
 Canonical committed schema SHA256:
 
-`b27dab79d05f985eb39ffbd638cab0dbd69e831fd37d29ace414f517229ba7f2`
+`2ede71d5171cf4dc1659fedfc99187a90d904d9264119a22ee9f94064baef3d2`
 
-Committed LF bytes were independently verified after downloading the immutable producer pin. Git blob: `bfb4aa02e2ccb0fa3b1a3b47972b3655ac9861f6`.
+Committed LF bytes and all four sanitized fixture hashes were independently verified from immutable public Git objects. A transient GitHub network outage was handled with that exact public-only fallback, not mutable backend source or private data.
 
 `docs/contracts/management-v1.schema.json` is the producer's canonical scoped schema. `tools/sync_contract.py` copies its exact bytes to the Swift resource. `Tests/ManagementChecks/Fixtures` contains its sanitized public positive/negative/evidence fixtures. No private backend source or real account payload was imported. `foundation-v1.schema.json` preserves the original proposal.
 
-The native auth-flow extension and its sanitized corpus are now pinned. The preserved unsigned developer engine input has SHA256 `3fd646ac3eb7bdd2acdbcc3ed3755d2f4e2722ea1a7b4798eae72acb7ac41fd7`. Local ad-hoc signing during embedding changes the executable bytes; the packaged copy has SHA256 `39df33fbac4334df12de39fb2e345a1ac64eb9e4330bb7a1f78de59b6fc26976`. **Provider consent remains separate from read-only/schema/build verification.** No successful account login is claimed merely because the native UI compiles.
+The preserved unsigned discovery engine input has SHA256 `14dd06466a201ddb77fe7c2d6f9a57bbbb79788f03413989e5158d9053c864ad`. Local ad-hoc signing during embedding changes the executable bytes; this packaged copy has SHA256 `62cb9564478d2a2bcee472b6f7d6865f5f3007a0314e30c7a06537523820f175`. **Provider consent remains separate from read-only/schema/build verification.** No successful account login is claimed merely because the native UI compiles.
 
 ## Developer application
 
@@ -58,12 +67,19 @@ The `.app` includes a release executable, required SwiftPM resources, original n
 
 Settings provides a native engine picker, account controls, explicit catalog market/language, advanced public-product lookup and a bounded redacted diagnostic preview. Backend discovery in a developer bundle does not establish signed runtime certification.
 
+Default LaunchServices startup was exercised with `open Xodus.app`, no mode,
+backend flag or environment override. The app started its own included engine as
+its child; first-run/account UI confirmation is tracked separately from that
+process evidence. Missing included engines do not silently select a remembered
+developer binary. User-mediated store authentication will use a backend-isolated
+launcher Keychain profile, not implicit CLI/private-worker credential import.
+
 `--fixture` opens the separate, labelled original design preview. Switching to it disconnects live work first. Fixture data never populates the live app. `--export-live <directory>` deliberately suppresses backend connection and renders only a disconnected shell, so its images cannot expose account/library content.
 
 ## Evidence and still-open gates
 
-At this client milestone, `sh tools/check.sh` passed on the Mac: **14 core + 118 management + 24 presentation = 156 checks**, zero failures. The management set includes all 68 positive, ten negative and four evidence-edge producer frames, typed auth/registry results, real mock subprocesses and temporal activity/snapshot-fencing tests. Release `.app` build, resource loading, ad-hoc verification, plist lint and disconnected own-view exports also passed.
+At this discovery milestone, `sh tools/check.sh` passed on the Mac: **14 core + 130 management + 24 presentation = 168 checks**, zero failures. The management set includes all 71 positive, eleven negative and four evidence-edge producer frames, typed auth/registry/discovery results, exact all-failure/error separation, locale checks, real mock subprocesses and temporal activity/snapshot-fencing tests. Release `.app` build, resource loading, ad-hoc verification and plist lint passed; earlier disconnected own-view visual confirmation remains recorded separately.
 
-Seven actual engine read-only checks also passed against both the preserved input and its locally signed embedded copy: hello, explicit capability gates, invalid saved-credential failure, partial observed catalog, durable activity, management-only registry and redacted diagnostic preview. **Actual `auth.status` returned AUTH_INVALID**, not a valid account; it was reported for backend status/error repair. No Microsoft login, logout or Keychain approval was attempted.
+Ten actual engine checks passed: the seven read-only management surfaces plus two bounded public discovery pages with stable/distinct IDs and actual checked-title search. The refined engine identifies the observed AUTH_INVALID category as **credentialStoreUnavailable**, not malformed credentials. The UI shows locally generated permission/availability guidance; no credentials are replaced. No Microsoft login, logout or Keychain approval was attempted.
 
 Native provider-consent/cancellation integration, source-backed discovery/search and explicit installed import are ongoing, not waived. Full owned-PC inventory/audience, legacy package authorization, safe staged installation/hash/expanded-size semantics, signed exact gameplay runtime, save-preserving updates/rollback, full VoiceOver/localization/min-OS and distribution remain open. No install or play action is enabled merely because Xbox Live sign-in succeeds. The user-directed full journey and coordinator-owned adversarial review remain completion prerequisites; this persisted client milestone is not final completion.

@@ -20,6 +20,11 @@ struct LiveProductView: View {
                         Text("Public catalog - not ownership evidence").foregroundStyle(.secondary)
                         Text("\(product.market) / \(product.language) - \(product.freshness) metadata")
                             .font(.caption).foregroundStyle(.secondary)
+                        if let resolved = product.resolvedLanguage,
+                           resolved.caseInsensitiveCompare(product.language) != .orderedSame {
+                            Text("Source metadata language: \(resolved). Requested scope: \(product.language).")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                     Spacer()
                 }
