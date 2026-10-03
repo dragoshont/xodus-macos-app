@@ -8,6 +8,12 @@ struct LiveRootView: View {
     @Environment(\.openSettings) private var openSettings
     @FocusState private var searchFocused: Bool
 
+    private var scopedQuery: String { state.query.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var canRefreshCatalog: Bool {
+        session.isReady && (session.supports(.search)
+            || (scopedQuery.isEmpty ? session.supports(.discover) : session.supports(.query)))
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
             Color(nsColor: .windowBackgroundColor)
@@ -78,7 +84,10 @@ struct LiveRootView: View {
                     .font(.system(size: 42, weight: .bold)).fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: 760, alignment: .leading)
                 Text(state.destination == .library ? "Start with your account. Keep access and compatibility clear."
-                     : state.destination == .discover ? "Browse public PC Game Pass titles. Keep access and compatibility clear."
+                     : state.destination == .discover ? (scopedQuery.isEmpty
+                         ? "Browse public PC Game Pass titles. Keep access and compatibility clear."
+                         : session.supports(.query) ? "Search Microsoft Store games. Keep access and compatibility clear."
+                         : "Search checked public products. Keep access and compatibility clear.")
                      : session.isReady ? "Catalog checks are live. Game downloads are not enabled in this build."
                      : "Connect Xodus to recover catalog checks. Game downloads are not enabled in this build.")
                     .font(.title3).fixedSize(horizontal: false, vertical: true)
@@ -91,7 +100,8 @@ struct LiveRootView: View {
                         Image(systemName: "magnifyingglass").accessibilityHidden(true)
                         NativeSearchField(text: $state.query,
                             focused: Binding(get: { searchFocused }, set: { searchFocused = $0 }),
-                            placeholder: state.destination == .library ? "Search your Library" : "Search checked catalog",
+                            placeholder: state.destination == .library ? "Search your Library"
+                                : session.supports(.query) ? "Search Microsoft Store games" : "Search checked catalog",
                             enabled: state.destination == .discover || session.installedSnapshot?.installations.isEmpty == false)
                         if !state.query.isEmpty {
                             Button { state.query = "" } label: { Image(systemName: "xmark.circle.fill") }
@@ -138,7 +148,7 @@ struct LiveRootView: View {
                 } else {
                     Button("Open account") { state.showingAccount = true }
                     Button("Browse checked catalog") { state.navigate(.discover) }
-                        .disabled(!session.supports(.search) && !session.supports(.discover))
+                        .disabled(!session.supports(.search) && !session.supports(.discover) && !session.supports(.query))
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 220)
@@ -204,9 +214,9 @@ struct LiveRootView: View {
             return "Choose a trusted development engine once in Settings. Xodus keeps sign-in in your Mac's Keychain."
         }
         if session.authentication?.state != .credentialPresent {
-            return "Use the account control to check or connect Xbox sign-in. This build cannot yet prove a complete owned-PC library."
+            return "Use the account control to check or connect Microsoft sign-in. This build cannot yet prove a complete owned-PC library."
         }
-        return "Your Xbox sign-in is saved, but this engine has not established authoritative PC ownership. No catalog result or play history is shown as an owned game."
+        return "Your Microsoft sign-in is saved, but this engine has not established authoritative PC ownership. No catalog result or play history is shown as an owned game."
     }
 
     private func readiness(_ title: String, _ detail: String, symbol: String) -> some View {
@@ -225,19 +235,33 @@ struct LiveRootView: View {
     private var catalog: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
-                Text(state.query.isEmpty && session.supports(.discover) ? "PC Game Pass discovery"
-                     : state.query.isEmpty ? "Checked PC catalog" : "Checked catalog search results").font(.title2.bold())
+                Text(scopedQuery.isEmpty && session.supports(.discover) ? "PC Game Pass discovery"
+                     : scopedQuery.isEmpty ? "Checked PC catalog"
+                     : session.supports(.query) ? "Microsoft Store search results" : "Checked catalog search results")
+                    .font(.title2.bold())
                 Spacer()
-                if session.searching { ProgressView().controlSize(.small) }
+                if session.searching {
+                    ProgressView().controlSize(.small)
+                    Button("Stop search") { session.stopCatalogSearch() }
+                }
                 Button("Refresh") { Task { await session.refreshCatalog(state.query) } }
-                    .disabled(session.searching || (state.query.isEmpty && session.supports(.discover)
-                              ? false : !session.supports(.search)))
+                    .disabled(session.searching || !canRefreshCatalog)
             }
             Text("Partial coverage, \(session.market) / \(session.language). These public products are not your owned library.")
                 .font(.callout).foregroundStyle(.secondary)
             if session.catalogCorpus == "pcGamePassDiscovery", let checked = session.discoveryCheckedAt {
-                Text("Microsoft PC Game Pass public feed - checked \(checked). Search matches products already checked, not the entire Microsoft Store.")
+                Text("Microsoft PC Game Pass public feed - checked \(checked). Public catalog, not ownership proof.")
                     .font(.caption).foregroundStyle(.secondary)
+            } else if session.catalogCorpus == "publicMicrosoftStoreSearch", let checked = session.discoveryCheckedAt {
+                Text("Microsoft Store public search - checked \(checked). PC candidates are independently checked against public product metadata; coverage remains partial.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if !scopedQuery.isEmpty && !session.supports(.query) {
+                Text("This engine searches only products already checked, not the whole Microsoft Store. Update the paired engine for network search.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if session.catalogStopped {
+                Label("Search stopped. Refresh when you are ready; no later result from that request will be shown.",
+                      systemImage: "pause.circle").foregroundStyle(.secondary)
             }
             if let error = session.catalogError {
                 Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.secondary)
@@ -249,14 +273,18 @@ struct LiveRootView: View {
             }
             if session.products.isEmpty {
                 ContentUnavailableView {
-                    Label(session.searching ? "Checking the catalog" : "No checked products to show",
+                    Label(session.searching ? "Checking the catalog" : session.catalogStopped ? "Search stopped"
+                          : session.catalogCorpus == "publicMicrosoftStoreSearch" && session.catalogError == nil
+                            && session.discoveryFailures.isEmpty ? "No Store matches" : "No checked products to show",
                           systemImage: "magnifyingglass")
                 } description: {
                     Text(!session.isReady ? "Connect Xodus in Settings to load its public product cache."
-                         : !session.supports(.search) ? "This engine does not provide catalog search. Update the paired Xodus build."
+                         : !canRefreshCatalog ? "This engine does not provide this catalog operation. Update the paired Xodus build."
+                         : session.catalogStopped ? "Run a new search or refresh this scope when you are ready."
                          : session.catalogError != nil ? "The public catalog could not be verified. Refresh to try again; no empty owned library is inferred."
-                         : state.query.isEmpty && session.supports(.discover) ? "Open Discover to check one public PC Game Pass page. It does not establish ownership or installation access."
-                         : state.query.isEmpty ? "This engine lists only products it has checked. Public discovery requires a matching engine update."
+                         : scopedQuery.isEmpty && session.supports(.discover) ? "Open Discover to check one public PC Game Pass page. It does not establish ownership or installation access."
+                         : scopedQuery.isEmpty ? "This engine lists only products it has checked. Public discovery requires a matching engine update."
+                         : session.catalogCorpus == "publicMicrosoftStoreSearch" ? "The public Store returned no matching games in this scope. This does not establish availability in other regions or your ownership."
                          : "No matching product in this partial catalog. This does not mean the game is unavailable or unowned.")
                 } actions: {
                     Button("Open Settings", action: openSettings.callAsFunction)
@@ -289,12 +317,14 @@ struct LiveRootView: View {
                         .accessibilityLabel("\(product.title), public catalog. Access unverified. View editions.")
                     }
                 }
-                if session.nextCursor != nil {
-                    Button(session.catalogCorpus == "pcGamePassDiscovery" ? "Browse more PC titles" : "Load more checked products") {
-                        Task { await session.refreshCatalog(state.query, more: true) }
-                    }
-                        .disabled(session.searching)
+            }
+            if session.nextCursor != nil {
+                Button(session.catalogCorpus == "pcGamePassDiscovery" ? "Browse more PC titles"
+                       : session.catalogCorpus == "publicMicrosoftStoreSearch" ? "Search more Store games"
+                       : "Load more checked products") {
+                    Task { await session.refreshCatalog(state.query, more: true) }
                 }
+                    .disabled(!session.canLoadMoreCatalog)
             }
         }
     }

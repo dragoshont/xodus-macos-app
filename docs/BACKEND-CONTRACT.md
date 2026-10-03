@@ -24,13 +24,15 @@ This example is synthetic, not runtime certification. Capability entries are typ
 
 ## Commands and ownership
 
-The exact implemented parameter/result shapes are in the canonical schema, not inferred from this forward-looking table. The scoped producer supports public-product metadata/search, catalog-refresh jobs, management-only registry snapshots and redacted diagnostics; sign-in uses separately agreed backend-owned native flow metadata. `auth.logout` takes `{}` and confirms `signedOut` only after successful credential/cache removal. No successful game-install/launch/update object is promised by the scoped implementation.
+The exact implemented parameter/result shapes are in the canonical schema, not inferred from this forward-looking table. The scoped producer supports public-product metadata/search, catalog-refresh jobs, management-only registry snapshots and redacted diagnostics; sign-in uses separately agreed backend-owned native flow metadata. `auth.logout` takes `{}` and confirms `signedOut` only after successful launcher-profile disconnect; device retention must succeed before user removal. CLI/other-app profiles are separate, never implicitly imported or removed. No successful game-install/launch/update object is promised by the scoped implementation.
 
 | Command | Required input | Result/behavior |
 | --- | --- | --- |
 | `auth.begin` / `auth.cancel` / `auth.status` | account scope, request ID; cancellation target | Approved consent flow metadata/status only; credentials delivered to broker/Keychain, never events. Nonempty valid credential proof required. |
 | `inventory.snapshot` | account scope, market, refresh policy | products + entitlement evidence; source, checkedAt, lastCompleteAt, completeness, cursor/error. Backend consumes all pages or explicitly marks partial. |
-| `catalog.search` | query, PC platform, market, language, cursor | catalog candidates and editions; no invented ownership. Pagination cannot rewrite entitlement. |
+| `catalog.search` | query, PC platform, market, language, cursor | Observed public-products cache title search only; partial, not full Store search or inventory. |
+| `catalog.discover` | market, language, limit, opaque cursor | Bounded public PC Game Pass candidates, explicit per-product failures, partial coverage; no entitlement inference. |
+| `catalog.query` | exact nonblank query, market, language, limit 1..16, opaque q1 cursor | Partial public Store network search with source-backed PC metadata; exact scope/query echo. Genuine zero-source success and strict all-failure error are distinct; leftover source positions cannot be skipped. |
 | `product.detail` | product/edition ID, account scope | independent facets + provenance/time/fingerprint; selected package or explicit ambiguity. |
 | `install.plan` | edition ID, architecture, language, destination | immutable expiring plan with exact package/version/runtime, storage calculation, authorization and consent requirements. |
 | `jobs.enqueue` | plan ID, plan digest, idempotency key | durable job ID. Repeated key returns same job; changed payload conflicts. Rechecks authorization/capacity. |

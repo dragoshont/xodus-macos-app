@@ -7,3 +7,4 @@ swift build
 swift run XodusFixtureChecks
 swift run XodusManagementChecks
 swift run XodusPreview --self-check
+swift run XodusPreview --live-check

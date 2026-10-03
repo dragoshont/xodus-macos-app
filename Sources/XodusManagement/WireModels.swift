@@ -6,7 +6,7 @@ public enum ManagementCommand: String, CaseIterable, Codable, Sendable {
     case hello, authStatus = "auth.status", authBegin = "auth.begin", authCancel = "auth.cancel"
     case authLogout = "auth.logout", inventory = "inventory.snapshot", search = "catalog.search"
     case product = "product.detail", plan = "install.plan", enqueue = "jobs.enqueue"
-    case discover = "catalog.discover"
+    case discover = "catalog.discover", query = "catalog.query"
     case pause = "jobs.pause", resume = "jobs.resume", cancel = "jobs.cancel", retry = "jobs.retry"
     case jobs = "jobs.snapshot", replay = "events.replay", installed = "installed.snapshot"
     case launch = "game.launch", update = "game.update", rollback = "game.rollback", remove = "game.remove"
@@ -18,6 +18,7 @@ public enum ManagementCommand: String, CaseIterable, Codable, Sendable {
         case .authStatus, .authLogout, .authBegin, .authCancel: "authData"
         case .search: "searchData"
         case .discover: "discoveryData"
+        case .query: "queryData"
         case .product: "productData"
         case .enqueue, .cancel, .retry: "jobData"
         case .jobs: "jobsData"
@@ -25,6 +26,13 @@ public enum ManagementCommand: String, CaseIterable, Codable, Sendable {
         case .installed: "installedData"
         case .diagnostics: "diagnosticsData"
         default: nil
+        }
+    }
+
+    public var defaultTimeout: Duration {
+        switch self {
+        case .authBegin, .authLogout: .seconds(600)
+        default: .seconds(30)
         }
     }
 }
@@ -182,6 +190,29 @@ public struct CatalogDiscovery: Codable, Equatable, Sendable {
             let prefix = "d1-\(corpusRevision)-"
             guard nextCursor.hasPrefix(prefix), let offset = UInt64(nextCursor.dropFirst(prefix.count)),
                   offset > 0 else { throw ManagementError.invalidPayload }
+        }
+        for product in products { try product.validatePublicScope(market: market, language: language) }
+    }
+}
+
+public struct CatalogQuery: Codable, Equatable, Sendable {
+    public let corpus: String
+    public let completeness: String
+    public let source: String
+    public let checkedAt: String
+    public let freshness: String
+    public let query: String
+    public let products: [CatalogProduct]
+    public let failures: [DiscoveryFailure]
+    public let nextCursor: String?
+
+    public func validatePublicScope(query: String, market: String, language: String, limit: Int) throws {
+        let ids = products.map(\.id) + failures.map(\.id)
+        guard corpus == "publicMicrosoftStoreSearch", completeness == "partial",
+              source == "MicrosoftStoreEdge:v9.0/searchResults", freshness == "live",
+              self.query == query, ids.count <= limit, Set(ids).count == ids.count,
+              !ids.isEmpty || nextCursor == nil else {
+            throw ManagementError.invalidPayload
         }
         for product in products { try product.validatePublicScope(market: market, language: language) }
     }

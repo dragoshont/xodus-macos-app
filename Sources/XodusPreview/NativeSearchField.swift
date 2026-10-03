@@ -20,6 +20,7 @@ struct NativeSearchField: NSViewRepresentable {
         view.focusRingType = .exterior
         view.font = .systemFont(ofSize: NSFont.systemFontSize)
         view.textColor = .white
+        view.setAccessibilityIdentifier("xodus.catalog.search")
         if let cell = view.cell as? NSSearchFieldCell {
             cell.searchButtonCell = nil
             cell.cancelButtonCell = nil

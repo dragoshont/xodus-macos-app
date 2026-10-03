@@ -1,11 +1,11 @@
 -- SPDX-License-Identifier: GPL-3.0-only
 on run arguments
-    if (count of arguments) is not 2 then error "Usage: exact-owned-app-PID snapshot|Library|Discover|Downloads|Account"
+    if (count of arguments) is not 2 then error "Usage: exact-owned-app-PID snapshot|Library|Discover|Downloads|Account|CheckStatus|CloseAccount"
     set ownedPID to (item 1 of arguments) as integer
     set requestedAction to item 2 of arguments
-    if requestedAction is not in {"snapshot", "Library", "Discover", "Downloads", "Account"} then error "Unsupported action."
-    set navigationIDs to {"xodus.navigation.library", "xodus.navigation.discover", "xodus.navigation.downloads", "xodus.account"}
-    set safeLabels to {"Library", "Discover", "Downloads", "Account", "Your Library", "Registered on this Mac", "Live Xodus connection - development build", "Xodus for Mac - development build", "Connect your Xodus engine", "Check your saved sign-in or sign in with Microsoft. Public browsing does not read your Keychain."}
+    if requestedAction is not in {"snapshot", "Library", "Discover", "Downloads", "Account", "CheckStatus", "CloseAccount"} then error "Unsupported action."
+    set navigationIDs to {"xodus.navigation.library", "xodus.navigation.discover", "xodus.navigation.downloads", "xodus.account", "xodus.account.checkStatus", "xodus.account.close"}
+    set safeLabels to {"Library", "Discover", "Downloads", "Account", "Your Library", "Registered on this Mac", "Live Xodus connection - development build", "Xodus for Mac - development build", "Connect your Xodus engine", "Check your saved sign-in or sign in with Microsoft. Public browsing does not read your Keychain.", "Sign in with Microsoft", "Sign-in needs attention"}
     tell application "System Events"
         set ownedProcesses to every application process whose unix id is ownedPID
         if (count of ownedProcesses) is not 1 then error "Exact owned process unavailable."
@@ -50,5 +50,7 @@ on targetIdentifier(destination)
     if destination is "Discover" then return "xodus.navigation.discover"
     if destination is "Downloads" then return "xodus.navigation.downloads"
     if destination is "Account" then return "xodus.account"
+    if destination is "CheckStatus" then return "xodus.account.checkStatus"
+    if destination is "CloseAccount" then return "xodus.account.close"
     error "Unknown destination."
 end targetIdentifier

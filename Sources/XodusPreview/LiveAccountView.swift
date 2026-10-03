@@ -46,8 +46,12 @@ struct LiveAccountView: View {
                         Label("Sign-in did not complete. Try again when you are ready.", systemImage: "exclamationmark.circle")
                     }
                 }
+                if session.authentication?.state == .expired || session.authentication?.state == .invalid {
+                    Text("Disconnect this saved launcher sign-in first, then connect again. Other apps' accounts are not changed.")
+                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
                 if session.authentication?.state == .credentialPresent {
-                    Label("Saved Xbox sign-in is not proof of PC ownership, package access or gameplay compatibility.",
+                    Label("Saved Microsoft sign-in is not proof of PC ownership, package access or gameplay compatibility.",
                           systemImage: "info.circle").foregroundStyle(.secondary)
                 } else if session.isReady && !session.supports(.authBegin) {
                     Text("This engine can check existing Keychain sign-in, but its native sign-in provider is not available yet.")
@@ -68,14 +72,23 @@ struct LiveAccountView: View {
                         }
                     }
                     .keyboardShortcut(.cancelAction).disabled(session.accountBusy)
+                    .accessibilityLabel(session.signInPending ? "Cancel sign-in" : "Close account")
+                    .accessibilityIdentifier(session.signInPending ? "xodus.account.cancelSignIn" : "xodus.account.close")
                     if session.isReady {
                         Button("Check status") { Task { await session.refreshAccount() } }
-                            .disabled(session.accountBusy || session.signInPending)
+                            .disabled(session.accountBusy)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("Check account status")
+                            .accessibilityIdentifier("xodus.account.checkStatus")
+                            .accessibilityAddTraits(.isButton)
+                            .accessibilityAction { Task { await session.refreshAccount() } }
                     } else { Button("Settings", action: openSettings.callAsFunction) }
                     Spacer()
-                    if session.authentication?.state == .credentialPresent {
-                        Button("Sign out") { interaction.confirmingSignOut = true }
-                            .disabled(session.accountBusy || session.signInPending || !session.supports(.authLogout))
+                    if session.needsAccountDisconnect {
+                        Button(session.authentication?.state == .expired ? "Disconnect expired sign-in" : "Sign out") {
+                            interaction.confirmingSignOut = true
+                        }
+                            .disabled(!session.canDisconnectAccount)
                     } else {
                         GlassAction(title: "Sign in with Microsoft") { Task { await session.beginSignIn() } }
                             .disabled(!session.canSignIn)
@@ -85,12 +98,13 @@ struct LiveAccountView: View {
             .padding(.horizontal, 28).padding(.bottom, 28)
         }
         .frame(width: 650)
+        .task { await session.refreshAccount() }
         .interactiveDismissDisabled(session.accountBusy || session.signInPending)
-        .confirmationDialog("Sign out of Xbox on this Mac?", isPresented: $interaction.confirmingSignOut) {
-            Button("Sign out", role: .destructive) { Task { await session.signOut() } }
+        .confirmationDialog("Sign out of Xodus on this Mac?", isPresented: $interaction.confirmingSignOut) {
+            Button("Disconnect sign-in", role: .destructive) { Task { await session.signOut() } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Xodus removes the stored user sign-in and invalidates account-bound evidence. Game saves are not removed.")
+            Text("Xodus removes its launcher sign-in and invalidates account-bound evidence. Other apps' credentials and game saves are not removed.")
         }
     }
 }
@@ -124,11 +138,13 @@ struct LiveSettingsView: View {
             Section("Account") {
                 LabeledContent("Status", value: session.accountLabel)
                 Button("Open account") { state.showingAccount = true }
-                Text("Xbox Live sign-in, PC ownership and package authorization are independent.")
+                Text("Microsoft sign-in, PC ownership and package authorization are independent.")
                     .foregroundStyle(.secondary)
             }
             Section("Advanced public catalog") {
-                Text("Discover checks a bounded public PC Game Pass page. Search matches checked products, not the whole Store or an owned library.")
+                Text(session.supports(.query)
+                     ? "Discover browses PC Game Pass titles or searches the public Microsoft Store. Neither source is an owned library."
+                     : "Discover checks a bounded public PC Game Pass page. This engine searches checked products only, not the whole Store or an owned library.")
                     .foregroundStyle(.secondary)
                 TextField("Market (for example US)", text: $session.market)
                 TextField("Language (for example en-US)", text: $session.language)

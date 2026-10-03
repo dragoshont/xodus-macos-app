@@ -13,25 +13,47 @@ Closing the client first closes stdin for owned-child cleanup, waits for the eng
 `LiveSession` and the native views implement a real default development shell: account status, explicit sign-in/cancel/logout actions, scoped partial catalog, edition detail, catalog-check cancellation/retry and authoritative activity snapshots. Native sign-in is backend-owned; the Swift app never receives tokens, redirect fragments or raw provider errors. Optional agreed flow metadata is consumed only through the bundled producer schema and negotiated capabilities. New sign-in is always an explicit user action, never startup or a test action.
 
 Anonymous startup does not read the Keychain. Account initially remains unchecked;
-opening Account shows that state explicitly, and **Check status** or **Sign in
-with Microsoft** initiates the corresponding operation. The original GUI startup
+explicitly opening Account requests a noninteractive saved-profile check.
+**Check status** remains available during pending sign-in. A new sign-in requires
+fresh, confirmed signed-out status; expired/invalid profiles instead expose a
+confirmed launcher-only disconnect. An unavailable store never causes deletion.
+The original GUI startup
 was observed to time out specifically in `auth.status`, despite the equivalent
 SSH read failing promptly with `credentialStoreUnavailable`. Removing that
 automatic read preserves anonymous browsing without approving any native consent.
-The coordinated producer fix also makes management-profile status reads
-noninteractive. OSLog records process start, negotiation and the canonical command
+The coordinated producer fix makes management-profile status reads noninteractive
+and bounds them to two seconds without blocking public dispatch. OSLog records process start, negotiation and the canonical command
 name on timeout only; no paths, arguments, IDs, credentials or upstream messages
 are logged.
 
 Sign-out clears account-bound UI evidence before the operation and is shown as signed out only after the backend confirms removal. Engine/Keychain errors remain errors. A transport failure invalidates credentials/evidence in the UI rather than silently falling back to invented games.
 
-Discover now requests one bounded public **pcGamePassDiscovery** page at a time from the official Microsoft PC Game Pass feed. Request market/language, cursor and corpus revision remain bound together. Successful public products seed **observedPublicProducts** checked-catalog title search; that search is not full Microsoft Store search or an owned library. Duplicate identities and contradictory product/edition scope are rejected. This public catalog cannot promote entitlement from unknown. Catalog checks are not game downloads; the activity UI names their actual operation.
+Human-interactive `auth.begin` preparation and `auth.logout` have separate finite
+600-second transport budgets; ordinary reads retain 30-second defaults. A
+mutation failure invalidates the pre-mutation account freshness and never causes
+a blind retry. Pending flow reconciliation survives transient unavailable-store
+or retryable responses. A rejected cancellation during credential commit resumes
+polling with the original monotonic deadline instead of claiming cancellation.
+Terminal flows cannot regress to a late pending snapshot. At deadline, the app
+asks for current status rather than manufacturing a terminal outcome.
+
+Discover now requests one bounded public **pcGamePassDiscovery** page at a time from the official Microsoft PC Game Pass feed. Request market/language, cursor and corpus revision remain bound together. Successful public products also seed **observedPublicProducts** checked-catalog
+title search, which remains distinct from real **catalog.query** network search.
+The latter uses Microsoft's public Store Edge search with source-backed PC product
+checks, exact query echo, scope-bound opaque cursors and visible per-item failures.
+Native input is explicitly trimmed before sending; duplicate identities and
+contradictory product/edition scope are rejected without merging same-title IDs.
+This public catalog cannot promote entitlement from unknown. Catalog checks are
+not game downloads; the activity UI names their actual operation.
 
 Each attempted page item is either a product or a visible lookup failure. An
 all-failure response remains an error: only command-correlated
-`failedDiscoveryData` is retained, validated separately from successful discovery
+`failedDiscoveryData` / `failedQueryData` is retained, validated separately from successful discovery
 whose products cannot be empty. No arbitrary error payload or raw upstream message
-is displayed. The native request allows 45 seconds around the producer's
+is displayed. Continuation remains visible even if every item on the first page
+failed. A genuine zero-source query is distinct from failed metadata checks.
+Stopping search fences late results but does not claim to abort HTTP.
+The native request allows 45 seconds around the producer's
 30-second whole-page budget; there is no full-feed crawl. Requested locale remains
 the cache scope; exact language is preferred, or an explicit same-base neutral
 `resolvedLanguage` is shown. Unrelated/regional fallback is rejected.
@@ -52,17 +74,34 @@ backend contract, not permission for a blanket private-folder scan.
 
 ## Producer pin
 
-The current schema pin is `dragoshont/xodus-macos`, branch `dragoshont-xodus-launcher-management`, commit `790f5c40e69570324e7674638d487469a8aa8c8c`. It adds strict failed-page validation to the discovery implementation at `8718dcb3f1a5a573c685d95dc78c8d41e8e0bbed`; the preserved discovery executable is unchanged by the schema-only follow-up.
+The current schema/fixture pin is public producer commit
+`9d024ae079daccafb3437e4b0c67aef735d657bb` in `dragoshont/xodus-macos`,
+branch `dragoshont-xodus-launcher-management`: 77 positive, 15 negative and four
+independent evidence-edge frames. This additive contract includes public
+`catalog.query`; capabilities are negotiated from the running producer, not
+copied from a fixture.
 
 Canonical committed schema SHA256:
 
-`2ede71d5171cf4dc1659fedfc99187a90d904d9264119a22ee9f94064baef3d2`
+`655e1ed31772b35a8526ef5a0986557e7f6de689d5c4925ccde7041bc33b5f29`
 
 Committed LF bytes and all four sanitized fixture hashes were independently verified from immutable public Git objects. A transient GitHub network outage was handled with that exact public-only fallback, not mutable backend source or private data.
 
 `docs/contracts/management-v1.schema.json` is the producer's canonical scoped schema. `tools/sync_contract.py` copies its exact bytes to the Swift resource. `Tests/ManagementChecks/Fixtures` contains its sanitized public positive/negative/evidence fixtures. No private backend source or real account payload was imported. `foundation-v1.schema.json` preserves the original proposal.
 
-The preserved unsigned discovery engine input has SHA256 `14dd06466a201ddb77fe7c2d6f9a57bbbb79788f03413989e5158d9053c864ad`. Local ad-hoc signing during embedding changes the executable bytes; this packaged copy has SHA256 `62cb9564478d2a2bcee472b6f7d6865f5f3007a0314e30c7a06537523820f175`. **Provider consent remains separate from read-only/schema/build verification.** No successful account login is claimed merely because the native UI compiles.
+The bounded Store/discovery probe used implementation
+`4de9c2b2e7c114854699e3708d41c12fa73e188d`, unsigned input SHA256
+`58f5b80f253d8ee199dc193d3a31cbd1571b641ce309f81bf0430910a6982e83`.
+Its ad-hoc-signed embedded copy has SHA256
+`5ea5b49610fc9887345234e0d66bc9954f3bf1e78716ab25866802c4f48f324b`.
+**That producer is provisional, not review-closed:** the retained reviewer found
+an empty-query cache failure and insufficient repeated-source-cursor normalization
+(R06/R07). Its positive two-page probe does not validate those edge cases.
+A new immutable producer and fresh interoperability evidence are required before
+claiming their closure or human sign-in readiness. Earlier discovery pins and
+hashes remain historical evidence in [verification](VERIFICATION.md).
+**Provider consent remains separate from read-only/schema/build verification.**
+No successful account login is claimed merely because the native UI compiles.
 
 ## Developer application
 
@@ -93,8 +132,23 @@ launcher Keychain profile, not implicit CLI/private-worker credential import.
 
 ## Evidence and still-open gates
 
-At this discovery milestone, `sh tools/check.sh` passed on the Mac: **14 core + 130 management + 24 presentation = 168 checks**, zero failures. The management set includes all 71 positive, eleven negative and four evidence-edge producer frames, typed auth/registry/discovery results, exact all-failure/error separation, locale checks, real mock subprocesses and temporal activity/snapshot-fencing tests. Release `.app` build, resource loading, ad-hoc verification and plist lint passed; earlier disconnected own-view visual confirmation remains recorded separately.
+The current app review-fix milestone passed one full `sh tools/check.sh` invocation
+on the Mac: **14 core + 156 management + 24 presentation + 18 native session =
+212 checks**, zero failures. The native session set uses mock child processes and
+the actual `LiveSession` coordinator, not real Keychain/provider operations.
+It covers R01-R04 recovery, permission-preserving disconnect gating,
+failed-mutation freshness, genuine empty query and stop-search fencing. Management
+tests include 31-second synthetic preparation/logout with concurrent public reads.
+The release bundle passed resource, plist and ad-hoc-signature checks; earlier
+disconnected own-view visual confirmation remains separate.
 
-Eleven actual engine checks passed: the read-only management surfaces, explicit hello/activity-snapshot session identity, two bounded public discovery pages with stable/distinct IDs and actual checked-title search. The refined engine identifies the observed AUTH_INVALID category as **credentialStoreUnavailable**, not malformed credentials. The UI shows locally generated permission/availability guidance; no credentials are replaced. No Microsoft login, logout or Keychain approval was attempted.
+Thirteen actual read-only engine checks passed against the preserved input and
+signed embedded copy: bounded Store/discovery pages, exact session identity,
+registry/diagnostics and checked-title search. Normal native Account status
+resolved noninteractively while anonymous discovery stayed connected beyond
+35 seconds. These results predate R06/R07 closure and do not prove genuine
+empty-source or complete paging behavior. No Microsoft login, logout or Keychain
+approval was attempted. The retained coordinator-owned review must separately
+close the persisted app fixes and all confirmed backend findings.
 
 Native provider-consent/cancellation integration, source-backed discovery/search and explicit installed import are ongoing, not waived. Full owned-PC inventory/audience, legacy package authorization, safe staged installation/hash/expanded-size semantics, signed exact gameplay runtime, save-preserving updates/rollback, full VoiceOver/localization/min-OS and distribution remain open. No install or play action is enabled merely because Xbox Live sign-in succeeds. The user-directed full journey and coordinator-owned adversarial review remain completion prerequisites; this persisted client milestone is not final completion.

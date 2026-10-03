@@ -15,7 +15,8 @@ enum ManagementChecks {
                 try await checks.probe(BackendConfiguration(
                     executable: URL(fileURLWithPath: CommandLine.arguments[index + 1]),
                     stateDirectory: URL(fileURLWithPath: CommandLine.arguments[stateIndex + 1])),
-                    discover: CommandLine.arguments.contains("--probe-discovery"))
+                    discover: CommandLine.arguments.contains("--probe-discovery"),
+                    query: CommandLine.arguments.contains("--probe-query"))
             } else { try await checks.run() }
         } catch { await checks.check(false, "Check harness: \(safeMessage(error))") }
         exit(await checks.finish() ? 0 : 1)
@@ -56,13 +57,13 @@ actor Checks {
     func run() async throws {
         let validator = try ContractValidator()
         let positive = try fixture("positive").array ?? []
-        check(positive.count == 71, "Pinned producer corpus contains 71 positive frames")
+        check(positive.count == 77, "Pinned producer corpus contains 77 positive frames")
         for (index, frame) in positive.enumerated() {
             do { try validator.validate(frame); check(true, "Producer positive frame \(index + 1)") }
             catch { check(false, "Producer positive frame \(index + 1)") }
         }
         let negative = try fixture("negative").array ?? []
-        check(negative.count == 11, "Pinned producer corpus contains eleven negative frames")
+        check(negative.count == 15, "Pinned producer corpus contains fifteen negative frames")
         for item in negative {
             do {
                 guard let frame = item["frame"] else { throw ManagementError.invalidPayload }
@@ -118,6 +119,56 @@ actor Checks {
                 check(false, "Unrelated or other-region language is rejected")
             } catch { check(true, "Unrelated or other-region language is rejected") }
         }
+        guard var queryProduct = discoveryData["products"]?.array?.first?.object else {
+            throw ManagementError.invalidPayload
+        }
+        queryProduct["source"] = .string("syntheticPublicSource")
+        var queryPage: [String: JSONValue] = [
+            "corpus": .string("publicMicrosoftStoreSearch"), "completeness": .string("partial"),
+            "source": .string("MicrosoftStoreEdge:v9.0/searchResults"),
+            "checkedAt": discoveryData["checkedAt"] ?? .null, "freshness": .string("live"),
+            "query": .string("original fixture query"), "products": .array([.object(queryProduct)]),
+            "failures": discoveryData["failures"] ?? .array([]), "nextCursor": .null
+        ]
+        try JSONValue.object(queryPage).decode(CatalogQuery.self).validatePublicScope(
+            query: "original fixture query", market: "US", language: "en-US", limit: 8)
+        check(true, "Typed network query preserves source, PC scope and mixed failures")
+        do {
+            try JSONValue.object(queryPage).decode(CatalogQuery.self).validatePublicScope(
+                query: "different query", market: "US", language: "en-US", limit: 8)
+            check(false, "Network query echo must match its exact request")
+        } catch { check(error as? ManagementError == .invalidPayload, "Network query echo must match its exact request") }
+        queryPage["products"] = .array([])
+        queryPage["failures"] = .array([])
+        try JSONValue.object(queryPage).decode(CatalogQuery.self).validatePublicScope(
+            query: "original fixture query", market: "US", language: "en-US", limit: 8)
+        check(true, "Genuine empty query is distinct from failed product checks")
+        queryPage["nextCursor"] = .string("synthetic-opaque-cursor")
+        do {
+            try JSONValue.object(queryPage).decode(CatalogQuery.self).validatePublicScope(
+                query: "original fixture query", market: "US", language: "en-US", limit: 8)
+            check(false, "Empty source matches cannot claim another query page")
+        } catch { check(error as? ManagementError == .invalidPayload, "Empty source matches cannot claim another query page") }
+        let queryResults = positive.compactMap { $0["data"] }.filter {
+            $0["corpus"]?.string == "publicMicrosoftStoreSearch"
+        }
+        check(queryResults.count >= 2, "Pinned query corpus contains real-shape success and empty results")
+        for data in queryResults {
+            try validator.validate(data, definition: "queryData")
+            let page = try data.decode(CatalogQuery.self)
+            check(page.corpus == "publicMicrosoftStoreSearch" && page.completeness == "partial",
+                  "Typed canonical query remains public and partial, not entitlement")
+        }
+        guard let failedQuery = positive.first(where: {
+            $0["error"]?["details"]?["corpus"]?.string == "publicMicrosoftStoreSearch"
+        })?["error"]?["details"] else { throw ManagementError.invalidPayload }
+        try validator.validate(failedQuery, definition: "failedQueryData")
+        check(try failedQuery.decode(CatalogQuery.self).products.isEmpty,
+              "Canonical all-failure query details are strict and independently typed")
+        do {
+            try validator.validate(failedQuery, definition: "queryData")
+            check(false, "All-failure query cannot masquerade as successful empty search")
+        } catch { check(true, "All-failure query cannot masquerade as successful empty search") }
         let edges = try fixture("evidence-edge").array ?? []
         check(edges.count == 4, "Four independent evidence edge cases remain distinct")
         for (index, value) in edges.enumerated() {
@@ -176,6 +227,40 @@ actor Checks {
                   "Keychain permission failure is not treated as invalid credentials")
         }
         await denied.close()
+        check(ManagementCommand.authBegin.defaultTimeout == .seconds(600)
+              && ManagementCommand.authLogout.defaultTimeout == .seconds(600)
+              && ManagementCommand.authStatus.defaultTimeout == .seconds(30),
+              "Human account mutations have a separate finite budget; ordinary reads stay short")
+        let human = try ManagementClient()
+        _ = try await human.connect(mockConfiguration("humanwait"))
+        async let preparing = human.request(.authBegin, params: ["accountScope": .string("default")])
+        async let loggingOut = human.request(.authLogout)
+        let readStart = ContinuousClock.now
+        _ = try await human.request(.jobs)
+        check(ContinuousClock.now - readStart < .seconds(2),
+              "Public snapshot answers while fake human preparation/logout remain in flight")
+        _ = try await preparing.decode(AuthenticationStatus.self)
+        _ = try await loggingOut.decode(AuthenticationStatus.self)
+        _ = try await human.request(.jobs)
+        check(true, "Preparation and logout exceeding thirty seconds preserve the connection")
+        await human.close()
+        let uncertain = try ManagementClient()
+        _ = try await uncertain.connect(mockConfiguration("hangmutation"))
+        do {
+            _ = try await uncertain.request(.authBegin, params: ["accountScope": .string("default")],
+                                            timeout: .milliseconds(200))
+            check(false, "Mutation deadline never synthesizes success or blindly retries")
+        } catch {
+            check(error as? ManagementError == .requestTimedOut,
+                  "Mutation deadline never synthesizes success or blindly retries")
+        }
+        await uncertain.close()
+        let reconciled = try ManagementClient()
+        _ = try await reconciled.connect(mockConfiguration("normal"))
+        let reconciledStatus = try await reconciled.request(.authStatus).decode(AuthenticationStatus.self)
+        check(reconciledStatus.state == .signedOut,
+              "After an uncertain mutation, reconnect reads authoritative status before another mutation")
+        await reconciled.close()
         let discoveryFailure = try ManagementClient()
         _ = try await discoveryFailure.connect(mockConfiguration("discoveryfail"))
         do {
@@ -190,6 +275,26 @@ actor Checks {
             } else { check(false, "Transport preserves only schema-validated all-failure discovery details") }
         }
         await discoveryFailure.close()
+        for scenario in ["queryfail", "badqueryfail"] {
+            let queryFailure = try ManagementClient()
+            _ = try await queryFailure.connect(mockConfiguration(scenario))
+            do {
+                _ = try await queryFailure.request(.query, params: [
+                    "query": .string("original fixture query"), "market": .string("US"),
+                    "language": .string("en-US"), "limit": .integer(8), "cursor": .null
+                ])
+                check(false, "Query failure transport \(scenario)")
+            } catch let error as ManagementError {
+                if scenario == "queryfail", case .queryFailed(let page) = error {
+                    check(page.products.isEmpty && !page.failures.isEmpty,
+                          "Transport preserves schema-validated failed query details only")
+                } else {
+                    check(scenario == "badqueryfail" && error == .invalidPayload,
+                          "Transport rejects malformed all-failure query details")
+                }
+            }
+            await queryFailure.close()
+        }
         for scenario in ["prompt", "oversize", "partial", "mismatch", "wrongid", "wrongshape", "eof", "exit", "timeout"] {
             let bad = try ManagementClient()
             do {
@@ -201,7 +306,7 @@ actor Checks {
         }
     }
 
-    func probe(_ configuration: BackendConfiguration, discover: Bool = false) async throws {
+    func probe(_ configuration: BackendConfiguration, discover: Bool = false, query: Bool = false) async throws {
         let client = try ManagementClient()
         do {
             let hello = try await client.connect(configuration)
@@ -238,6 +343,43 @@ actor Checks {
                 var activity = ActivityStore()
                 try activity.apply(snapshot)
                 check(!activity.needsSnapshot, "Actual authoritative durable activity snapshot")
+            }
+            if query {
+                guard hello.supports(.query) else { throw ManagementError.capabilityMissing("catalog.query") }
+                let params: [String: JSONValue] = [
+                    "query": .string("Halo"), "market": .string("US"), "language": .string("en-US"),
+                    "limit": .integer(8), "cursor": .null
+                ]
+                func queryPage(_ params: [String: JSONValue]) async throws -> CatalogQuery {
+                    do {
+                        return try await client.request(.query, params: params, timeout: .seconds(45))
+                            .decode(CatalogQuery.self)
+                    } catch ManagementError.queryFailed(let page) { return page }
+                }
+                let first = try await queryPage(params)
+                try first.validatePublicScope(query: "Halo", market: "US", language: "en-US", limit: 8)
+                check(!first.products.isEmpty, "Actual Store network query resolves source-backed PC candidates")
+                if let cursor = first.nextCursor {
+                    var next = params
+                    next["cursor"] = .string(cursor)
+                    let second = try await queryPage(next)
+                    try second.validatePublicScope(query: "Halo", market: "US", language: "en-US", limit: 8)
+                    let firstIDs = Set(first.products.map(\.id) + first.failures.map(\.id))
+                    let secondIDs = Set(second.products.map(\.id) + second.failures.map(\.id))
+                    check(!secondIDs.isEmpty && firstIDs.isDisjoint(with: secondIDs)
+                          && second.nextCursor != cursor,
+                          "Actual scoped Store cursor advances without merging edition/product identities")
+                }
+                let emptyQuery = "XodusNoMatch9F4A12C7"
+                var emptyParams = params
+                emptyParams["query"] = .string(emptyQuery)
+                let empty = try await client.request(.query, params: emptyParams, timeout: .seconds(45))
+                    .decode(CatalogQuery.self)
+                try empty.validatePublicScope(query: emptyQuery, market: "US", language: "en-US", limit: 8)
+                check(empty.products.isEmpty && empty.failures.isEmpty && empty.nextCursor == nil,
+                      "Actual zero-source query returns genuine empty success, not metadata failure")
+                _ = try await client.request(.jobs).decode(JobsSnapshot.self)
+                check(true, "Actual connection survives a genuine zero-source Store query")
             }
             if hello.supports(.installed) {
                 let registry = try await client.request(.installed).decode(InstalledSnapshot.self)
@@ -348,8 +490,14 @@ enum MockBackend {
         do {
             let frames = try fixture("positive").array ?? []
             var hello = frames.first(where: { $0["data"]?["schema"] != nil })?["data"]?.object ?? [:]
-            let supported: Set<ManagementCommand> = scenario == "discoveryfail"
-                ? [.authStatus, .authLogout, .jobs, .discover] : [.authStatus, .authLogout, .jobs]
+            var supported: Set<ManagementCommand> = [.authStatus, .authLogout, .jobs]
+            if ["discoveryfail", "discoveryrecover"].contains(scenario) { supported.insert(.discover) }
+            if ["queryfail", "badqueryfail", "queryempty", "queryslow"].contains(scenario) { supported.insert(.query) }
+            if ["expired", "expiredpermission", "transientauth", "latecancel", "humanwait", "hangmutation", "beginfail"].contains(scenario) {
+                supported.formUnion([.authBegin, .authCancel])
+            }
+            var loggedOut = false, flowStarted = false, cancelledLate = false
+            var flowReads = 0, discoveryReads = 0, profileReads = 0
             hello["capabilities"] = .array(ManagementCommand.allCases.map { command in .object([
                 "command": .string(command.rawValue), "supported": .bool(supported.contains(command)),
                 "audience": .null, "reason": supported.contains(command) ? .null : .string("Fixture gate.")
@@ -365,12 +513,121 @@ enum MockBackend {
                     if scenario == "mismatch" { result["protocol"] = .object(["major": .integer(2), "minor": .integer(0)]) }
                     try emit(.object(result))
                 } else {
+                    if scenario == "beginfail", command == "auth.begin" {
+                        try emitFailure(request, code: "AUTH_INVALID")
+                        continue
+                    }
+                    if ["expired", "expiredpermission", "transientauth", "latecancel"].contains(scenario) {
+                        if command == "auth.begin" { flowStarted = true; flowReads = 0 }
+                        if command == "auth.logout" { loggedOut = true; flowStarted = false }
+                        if command == "auth.cancel", scenario == "latecancel" {
+                            cancelledLate = true
+                            try emitFailure(request, code: "INVALID_TRANSITION")
+                            continue
+                        }
+                        if command.hasPrefix("auth.") {
+                            if command == "auth.status", scenario == "expiredpermission" {
+                                profileReads += 1
+                                if profileReads == 2 {
+                                    try emitFailure(request, code: "AUTH_INVALID", category: "credentialStoreUnavailable")
+                                    continue
+                                }
+                            }
+                            if command == "auth.status", flowStarted {
+                                flowReads += 1
+                                if scenario == "transientauth", flowReads == 1 {
+                                    try emitFailure(request, code: "AUTH_INVALID", category: "credentialStoreUnavailable")
+                                    continue
+                                }
+                            }
+                            let completed = flowStarted && command == "auth.status"
+                                && (scenario != "latecancel" || cancelledLate)
+                            var status: [String: JSONValue] = [
+                                "state": .string(completed ? "credentialPresent"
+                                    : ["expired", "expiredpermission"].contains(scenario) && !loggedOut && !flowStarted
+                                        ? "expired" : "signedOut"),
+                                "credentialStore": .string("macOSKeychain"), "audience": .null,
+                                "expiresAt": .null, "entitlementAuthorized": .bool(false)
+                            ]
+                            if flowStarted {
+                                status["flow"] = .object(["flowID": .string("fixture-native-flow"),
+                                    "state": .string(completed ? "completed" : "pending"), "error": .null])
+                            }
+                            try emit(.object(result(request, data: .object(status))))
+                            continue
+                        }
+                    }
+                    if ["humanwait", "hangmutation"].contains(scenario),
+                       ["auth.begin", "auth.logout"].contains(command) {
+                        if scenario == "humanwait" {
+                            let response = result(request, data: .object([
+                                "state": .string("signedOut"), "credentialStore": .string("macOSKeychain"),
+                                "audience": .null, "expiresAt": .null, "entitlementAuthorized": .bool(false)
+                            ]))
+                            DispatchQueue.global().async {
+                                Thread.sleep(forTimeInterval: 31)
+                                do { try emit(.object(response)) }
+                                catch { exit(3) }
+                            }
+                        }
+                        continue
+                    }
+                    if scenario == "discoveryrecover", command == "catalog.discover" {
+                        discoveryReads += 1
+                        guard let failedPage = frames.first(where: {
+                            $0["error"]?["details"]?["corpus"]?.string == "pcGamePassDiscovery"
+                        }) else { exit(3) }
+                        if discoveryReads == 1 {
+                            guard var response = failedPage.object else { exit(3) }
+                            response["requestID"] = request["requestID"]
+                            try emit(.object(response))
+                        } else {
+                            guard var page = frames.first(where: {
+                                $0["data"]?["corpus"]?.string == "pcGamePassDiscovery"
+                            })?["data"]?.object else { exit(3) }
+                            page["products"] = .array((page["products"]?.array ?? []).map { product in
+                                var value = product.object ?? [:]
+                                value["source"] = .string("syntheticPublicSource")
+                                return .object(value)
+                            })
+                            page["failures"] = .array([])
+                            page["corpusRevision"] = failedPage["error"]?["details"]?["corpusRevision"]
+                            page["nextCursor"] = .null
+                            try emit(.object(result(request, data: .object(page))))
+                        }
+                        continue
+                    }
                     if scenario == "discoveryfail", command == "catalog.discover" {
                         guard var response = frames.first(where: {
                             $0["error"]?["details"]?["corpus"]?.string == "pcGamePassDiscovery"
                         })?.object else { exit(3) }
                         response["requestID"] = request["requestID"]
                         try emit(.object(response))
+                        continue
+                    }
+                    if ["queryfail", "badqueryfail"].contains(scenario), command == "catalog.query" {
+                        guard var response = frames.first(where: {
+                            $0["error"]?["details"]?["corpus"]?.string == "publicMicrosoftStoreSearch"
+                        })?.object else { exit(3) }
+                        response["requestID"] = request["requestID"]
+                        if scenario == "badqueryfail" {
+                            guard var error = response["error"]?.object,
+                                  var details = error["details"]?.object else { exit(3) }
+                            details["failures"] = .array([])
+                            error["details"] = .object(details)
+                            response["error"] = .object(error)
+                        }
+                        try emit(.object(response))
+                        continue
+                    }
+                    if ["queryempty", "queryslow"].contains(scenario), command == "catalog.query" {
+                        guard var page = frames.first(where: {
+                            $0["data"]?["corpus"]?.string == "publicMicrosoftStoreSearch"
+                                && $0["data"]?["products"]?.array?.isEmpty == true
+                        })?["data"]?.object else { exit(3) }
+                        page["query"] = request["params"]?["query"]
+                        if scenario == "queryslow" { Thread.sleep(forTimeInterval: 1) }
+                        try emit(.object(result(request, data: .object(page))))
                         continue
                     }
                     if scenario == "eof" { exit(0) }
@@ -409,6 +666,21 @@ enum MockBackend {
     static func emit(_ frame: JSONValue) throws {
         var data = try JSONEncoder().encode(frame)
         data.append(10)
+        outputLock.lock()
+        defer { outputLock.unlock() }
         try FileHandle.standardOutput.write(contentsOf: data)
+    }
+
+    private static let outputLock = NSLock()
+
+    static func emitFailure(_ request: JSONValue, code: String, category: String? = nil) throws {
+        var error: [String: JSONValue] = [
+            "code": .string(code), "message": .string("Synthetic fixture failure."), "retryable": .bool(false)
+        ]
+        if let category { error["details"] = .object(["category": .string(category)]) }
+        try emit(.object([
+            "kind": .string("result"), "protocol": .object(["major": .integer(1), "minor": .integer(0)]),
+            "requestID": request["requestID"] ?? .null, "ok": .bool(false), "error": .object(error)
+        ]))
     }
 }

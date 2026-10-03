@@ -29,6 +29,7 @@ struct XodusPreviewApp: App {
     @StateObject private var session = LiveSession()
 
     init() {
+        if CommandLine.arguments.contains("--live-check") { NativeChecks.launch() }
         if CommandLine.arguments.contains("--self-check") {
             exit(PreviewChecks.run() ? 0 : 1)
         }

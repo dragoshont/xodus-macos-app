@@ -109,7 +109,9 @@ public actor ManagementClient {
     }
 
     public func request(_ command: ManagementCommand, params: [String: JSONValue] = [:],
-                        timeout: Duration = .seconds(30)) async throws -> JSONValue {
+                        timeout: Duration? = nil) async throws -> JSONValue {
+        let budget = timeout ?? command.defaultTimeout
+        guard budget > .zero else { throw ManagementError.invalidRequest }
         guard !stopped, let child = process, child.isRunning, let stdin else {
             throw ManagementError.disconnected
         }
@@ -132,7 +134,7 @@ public actor ManagementClient {
         usedIDs.insert(id)
         return try await withCheckedThrowingContinuation { continuation in
             let deadline = Task { [weak self] in
-                do { try await Task.sleep(for: timeout) }
+                do { try await Task.sleep(for: budget) }
                 catch { return }
                 await self?.timedOut(id)
             }
@@ -210,6 +212,10 @@ public actor ManagementClient {
                 guard let details = error["details"] else { throw ManagementError.invalidPayload }
                 try validator.validate(details, definition: "failedDiscoveryData")
                 failure = .discoveryFailed(try details.decode(CatalogDiscovery.self))
+            } else if waiter.command == .query, code == "PACKAGE_UNAVAILABLE" {
+                guard let details = error["details"] else { throw ManagementError.invalidPayload }
+                try validator.validate(details, definition: "failedQueryData")
+                failure = .queryFailed(try details.decode(CatalogQuery.self))
             } else if code == "AUTH_INVALID", error["details"]?["category"]?.string == "credentialStoreUnavailable",
                       [.authStatus, .authBegin, .authCancel, .authLogout].contains(waiter.command) {
                 failure = .credentialStoreUnavailable

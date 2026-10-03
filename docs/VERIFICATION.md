@@ -1,6 +1,55 @@
 # Verification evidence
 
-Recorded 2026-10-03. This is evidence for the **fixture foundation**, not live authentication, download, install or gameplay.
+Foundation recorded 2026-10-03; subsequent native/read-only milestones are
+identified separately below. None establishes successful human authentication,
+game download, install or gameplay.
+
+## Store search and adversarial-review app fixes
+
+Recorded 2026-10-04. One complete `sh tools/check.sh` invocation passed **14 core +
+156 management + 24 presentation + 18 native session = 212 checks**, zero
+failures. Native checks execute the actual session coordinator against sanitized
+synthetic child processes and exit before creating a window. They exercise:
+
+| Finding / edge | Actual regression evidence |
+| --- | --- |
+| R01 expired profile | Explicit current status exposes confirmed launcher disconnect; fresh signed-out state precedes a new sign-in |
+| Permission failure after expired status | Disconnect disabled; attempted unavailable-store recovery makes no deletion request and preserves the profile |
+| R02 transient polling / rejected late cancel | Status remains available while pending; one inaccessible-store error recovers; INVALID_TRANSITION resumes polling to a terminal result, never false cancellation |
+| R03 human operation budget | Synthetic preparation/logout exceeds the old 30-second limit while public snapshots still respond; finite 600-second mutation budgets remain distinct from short reads |
+| Uncertain mutation | Failed preparation invalidates pre-mutation freshness; explicit fresh status required before another attempt; transport timeout separately tested with reconnect/status reconciliation |
+| R04 initial all-failure page | Continuation exposed with zero products; later success retains earlier failures and unknown entitlement |
+| Empty / stopped query | Genuine empty success remains live and distinct from failures; stop fences a late bounded result without claiming HTTP abort |
+
+Canonical schema pin is `9d024ae079daccafb3437e4b0c67aef735d657bb`, SHA256
+`655e1ed31772b35a8526ef5a0986557e7f6de689d5c4925ccde7041bc33b5f29`,
+with 77 positive, 15 negative and four independent evidence-edge frames.
+All four exact fixture hashes were checked against immutable public Git bytes.
+
+**Thirteen actual read-only checks passed** against preserved producer
+`4de9c2b2e7c114854699e3708d41c12fa73e188d` and its signed embedded copy:
+two bounded Microsoft Store query pages, two discovery pages and checked-cache
+title search, negotiation/session identity, registry and redacted diagnostics.
+Unsigned SHA256 `58f5b80f253d8ee199dc193d3a31cbd1571b641ce309f81bf0430910a6982e83`;
+embedded SHA256 `5ea5b49610fc9887345234e0d66bc9954f3bf1e78716ab25866802c4f48f324b`.
+Release compilation, resources, plist and signature checks passed.
+
+Normal LaunchServices app PID 39706 / embedded child 39709 exposed Account,
+noninteractive saved-status refresh, explicit Check status and Close. Discover
+retained the engine beyond 35 seconds. These are bounded owned-window authored
+label checks, not successful sign-in or full VoiceOver. No consent was initiated.
+
+**This producer is not review-closed.** The retained reviewer subsequently found
+R06 (zero-source query cached as an invalid empty registry operation) and R07
+(repeated source-cursor equivalence not fully normalized). Positive two-page
+evidence above cannot close either issue. A new immutable producer must pass the
+committed actual zero-source query/connection-survival probe and backend cursor
+regressions before readiness. App R01-R04 fixes await review of their persisted
+revision; no new reviewer is spawned.
+
+Hosted startup-fix revision `44f24407ad9562e90a305426771423e3f46864dc`
+[passed its own GitHub Actions run](https://github.com/dragoshont/xodus-macos-app/actions/runs/37159377257).
+That success is not attributed to these newer changes.
 
 ## Bounded discovery and default application startup
 
@@ -51,8 +100,8 @@ the failed sustained startup and its verified correction are recorded above.
 Missing/nonexecutable embedded engines show
 an actionable error and do not silently reuse saved developer binaries or fixtures.
 
-Hosted follow-up CI retrieval is currently blocked by a GitHub network timeout;
-local Mac evidence is not relabelled as hosted CI. Full Store search, genuine
+Hosted startup follow-up subsequently succeeded for `44f2440`, as recorded above;
+local Mac evidence is not relabelled as hosted CI. Full search coverage, genuine
 ownership, authorized install/update/play/recovery and coordinator-owned adversarial
 review/findings closure remain active completion prerequisites.
 

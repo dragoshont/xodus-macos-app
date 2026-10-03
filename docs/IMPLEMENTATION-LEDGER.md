@@ -10,14 +10,22 @@ The user directed autonomous native development after foundation `44d7338`. This
 
 | Work | Status | Implemented scope | Evidence / remaining gate |
 | --- | --- | --- | --- |
-| C-TRANSPORT | implemented-client | Codable1.0 models, producer-schema validation, bounded supervised stdin/stdout JSONL, correlated results, deadlines, EOF/nonzero handling and owned-process cleanup | 130 Mac management checks plus eleven actual bounded engine checks; no gameplay implication |
-| C-ACCOUNT | implemented-client | Native status/sign-in/poll/cancel/logout UI, no tokens/redirects in Swift, commit/cancel-race messaging, explicit user action and capability checks | Published auth/schema pin passes; actual status reports AUTH_INVALID; provider-consent integration remains open |
-| C-CATALOG | implemented-client | Real bounded public PC Game Pass discovery, observed-products title search, strict provenance/cursor/locale/failure shapes and edition detail | Actual two-page/title-search probe; full Store search and genuine owned-PC inventory remain active gaps |
+| C-TRANSPORT | implemented-client | Codable1.0 models, producer-schema validation, bounded supervised stdin/stdout JSONL, correlated results, separate human/read deadlines, EOF/nonzero handling and owned-process cleanup | 156 Mac management checks plus actual bounded engine checks; no gameplay implication |
+| C-ACCOUNT | implemented-client | Isolated Store profile status/sign-in/poll/cancel/logout, expired-profile recovery, safe pending status, no automatic deletion or blind mutation retry | Noninteractive GUI status verified; native synthetic R01-R03 regressions pass; human provider consent and retained-review closure remain open |
+| C-CATALOG | implemented-client | Real PC Game Pass discovery and Microsoft Store network query, separate observed-cache title search, scoped provenance/paging, visible per-item failures and edition detail | Actual positive two-page Store/discovery probes; R06/R07 producer replacement and genuine empty-source probe pending; no ownership inference |
 | C-ACTIVITY | implemented-client | Real catalog-check enqueue/cancel/retry, fenced snapshot/revision/sequence reconciliation and terminal protection | Actual read-only snapshot verified; game installation/recovery remains separate |
 | C-INSTALLED | implemented-client | Typed actual managed-registry snapshot, recorded health, scoped Library and independent detail facet | Actual registry read verified; user-selected inspection/import and current filesystem checks remain ongoing |
 | C-BUNDLE | implemented-client | Release `.app`, required resources, original icon generator, local ad-hoc signing/plist verification | Mac bundle/resource/self-check/own-view evidence; no notarization/runtime certification/public distribution |
 
-Current discovery/startup milestone: **14 core + 130 management + 24 presentation = 168 checks**, zero failures, plus eleven actual bounded engine checks. Default LaunchServices startup no longer reads the Keychain; its included engine survives the original GUI auth-status timeout. Exact owned-window Accessibility navigation verifies Library/Discover/Downloads and the unchecked Account sheet without account actions. This is not full VoiceOver or provider consent. Fixture arrays/jobs remain in explicit `--fixture` mode. Any new provider pin or binary needs its own interoperability evidence before a row becomes `implemented-live`. The user requires the full real journey and coordinator-owned adversarial review/findings closure before final completion.
+Current app review-fix milestone: **14 core + 156 management + 24 presentation +
+18 native session = 212 checks**, zero failures, plus thirteen actual positive
+read-only Store/discovery engine checks. Anonymous startup does not read Keychain;
+explicit Account opening checks status noninteractively. Owned-window navigation,
+Check status/Close and sustained engine lifetime were verified without consent.
+The current query producer has newly confirmed R06/R07 findings; positive pages
+do not close empty-source or repeated-cursor behavior. Its replacement is pending.
+This is not full VoiceOver, provider consent or final review closure. Fixture
+arrays/jobs remain in `--fixture`; no client milestone waives the full real journey.
 
 ## Foundation delivered
 
@@ -34,7 +42,7 @@ Current discovery/startup milestone: **14 core + 130 management + 24 presentatio
 
 | Work ID / requirements | Status | Dependencies | App/backend deliverable and required evidence | Gate / test command |
 | --- | --- | --- | --- | --- |
-| V1-NEGOTIATE / RELEASE-01 | planned-live | F-PROTOCOL | Rust `manage` entry + Swift process adapter; hello/version/capabilities/per-capability audiences; bounded frames and explicit transport errors | Future adapter tests for incompatible major, missing capability, malformed/EOF/interactive stdout. Foundation `sh tools/check.sh` does not prove this |
+| V1-NEGOTIATE / RELEASE-01 | implemented-client | F-PROTOCOL | Rust `manage` entry + Swift process adapter; hello/version/capabilities/per-capability audiences; bounded frames and explicit transport errors | Current management checks and actual producer probes cover incompatible versions, missing capabilities, malformed/EOF/interactive stdout; not runtime certification |
 | V1-AUTH / AUTH-01,02 | blocked-live | V1-NEGOTIATE, D-04 | Approved consent/audience; reuse existing backend Keychain owner; forbid `key-chain-file`; app cancellation/disconnect/account isolation | Prove nonempty validated credential ownership; cancelled/expired/missing-token tests. No token argv/events/logs |
 | V1-CATALOG / FIND-01, ID-01 | blocked-live | V1-NEGOTIATE, D-05 | Authorized full-text catalog search/PC edition-package mapping; existing ID lookup is not full search | Market/language/architecture/edition paging and errors; absent catalog must not imply no ownership |
 | V1-INVENTORY / LIB-01,02,03 | blocked-live | V1-AUTH, D-04 | Genuine PC purchase/subscription inventory, all pages; source/time/completeness/cached last complete snapshot | Never-played purchase, expired subscription, console-only, partial/offline/unknown corpus; prove audience/modern PC coverage |
@@ -55,7 +63,12 @@ Dependencies are prerequisites, not a promise of execution order or access. D-ID
 
 ## Commands and evidence policy
 
-**Actual native command:** `sh tools/check.sh` builds and runs core, management and presentation dependency-free checks on the isolated Mac. Foundation ran 29; the current discovery milestone runs 168. `swift test` did not pass because XCTest/Testing are absent in that CLT; no fake test-framework shim is provided. Hosted workflow results must be read separately.
+**Actual native command:** `sh tools/check.sh` builds and runs core, management,
+presentation and native session dependency-free checks on the isolated Mac.
+Foundation ran 29; the current app milestone runs 212. `swift test` did not pass
+because XCTest/Testing are absent in that CLT; no fake shim is provided. Hosted
+workflow results must be read separately. Actual producer probes use explicit
+immutable engines and isolated app-adapter state, not private game roots.
 
 **Actual design commands:** `python3 tools/generate_mockups.py`; `swift tools/render_mockups.swift`; original art reproduction/export commands in design/README. Optional `swift run XodusPreview --export-preview <explicit-directory>` renders only this app's own views and exits; no desktop capture.
 

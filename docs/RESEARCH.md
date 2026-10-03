@@ -22,6 +22,8 @@ Recorded 2026-10-03. This foundation consumes **supplied prior research**, not f
 | Heroic new-store plugin proposal remains a proposal | [Public issue #3158](https://github.com/Heroic-Games-Launcher/HeroicGamesLauncher/issues/3158), supplied review | No proven shipping plugin API; standalone app selected. Do not interpret this as a freshly checked issue status. |
 | Public Game Pass candidate discovery uses catalog/display catalog endpoints | [NikkelM/Game-Pass-API](https://github.com/NikkelM/Game-Pass-API), [scraper source](https://github.com/azxie/gamepass-scraper/blob/master/find_game_ids.py), prior source-derived leads | `catalog.gamepass.com/sigls/v2` and `displaycatalog.mp.microsoft.com/v7.0/products` are catalog leads, not observed desktop API traces or ownership. Region/platform/paging/freshness need proof. |
 | Official current Xbox games-page script maps All PC Games to Sigls v3 category `609d944c-d395-4c0a-9ea4-e9f39b52c1ad`, PC platform and subscription context `cfq7ttc0kgq8` | Backend-supplied public script/HTTP verification; actual pinned native-engine two-page and checked-title-search probe | Anonymous feed contains a header plus candidate product IDs. Bounded metadata lookup establishes partial public discovery, not purchased/subscription entitlement or global Store search. Source-neutral `en` vs requested `en-US` is exposed, not hidden. |
+| Anonymous Microsoft Store Edge v9 search returns source cards and server continuation; observed first/next pages contain 40 distinct IDs for a public Halo query | Coordinator-supplied direct public HTTP verification, followed by actual pinned management-engine two-page native-client probe | Public game search, not desktop API capture or ownership. Cards are checked against DisplayCatalog Windows.Desktop evidence; localized labels or mediaType alone do not prove PC eligibility. Same-title product IDs remain separate; CardActions are never executed. Positive pages do not establish exhaustive coverage or R06/R07 edge-case closure. |
+| Legacy playing-account XAL flow alone is insufficient; isolated Store profile uses existing NativeTokenBroker/Passport provider machinery and native Keychain worker | Backend-supplied public implementation pin plus actual noninteractive native status/read-only probe | Launcher uses Xodus Management Service separately from CLI Xodus Service; no implicit credential/cookie import. Backend memory-facade tests retain device credentials on logout and leave user intact if retention fails. No actual logout, human consent or package/inventory audience proof is inferred. |
 | Microsoft Inventory Service + XSTS might support consumer inventory | [Historical Xbox Live API issue comment](https://github.com/microsoft/xbox-live-api/issues/575#issuecomment-1105826347) | Historical lead only: audience, pagination, current availability, PC purchases and subscriptions unproven. |
 | Publisher Collections APIs query entitlements | [Microsoft GDK documentation](https://learn.microsoft.com/en-us/gaming/gdk/docs/store/commerce/service-to-service/xstore-query-user-entitlements) | Partner-oriented, not turnkey consumer library. Their scope does not prove a consumer route impossible. |
 | Xbox desktop accessibility initially exposed Home/Game Pass/My Library/Store/Search and Library MyGames/PlayLater/PlayHistory/InstallQueue | Supplied initial accessibility observation | Initial navigation/network observation did not succeed; no API or inventory semantics were inferred. |
@@ -32,6 +34,18 @@ Recorded 2026-10-03. This foundation consumes **supplied prior research**, not f
 | macOS design and modern glass guidance | [macOS HIG](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos), [Adopting Liquid Glass](https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass) | Use native controls and availability-aware system behavior, not web glass styling. |
 
 ## Decision register
+
+Retail-search evidence endpoint:
+`https://storeedgefd.dsx.mp.microsoft.com/v9.0/pages/searchResults?market=US&locale=en-US&deviceFamily=windows.desktop&query=Halo&mediaType=games`.
+Public source-derived prior art:
+[MS-Store-API v9 pages documentation](https://github.com/ThomasPe/MS-Store-API/blob/master/endpoints/v9.0/pages.md).
+Observed first response is a two-item array; the next page is an object under
+`Payload`. No cookies, auth or appVersion were required. Continuation is confined
+to the exact Store Edge host/path and bound market/language/query; opaque native
+q1 cursors preserve leftover source positions when native pages are smaller.
+Source cards can include console-only products; those are explicit failures, not
+PC results or an empty-success substitute. This is anonymous public discovery,
+not entitlement, observed Xbox-desktop traffic or a full Store corpus guarantee.
 
 | ID | Status | Decision / question | Evidence needed to close |
 | --- | --- | --- | --- |

@@ -13,7 +13,9 @@ final class LiveSession: ObservableObject {
     @Published private(set) var products: [CatalogProduct] = []
     @Published private(set) var activity = ActivityStore()
     @Published private(set) var searching = false
+    @Published private(set) var catalogStopped = false
     @Published private(set) var accountBusy = false
+    @Published private(set) var accountStatusCurrent = false
     @Published private(set) var lookupBusy = false
     @Published private(set) var installedSnapshot: InstalledSnapshot?
     @Published private(set) var installedRefreshing = false
@@ -39,8 +41,15 @@ final class LiveSession: ObservableObject {
     private var currentQuery = ""
     private var cacheRevision: UInt64?
     private var discoveryRevision: String?
+    private let configuration: BackendConfiguration?
+    private var signInDeadline: ContinuousClock.Instant?
 
-    init() {
+    init(configuration: BackendConfiguration? = nil) {
+        self.configuration = configuration
+        if let configuration {
+            backendPath = configuration.executable.path
+            return
+        }
         let embedded = Bundle.main.resourceURL?.appendingPathComponent("XodusEngine/xodus-cli")
         let bundledPath = embedded.flatMap {
             FileManager.default.isExecutableFile(atPath: $0.path) ? $0.path : nil
@@ -61,18 +70,27 @@ final class LiveSession: ObservableObject {
     var signInPending: Bool { authentication?.flow?.state == .pending }
     var canSignIn: Bool {
         isReady && supports(.authBegin) && supports(.authCancel) && supports(.authStatus)
+            && accountStatusCurrent && authentication?.state == .signedOut && !accountBusy && !signInPending
+    }
+    var needsAccountDisconnect: Bool {
+        guard let state = authentication?.state else { return false }
+        return [.credentialPresent, .expired, .invalid].contains(state)
+    }
+    var canDisconnectAccount: Bool {
+        isReady && supports(.authLogout) && accountStatusCurrent && needsAccountDisconnect
             && !accountBusy && !signInPending
     }
+    var canLoadMoreCatalog: Bool { nextCursor != nil && !searching }
 
     var accountLabel: String {
         if phase == .connecting { return "Connecting to Xodus" }
         guard isReady else { return "Connect Xodus" }
         if signInPending { return "Finish Microsoft sign-in" }
         switch authentication?.state {
-        case .credentialPresent: return "Xbox sign-in saved"
+        case .credentialPresent: return "Microsoft sign-in saved"
         case .expired: return "Sign-in expired"
         case .invalid: return "Sign-in needs attention"
-        case .signedOut: return "Sign in to Xbox"
+        case .signedOut: return "Sign in with Microsoft"
         case nil: return "Account"
         }
     }
@@ -108,7 +126,7 @@ final class LiveSession: ObservableObject {
             client = connection
             let state = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
                 .appendingPathComponent("Library/Application Support/Xodus/Management", isDirectory: true)
-            let negotiated = try await connection.connect(BackendConfiguration(
+            let negotiated = try await connection.connect(configuration ?? BackendConfiguration(
                 executable: URL(fileURLWithPath: backendPath), stateDirectory: state))
             guard token == generation else { await connection.close(); return }
             hello = negotiated
@@ -122,7 +140,8 @@ final class LiveSession: ObservableObject {
                         if self.activity.needsSnapshot && !self.activity.isReconciling {
                             try await self.reconcileActivity()
                         }
-                        if event.data.state == .completed, self.catalogCorpus != "pcGamePassDiscovery" {
+                        if event.data.state == .completed,
+                           !["pcGamePassDiscovery", "publicMicrosoftStoreSearch"].contains(self.catalogCorpus) {
                             await self.search(self.currentQuery)
                         }
                     }
@@ -152,6 +171,8 @@ final class LiveSession: ObservableObject {
         client = nil
         hello = nil
         authentication = nil
+        accountStatusCurrent = false
+        signInDeadline = nil
         installedSnapshot = nil
         installedError = nil
         installedRefreshing = false
@@ -167,6 +188,7 @@ final class LiveSession: ObservableObject {
         diagnosticPreview = nil
         phase = .disconnected
         searching = false
+        catalogStopped = false
         lookupBusy = false
         accountBusy = false
         if let previous { await previous.close() }
@@ -186,11 +208,21 @@ final class LiveSession: ObservableObject {
         do {
             let status = try await client.request(.authStatus).decode(AuthenticationStatus.self)
             guard token == generation, authToken == authenticationGeneration else { return }
-            authentication = status
+            acceptAccountStatus(status)
+            errorMessage = nil
         } catch {
             guard token == generation, authToken == authenticationGeneration else { return }
+            accountStatusCurrent = false
             errorMessage = Self.describe(error)
         }
+    }
+
+    private func acceptAccountStatus(_ status: AuthenticationStatus) {
+        if let currentFlow = authentication?.flow, let incomingFlow = status.flow,
+           currentFlow.flowID == incomingFlow.flowID,
+           currentFlow.state != .pending, incomingFlow.state == .pending { return }
+        authentication = status
+        accountStatusCurrent = true
     }
 
     func refreshInstalled() async {
@@ -231,11 +263,14 @@ final class LiveSession: ObservableObject {
             guard token == generation else { return }
             guard let flow = status.flow else { throw ManagementError.invalidPayload }
             authentication = status
+            accountStatusCurrent = true
+            signInDeadline = ContinuousClock.now.advanced(by: .seconds(600))
             accountBusy = false
             if flow.state == .pending { pollSignIn(flowID: flow.flowID, generation: token) }
         } catch {
             guard token == generation else { return }
             accountBusy = false
+            accountStatusCurrent = false
             errorMessage = Self.describe(error)
         }
     }
@@ -243,20 +278,32 @@ final class LiveSession: ObservableObject {
     private func pollSignIn(flowID: String, generation token: Int) {
         authTask?.cancel()
         authTask = Task { [weak self] in
-            let deadline = ContinuousClock.now.advanced(by: .seconds(600))
+            let deadline = self?.signInDeadline ?? ContinuousClock.now.advanced(by: .seconds(600))
             do {
                 while !Task.isCancelled {
                     try await Task.sleep(for: .seconds(1))
                     guard let self, token == self.generation, let client = self.client else { return }
-                    let status = try await client.request(.authStatus).decode(AuthenticationStatus.self)
+                    guard ContinuousClock.now < deadline else {
+                        self.errorMessage = "Sign-in is still pending. Check status before retrying or closing; no cancellation was assumed."
+                        return
+                    }
+                    let status: AuthenticationStatus
+                    do { status = try await client.request(.authStatus).decode(AuthenticationStatus.self) }
+                    catch {
+                        guard token == self.generation, !Task.isCancelled else { return }
+                        self.accountStatusCurrent = false
+                        self.errorMessage = Self.describe(error)
+                        if error as? ManagementError == .credentialStoreUnavailable { continue }
+                        if case ManagementError.backendError(_, retryable: true) = error { continue }
+                        return
+                    }
                     guard token == self.generation, !Task.isCancelled,
-                          self.authentication?.flow?.flowID == flowID else { return }
+                          self.authentication?.flow?.flowID == flowID,
+                          self.authentication?.flow?.state == .pending else { return }
                     guard status.flow?.flowID == flowID else { throw ManagementError.invalidPayload }
-                    self.authentication = status
-                    if status.flow?.state != .pending { return }
-                    if ContinuousClock.now >= deadline {
-                        await self.cancelSignIn()
-                        self.errorMessage = "Sign-in timed out. Start again when you are ready."
+                    self.acceptAccountStatus(status)
+                    if status.flow?.state != .pending {
+                        if status.flow?.state == .completed { self.errorMessage = nil }
                         return
                     }
                 }
@@ -284,22 +331,32 @@ final class LiveSession: ObservableObject {
                 throw ManagementError.invalidPayload
             }
             authentication = status
+            accountStatusCurrent = true
             if status.flow?.state == .completed {
                 errorMessage = "Sign-in finished before cancellation. Your sign-in is saved; use Sign out to remove it."
             }
         } catch {
             guard token == generation else { return }
-            errorMessage = Self.describe(error)
+            if case ManagementError.backendError("INVALID_TRANSITION", _) = error {
+                errorMessage = "Sign-in is finishing. Checking the saved result before closing."
+            } else { errorMessage = Self.describe(error) }
+            if authentication?.flow?.flowID == flow.flowID, signInPending {
+                pollSignIn(flowID: flow.flowID, generation: token)
+            }
         }
         if token == generation { accountBusy = false }
     }
 
     func signOut() async {
-        guard let client, isReady, supports(.authLogout), !accountBusy else { return }
+        guard let client, canDisconnectAccount else {
+            errorMessage = "Check the current saved sign-in before disconnecting. No credentials were removed."
+            return
+        }
         authenticationGeneration += 1
         accountBusy = true
         authTask?.cancel()
         authentication = nil
+        accountStatusCurrent = false
         selectedProduct = nil
         products = []
         nextCursor = nil
@@ -309,8 +366,9 @@ final class LiveSession: ObservableObject {
             guard token == generation else { return }
             guard status.state == .signedOut else { throw ManagementError.invalidPayload }
             authentication = status
+            accountStatusCurrent = true
             diagnosticPreview = nil
-            await search(currentQuery)
+            await refreshCatalog(currentQuery)
         } catch {
             guard token == generation else { return }
             errorMessage = Self.describe(error)
@@ -336,6 +394,7 @@ final class LiveSession: ObservableObject {
             discoveryRevision = nil
         }
         searching = true
+        catalogStopped = false
         catalogError = nil
         do {
             let cursor: JSONValue = more ? nextCursor.map(JSONValue.string) ?? .null : .null
@@ -363,15 +422,85 @@ final class LiveSession: ObservableObject {
             discoveryCheckedAt = nil
             discoveryRevision = nil
         } catch {
-            guard token == generation, searchToken == queryGeneration else { return }
+            guard token == generation, searchToken == queryGeneration, !Task.isCancelled else { return }
             catalogError = Self.describe(error)
         }
     }
 
     func refreshCatalog(_ query: String, more: Bool = false) async {
-        if query.isEmpty, supports(.discover) {
+        let scopedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if scopedQuery.isEmpty, supports(.discover) {
             await browseDiscovery(more: more)
-        } else { await search(query, more: more) }
+        } else if !scopedQuery.isEmpty, supports(.query) {
+            await queryStore(scopedQuery, more: more)
+        } else { await search(scopedQuery, more: more) }
+    }
+
+    func stopCatalogSearch() {
+        guard searching else { return }
+        queryGeneration += 1
+        searching = false
+        catalogStopped = true
+        catalogError = nil
+    }
+
+    private func queryStore(_ query: String, more: Bool) async {
+        guard isReady, supports(.query), let client else { return }
+        guard validScope else { catalogError = "Use a two-letter market and a language such as en-US."; return }
+        if more && (searching || catalogCorpus != "publicMicrosoftStoreSearch" || nextCursor == nil
+                    || currentQuery != query) { return }
+        queryGeneration += 1
+        let queryToken = queryGeneration, token = generation
+        let cursor = more ? nextCursor : nil
+        if !more {
+            products = []
+            nextCursor = nil
+            discoveryFailures = []
+            discoveryCheckedAt = nil
+            discoveryRevision = nil
+            cacheRevision = nil
+            catalogCorpus = "publicMicrosoftStoreSearch"
+        }
+        currentQuery = query
+        searching = true
+        catalogStopped = false
+        catalogError = nil
+        defer { if token == generation, queryToken == queryGeneration { searching = false } }
+        do {
+            let page = try await client.request(.query, params: [
+                "query": .string(query), "market": .string(market), "language": .string(language),
+                "limit": .integer(8), "cursor": cursor.map(JSONValue.string) ?? .null
+            ], timeout: .seconds(45)).decode(CatalogQuery.self)
+            guard token == generation, queryToken == queryGeneration, !Task.isCancelled else { return }
+            try applyQueryPage(page, query: query, more: more, cursor: cursor)
+        } catch {
+            guard token == generation, queryToken == queryGeneration, !Task.isCancelled else { return }
+            if case let ManagementError.queryFailed(page) = error {
+                do { try applyQueryPage(page, query: query, more: more, cursor: cursor) }
+                catch { catalogError = Self.describe(error); return }
+            }
+            catalogError = Self.describe(error)
+        }
+    }
+
+    private func applyQueryPage(_ page: CatalogQuery, query: String, more: Bool, cursor: String?) throws {
+        try page.validatePublicScope(query: query, market: market, language: language, limit: 8)
+        let existingIDs = Set(products.map(\.id) + discoveryFailures.map(\.id))
+        let incomingIDs = Set(page.products.map(\.id) + page.failures.map(\.id))
+        if more {
+            guard existingIDs.isDisjoint(with: incomingIDs), existingIDs.count + incomingIDs.count <= 512,
+                  page.nextCursor != cursor else {
+                throw ManagementError.backendError("REVISION_CONFLICT", retryable: true)
+            }
+            products += page.products
+            discoveryFailures += page.failures
+        } else {
+            products = page.products
+            discoveryFailures = page.failures
+        }
+        nextCursor = page.nextCursor
+        discoveryCheckedAt = page.checkedAt
+        catalogCorpus = page.corpus
     }
 
     private func browseDiscovery(more: Bool) async {
@@ -392,6 +521,7 @@ final class LiveSession: ObservableObject {
         }
         currentQuery = ""
         searching = true
+        catalogStopped = false
         catalogError = nil
         defer { if token == generation, queryToken == queryGeneration { searching = false } }
         do {
@@ -402,7 +532,7 @@ final class LiveSession: ObservableObject {
             guard token == generation, queryToken == queryGeneration, !Task.isCancelled else { return }
             try applyDiscoveryPage(page, more: more, cursor: cursor)
         } catch {
-            guard token == generation, queryToken == queryGeneration else { return }
+            guard token == generation, queryToken == queryGeneration, !Task.isCancelled else { return }
             if case let ManagementError.discoveryFailed(page) = error {
                 do { try applyDiscoveryPage(page, more: more, cursor: cursor) }
                 catch { catalogError = Self.describe(error); return }
@@ -445,6 +575,7 @@ final class LiveSession: ObservableObject {
         catalogCorpus = "observedPublicProducts"
         catalogError = nil
         searching = false
+        catalogStopped = false
     }
 
     func lookupProduct() async {
@@ -536,9 +667,9 @@ final class LiveSession: ObservableObject {
     static func describe(_ error: Error) -> String {
         if case let ManagementError.backendError(code, _) = error {
             switch code {
-            case "AUTH_INVALID": return "The saved sign-in could not be validated. Sign in again to repair it."
+            case "AUTH_INVALID": return "The saved sign-in could not be validated. Check status before disconnecting and reconnecting it."
             case "AUTH_REQUIRED": return "Sign in with Microsoft before continuing."
-            case "AUTH_EXPIRED": return "Your saved sign-in expired. Sign in again."
+            case "AUTH_EXPIRED": return "Your saved sign-in expired. Check status, then disconnect it before signing in again."
             case "CURSOR_INVALID", "REVISION_CONFLICT":
                 return "The catalog changed while browsing. Refresh this scope before loading more."
             default: break
