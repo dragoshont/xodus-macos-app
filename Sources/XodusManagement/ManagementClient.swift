@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import Darwin
 import Foundation
+import OSLog
 
 public struct BackendConfiguration: Sendable {
     public let executable: URL
@@ -16,6 +17,7 @@ public actor ManagementClient {
     public nonisolated let events: AsyncThrowingStream<ManagementEvent, Error>
     private let eventContinuation: AsyncThrowingStream<ManagementEvent, Error>.Continuation
     private let validator: ContractValidator
+    private let logger = Logger(subsystem: "io.github.dragoshont.xodus.development", category: "management")
     private let writer = DispatchQueue(label: "Xodus.management.stdin")
     private var process: Process?
     private var stdin: FileHandle?
@@ -72,6 +74,7 @@ public actor ManagementClient {
         catch { throw ManagementError.startFailed }
         process = child
         stdin = input.fileHandleForWriting
+        logger.info("Management process started.")
 
         let stdout = Self.chunks(output.fileHandleForReading, label: "Xodus.management.stdout")
         outputTask = Task { [weak self] in
@@ -194,6 +197,7 @@ public actor ManagementClient {
                     throw ManagementError.invalidPayload
                 }
                 hello = negotiated
+                logger.info("Management protocol negotiated.")
             }
             pending.removeValue(forKey: id)
             waiter.deadline.cancel()
@@ -238,7 +242,8 @@ public actor ManagementClient {
     }
 
     private func timedOut(_ id: String) {
-        guard pending[id] != nil else { return }
+        guard let waiter = pending[id] else { return }
+        logger.error("Management request timed out: \(waiter.command.rawValue, privacy: .public).")
         fail(.requestTimedOut)
     }
 

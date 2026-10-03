@@ -73,7 +73,7 @@ final class LiveSession: ObservableObject {
         case .expired: return "Sign-in expired"
         case .invalid: return "Sign-in needs attention"
         case .signedOut: return "Sign in to Xbox"
-        case nil: return "Account status unavailable"
+        case nil: return "Account"
         }
     }
 
@@ -131,7 +131,7 @@ final class LiveSession: ObservableObject {
                     await self.connectionFailed(error)
                 }
             }
-            await refreshAccount()
+            // Credential-store authorization belongs to explicit Account actions, not anonymous startup.
             await refreshInstalled()
             await search("")
         } catch {

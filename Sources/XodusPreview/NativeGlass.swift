@@ -48,7 +48,12 @@ struct FloatingNavigation: View {
                         }
                 }
                 .buttonStyle(.plain)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(destination.rawValue)
+                .accessibilityIdentifier("xodus.navigation.\(destination.rawValue.lowercased())")
+                .accessibilityAddTraits(.isButton)
                 .accessibilityAddTraits(state.destination == destination ? .isSelected : [])
+                .accessibilityAction { state.navigate(destination) }
             }
         }
 

@@ -36,6 +36,9 @@ struct LiveAccountView: View {
                 if session.signInPending {
                     Text("Complete Microsoft sign-in in the native authentication window. You can cancel without connecting an account.")
                         .fixedSize(horizontal: false, vertical: true)
+                } else if session.authentication == nil && session.isReady {
+                    Text("Check your saved sign-in or sign in with Microsoft. Public browsing does not read your Keychain.")
+                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 } else if let flow = session.authentication?.flow {
                     if flow.state == .cancelled {
                         Label("Sign-in cancelled. No new connection was assumed.", systemImage: "xmark.circle")

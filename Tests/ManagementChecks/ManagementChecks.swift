@@ -233,6 +233,8 @@ actor Checks {
             }
             if hello.supports(.jobs) {
                 let snapshot = try await client.request(.jobs).decode(JobsSnapshot.self)
+                check(snapshot.sessionID == hello.sessionID,
+                      "Actual activity snapshot belongs to the negotiated engine session")
                 var activity = ActivityStore()
                 try activity.apply(snapshot)
                 check(!activity.needsSnapshot, "Actual authoritative durable activity snapshot")

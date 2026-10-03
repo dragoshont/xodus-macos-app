@@ -32,7 +32,11 @@ struct LiveRootView: View {
                                 .font(.title2).frame(width: 48, height: 48).modifier(NativeGlass())
                         }
                         .buttonStyle(.plain).padding(.trailing, 24)
+                        .accessibilityElement(children: .ignore)
                         .accessibilityLabel(session.accountLabel)
+                        .accessibilityIdentifier("xodus.account")
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityAction { state.showingAccount = true }
                     }
                 Label(session.isReady ? "Live Xodus connection - development build" : "Xodus for Mac - development build",
                       systemImage: session.isReady ? "cable.connector" : "hammer")

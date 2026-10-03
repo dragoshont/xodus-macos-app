@@ -4,6 +4,23 @@ Recorded 2026-10-03. This is evidence for the **fixture foundation**, not live a
 
 ## Bounded discovery and default application startup
 
+Follow-up recorded 2026-10-04: the initial PID graph below did **not** establish
+sustained startup. Bounded own-window inspection subsequently found the local
+timeout message and no engine child. Added privacy-safe OSLog evidence identified
+`auth.status` as the exact stalled GUI request; hello and activity negotiation
+succeeded, and a same-state SSH probe confirmed matching hello/snapshot session
+identities. No native permission was approved.
+
+Anonymous startup now performs registry/catalog work without a Keychain read.
+The rebuilt normal LaunchServices app retained its included engine beyond the
+original 30-second failure deadline. Exact-PID/bundle/window-checked Accessibility
+presses successfully opened **Discover, Downloads, Library and Account**. The
+account sheet exposed the authored unchecked-status explanation; it did not read
+credentials or start sign-in. Navigation and profile controls now have explicit
+button/press semantics and stable identifiers. The committed helper logs only
+allowlisted public UI labels, not product/account data. This confirms bounded
+normal startup/navigation, not full VoiceOver, live compositor or account consent.
+
 The discovery follow-up passed **14 core + 130 management + 24 presentation =
 168 checks**, zero failures. Canonical schema is now producer commit `790f5c4`,
 SHA256 `2ede71d5171cf4dc1659fedfc99187a90d904d9264119a22ee9f94064baef3d2`;
@@ -14,7 +31,8 @@ page cannot masquerade as successful discovery. Source language and same-base
 neutral fallback, inaccessible-Keychain errors and scoped catalog invalidation
 are covered.
 
-**Ten actual engine checks passed**, including two source-backed anonymous PC Game
+**Eleven actual engine checks passed**, including explicit hello/snapshot session
+identity and two source-backed anonymous PC Game
 Pass discovery pages with distinct identities/stable cursor, and actual title
 search in the resulting checked cache. This is not global Store search or owned
 inventory. The refined authentication result identifies an inaccessible
@@ -28,9 +46,9 @@ embedded local SHA256 is
 `62cb9564478d2a2bcee472b6f7d6865f5f3007a0314e30c7a06537523820f175`.
 Actual default LaunchServices entry (`open Xodus.app`, no live/backend flags or
 environment override) started the application and its own included-engine child.
-That PID/parent relationship establishes default embedded selection, not complete
-account UI behavior; the coordinator's bounded own-window AX confirmation is
-recorded separately when available. Missing/nonexecutable embedded engines show
+That initial PID/parent relationship established default embedded selection only;
+the failed sustained startup and its verified correction are recorded above.
+Missing/nonexecutable embedded engines show
 an actionable error and do not silently reuse saved developer binaries or fixtures.
 
 Hosted follow-up CI retrieval is currently blocked by a GitHub network timeout;
