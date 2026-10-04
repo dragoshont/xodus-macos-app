@@ -9,9 +9,13 @@ public struct ContractValidator: Sendable {
         guard let url = Bundle.module.url(forResource: "management-v1.schema", withExtension: "json") else {
             throw ManagementError.unsupportedSchema
         }
-        do { root = try JSONDecoder().decode(JSONValue.self, from: Data(contentsOf: url)) }
+        try self.init(schemaURL: url, schemaIdentifier: "urn:xodus:management:1.0")
+    }
+
+    public init(schemaURL: URL, schemaIdentifier: String) throws {
+        do { root = try JSONDecoder().decode(JSONValue.self, from: Data(contentsOf: schemaURL)) }
         catch { throw ManagementError.unsupportedSchema }
-        guard root["$id"]?.string == "urn:xodus:management:1.0" else {
+        guard root["$id"]?.string == schemaIdentifier else {
             throw ManagementError.unsupportedSchema
         }
     }
@@ -45,8 +49,10 @@ public struct ContractValidator: Sendable {
            !choices.contains(where: { matches(value, schema: $0, depth: depth + 1) }) { return false }
         if let choices = rules["allOf"]?.array,
            !choices.allSatisfy({ matches(value, schema: $0, depth: depth + 1) }) { return false }
-        if let condition = rules["if"], matches(value, schema: condition, depth: depth + 1),
-           let consequent = rules["then"], !matches(value, schema: consequent, depth: depth + 1) { return false }
+        if let condition = rules["if"] {
+            let branch = matches(value, schema: condition, depth: depth + 1) ? rules["then"] : rules["else"]
+            if let branch, !matches(value, schema: branch, depth: depth + 1) { return false }
+        }
         if let object = value.object {
             let required = rules["required"]?.array?.compactMap(\.string) ?? []
             if !required.allSatisfy({ object[$0] != nil }) { return false }

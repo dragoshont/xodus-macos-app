@@ -9,7 +9,7 @@ real Microsoft access or compatibility.
 
 ## Navigation and search
 
-One native Mac window with user-directed **floating fully rounded Library / Discover / Downloads Glass capsule**, separate trailing circular account control, immersive art beneath native titlebar and prominent scoped Search. Library is the proposed first screen: artwork-led focused-game area, compact Continue Playing, then Your Games/count/sort-filter and adaptive horizontal square-icon entries with separate access/compatibility text and contextual action. Discover has immersive feature/browse/shelves; detail imagery is edge-to-edge. Search is scoped to the current tab; Downloads uses a queue, not catalog search. Command-1/2/3 navigate and Command-F focuses search. Native Settings has account/storage and Advanced diagnostics. Back from a detail sheet restores selection and scroll position. No persistent sidebar, Friends or Arcade destination.
+One native Mac window with full-width system toolbar chrome, native traffic lights and no visible app title. Library / Discover / Downloads and compact stock search share the principal toolbar group; Account stays separately trailing. The older floating-capsule mock direction is superseded. Original artwork extends beneath system chrome, without custom tint or decorative glass; whole-toolbar placement/tint still awaits safe live visual confirmation. Library is the proposed first screen: artwork-led focused-game area, compact Continue Playing, then Your Games/count/sort-filter and adaptive horizontal square-icon entries with separate access/compatibility text and contextual action. Discover has immersive feature/browse/shelves; detail imagery is edge-to-edge. Search is scoped to the current tab; Downloads uses a queue, not catalog search. Command-1/2/3 navigate and Command-F focuses search. Native Settings has account/storage, declared runtime configuration and Advanced diagnostics. Back from a detail sheet restores selection and scroll position. No persistent sidebar, Friends or Arcade destination.
 
 [Editable FigJam flow](https://www.figma.com/board/3MejlFaXHkogmJ3J5k79Gw) and [latest v0.2 Figma mockups](https://www.figma.com/design/5iQu716UFImHjRxJkf0t8V?node-id=3-115) are proposed UX artifacts, not observed API behavior or exact system compositor effects.
 
@@ -25,6 +25,17 @@ One native Mac window with user-directed **floating fully rounded Library / Disc
 | Settings | Account, destination, safe updates | Disconnect confirms impact on jobs; storage picker checks access; diagnostics explicitly advanced/redacted. License and distribution details await decision. |
 
 ## Critical paths
+
+**Declared runtime configuration:** Settings -> choose GPTK3, GPTK4,
+legitimately user-installed CrossOver or standalone/source-built Wine ->
+optionally declare separate provider/Wine/graphics metadata -> request a fresh
+isolated plan or cancel. Initial selection is empty, not the external GPTK4
+trial default. Blank versions/hashes remain unknown. Changing any component
+clears previous planning evidence. A valid plan still says not inspected,
+device preflight not performed, no game verified and Play unavailable; it
+creates no prefix and touches no bottles/saves. Unsupported older engine,
+invalid response, timeout and cancellation are explicit states. Fixture
+Settings share the declarations but keep the planning action disabled.
 
 **Connection:** Welcome -> connect(request ID) -> approved callback -> validated credentials in Keychain -> inventory snapshot. Cancellation from any intermediate state -> signed out. A "login successful" string without tokens -> explicit authentication failure.
 

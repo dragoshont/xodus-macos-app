@@ -85,6 +85,30 @@ claim, entitlement promotion or launch occurs.
 
 ## Producer pin
 
+### Separate runtime configuration consumer
+
+Native Settings now share a bounded four-provider section with fixture Settings.
+`RuntimeProviderSettings` holds in-memory declarations with initial nil selection;
+its action uses `RuntimePlanClient`, not `LiveSession` authentication or C95.
+Required nullable fields are explicitly encoded as JSON null. The client uses
+the selected trusted executable's sole `runtime-plan` argument, filtered
+nonsecret environment, nonblocking pipes, explicit stdin EOF, finite deadline
+and exact-owned-process cleanup. It validates strict unique JSON keys, canonical
+schema, configuration echo and configuration-hash/generation path correlation.
+Nonzero exit discards even valid-looking output. Pending cancellation cannot
+publish a late plan. No component path picker/inspection, provider launch,
+prefix creation, save reuse, install/play promotion or production-engine trial
+is included.
+
+Source producer is independently frozen
+`9ef0f298481fb48840734b538e0f6d22e1c98ff3`; schema LF SHA256
+`90c094e4585af059b5ebcfc3201260362e88aa642b50ec0388a03427260d55e9`
+and fixture SHA256
+`76a0d791c99a6c77e12581a4361dbe6e37a0dbd29f2e556ef292bbbc360bc40c`.
+The schema is a separate bundle resource; C95 and the reviewed Swift auth-host
+source remain unchanged. This integration is source/headless only, not deployed
+or a claim of any installed/runtime/game qualification.
+
 The current schema/fixture pin is public producer commit
 `e3129cee422305657b945d35daf2f780ffe98e2b` in `dragoshont/xodus-macos`,
 branch `dragoshont-xodus-launcher-management`: 79 positive, 20 negative and four

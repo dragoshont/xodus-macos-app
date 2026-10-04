@@ -18,6 +18,7 @@ The original offline demonstration is now an explicit `--fixture` mode. Its titl
 | [UX flows](docs/UX-FLOWS.md) | Screens, cancellation, loading, degraded and recovery states |
 | [Architecture](docs/ARCHITECTURE.md) | SwiftUI/AppKit boundary, Rust adapter and trust model |
 | [Backend contract](docs/BACKEND-CONTRACT.md) | Pinned scoped management protocol and future lifecycle requirements |
+| [Runtime providers](docs/RUNTIME-PROVIDERS.md) | Four declared presets and separately versioned, configuration-only planning |
 | [Native integration](docs/NATIVE-INTEGRATION.md) | Actual native client, developer app bundle, limitations and producer pin |
 | [Research and decisions](docs/RESEARCH.md) | Evidence, leads, uncertainties and decision register |
 | [Milestones](docs/MILESTONES.md) | Release gates; prototype is not a production milestone |
@@ -48,6 +49,17 @@ open dist/Xodus.app
 The optional positional argument to `build_app.sh` is an explicit matching management-engine executable. The script now requires clean committed source and includes the dependency-free Swift `XodusAuthHost`, its resources and fixed-path/version/post-sign-hash metadata. This packaging revision has **not been executed or deployed**. Its private worker integration requires a separately reviewed matching producer; unchanged management-schema bytes alone do not establish compatibility. The current deployed producer still owns its older worker. A future package is an **ad-hoc-signed development app**, not a notarized/distributed installer or signed gameplay runtime. Runtime licensing and public distribution remain separate gates.
 
 The proposed deployment baseline is **macOS 14**, not a user-approved support commitment. The shared native toolbar groups Library / Discover / Downloads with compact stock `NSSearchField` search: real `.tabs` on macOS 27+, segmented fallback on 14-26. Search expands for editing, Command-F or a retained query; Account stays separate at the trailing edge. The Scene hides the visible title while retaining native traffic lights and app identity. Original hero artwork extends behind system chrome without a sampled tint or fabricated glass overlay. Account content scrolls independently of its adaptive action footer, and normal activation remains AppKit-owned. These source corrections are built and headlessly checked, **not deployed or visually confirmed**; artwork-dependent toolbar tint is still a live compositor gate.
+
+Native Settings source now exposes **Apple GPTK3, Apple GPTK4, legitimately
+user-installed CrossOver, and standalone/source-built Wine**, with no initial
+selection. Wine and graphics versions, sources and hashes are independent
+declarations, not detected installations. The bounded `runtime-plan` client
+requests a fresh isolated configuration plan from an explicitly selected trusted
+engine; it does not inspect a runtime, create a prefix, migrate saves or enable
+Play. Older engines report planning unavailable, without an authentication or
+provider fallback. The fixture Settings share these choices but cannot start
+planning. This separate source revision is not deployed; runtime licensing,
+component verification and actual gameplay remain open gates.
 
 `XodusAuthHost` implements AppKit/WebKit window ownership and a strict private,
 anonymous-channel protocol. Its exact seven-string legacy handoff remains

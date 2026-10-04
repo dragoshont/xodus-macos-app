@@ -16,7 +16,8 @@ let package = Package(
     targets: [
         .target(name: "XodusCore"),
         .target(name: "XodusManagement", dependencies: ["XodusCore"],
-                resources: [.copy("Resources/management-v1.schema.json")]),
+                resources: [.copy("Resources/management-v1.schema.json"),
+                            .copy("Resources/runtime-providers-v1.schema.json")]),
         .executableTarget(name: "XodusPreview", dependencies: ["XodusCore", "XodusManagement"],
                           resources: [.copy("Resources/Artwork")]),
         .executableTarget(name: "XodusAuthHost", resources: [.copy("Resources")]),

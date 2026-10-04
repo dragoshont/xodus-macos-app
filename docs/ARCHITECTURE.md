@@ -31,6 +31,19 @@ account/catalog/install/queue management. No private Rust source is imported.
 
 ## Model and ownership
 
+Runtime declarations use a separate version-one configuration model and
+`runtime-plan` subprocess, not a C95 operation or an authentication route.
+Four native presets start unselected. Provider, engine and graphics metadata
+have independent nullable versions/hashes and provenance. The schema evaluator
+is shared, including the provider schema's conditional `else`; duplicate-key
+checking happens before Foundation decoding can erase duplicates.
+The caller writes bounded stdin then EOF, drains bounded output/diagnostics,
+requires clean exit zero and validates the configuration echo plus generation/
+configuration-hash relative path before accepting a plan. Cancellation/deadline
+cleanup stops and reaps only its owned planning child. No provider path is read,
+prefix created, save migrated or installation/device/game evidence promoted.
+See [the separately pinned provider contract](RUNTIME-PROVIDERS.md).
+
 `ProductID` identifies a catalog product; edition identity, package identity/version, market, language and architecture remain separate. Entitlement is purchase/subscription/none/unknown, with provenance/time and expiry where supplied. Installability is downloadable/blocked/unknown with a reason and pinned package. Compatibility is verified/experimental/unsupported/unknown with OS/architecture/runtime fingerprint. Local installation has its own version/runtime/state; no boolean `supported` or title-string lookup.
 
 The Rust management layer owns credential proof/SOAP, the isolated Keychain

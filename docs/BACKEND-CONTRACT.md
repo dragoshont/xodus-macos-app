@@ -56,6 +56,18 @@ This example is synthetic, not runtime certification. Capability entries are typ
 
 ## Commands and ownership
 
+`xodus runtime-plan` is a **separate configuration-only route**, pinned to public
+producer `9ef0f298481fb48840734b538e0f6d22e1c98ff3` and namespace
+`urn:xodus:runtime-provider-configuration:1`; it adds no management operation.
+The [provider contract](RUNTIME-PROVIDERS.md) defines explicit stdin EOF and
+required nullable fields. Native consumption caps input at 16,384 bytes, stdout
+at 32,768 bytes and discarded stderr at 8,192 bytes, with a five-second default
+deadline. Exactly one JSON line and clean exit zero are required; all stdout
+is discarded on nonzero/signal/error. Extra/duplicate/wrong-type fields, a
+different configuration, mismatched generation/path/digest, evidence promotion
+or launchable=true are rejected. An older engine reports planning unavailable;
+there is no synthetic success, provider probe or auth fallback.
+
 The exact implemented parameter/result shapes are in the canonical schema, not inferred from this forward-looking table. The scoped producer supports public-product metadata/search, catalog-refresh jobs, management-only registry snapshots and redacted diagnostics; sign-in uses separately agreed backend-owned native flow metadata. `auth.logout` takes `{}` and confirms `signedOut` only after successful launcher-profile disconnect; device retention must succeed before user removal. CLI/other-app profiles are separate, never implicitly imported or removed. No successful game-install/launch/update object is promised by the scoped implementation.
 
 | Command | Required input | Result/behavior |

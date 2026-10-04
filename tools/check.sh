@@ -3,6 +3,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 python3 tools/sync_contract.py
+python3 tools/sync_runtime_provider_contract.py --check
 swift build
 swift run XodusFixtureChecks
 swift run XodusManagementChecks

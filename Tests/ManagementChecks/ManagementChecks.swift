@@ -7,6 +7,7 @@ import XodusManagement
 @main
 enum ManagementChecks {
     static func main() async {
+        if CommandLine.arguments.dropFirst().first == "runtime-plan" { MockRuntimePlan.run() }
         if CommandLine.arguments.dropFirst().first == "manage" { MockBackend.run() }
         let checks = Checks()
         do {
@@ -58,6 +59,7 @@ actor Checks {
     }
 
     func run() async throws {
+        try await runtimePlanChecks()
         try hostBindingChecks()
         let validator = try ContractValidator()
         let positive = try fixture("positive").array ?? []

@@ -31,6 +31,7 @@ final class SheetInteraction: ObservableObject {
 
 @MainActor
 final class AppState: ObservableObject {
+    let runtimeSettings = RuntimeProviderSettings()
     @Published var fixtureMode = CommandLine.arguments.contains("--fixture")
         || CommandLine.arguments.contains("--export-preview")
     @Published var showingAccount = false

@@ -1,12 +1,42 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import AppKit
 import SwiftUI
+import XodusCore
 
 @MainActor
 enum NativeUIChecks {
     static func run(check: (Bool, String) -> Void) {
         let application = NSApplication.shared
         let windows = application.windows.count
+        let runtime = RuntimeProviderSettings()
+        check(runtime.configuration == nil && runtime.plan == nil && !runtime.planning,
+              "Runtime Settings start with no provider selected, no trial-default inheritance and no plan")
+        for provider in RuntimeProviderKind.allCases {
+            runtime.select(provider)
+            check(runtime.configuration == .preset(provider) && runtime.plan == nil,
+                  "Each native provider selection is a declaration, not installation or game evidence")
+        }
+        runtime.text(\.engine.version).wrappedValue = "11.0"
+        runtime.text(\.graphics.version).wrappedValue = "4.0"
+        check(runtime.configuration?.engine.version == "11.0"
+              && runtime.configuration?.graphics.version == "4.0" && runtime.plan == nil,
+              "Engine and graphics version bindings remain independent and invalidate previous planning evidence")
+        runtime.text(\.engine.version).wrappedValue = ""
+        check(runtime.configuration?.engine.version == nil && runtime.configuration?.graphics.version == "4.0",
+              "Clearing a declared version means unknown, not a copied graphics version")
+        for width in [CGFloat(440), CGFloat(560)] {
+            let host = NSHostingView(rootView: Form {
+                RuntimeProviderSection(settings: runtime, backendPath: "")
+            }.formStyle(.grouped))
+            host.sizingOptions = []
+            host.frame = CGRect(x: 0, y: 0, width: width, height: 600)
+            host.layoutSubtreeIfNeeded()
+            check(host.window == nil && host.frame.width == width,
+                  "Runtime Settings allocate and lay out detached native controls at constrained Mac widths")
+        }
+        runtime.select(nil)
+        check(runtime.configuration == nil && runtime.plan == nil && runtime.errorMessage == nil,
+              "Clearing native provider selection leaves no fabricated default or plan")
         check(NativeToolbarSearch.width(text: "", focused: false) == 32
               && NativeToolbarSearch.width(text: "", focused: true) == 220,
               "Grouped native toolbar search stays compact until native editing or Command-F focus")

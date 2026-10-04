@@ -102,6 +102,16 @@ let checks: [(String, () throws -> Void)] = [
         job.retry()
         try require(job.phase == .queued, "Retry should create no fictional completed bytes")
     }),
+    ("All four user-directed provider choices retain separate typed identities", {
+        try require(Set(RuntimeProviderKind.allCases.map(\.rawValue)) ==
+                    ["gptk3", "gptk4", "crossover", "standaloneWine"],
+                    "No provider may be replaced by the external trial default")
+        try require(Set(RuntimeProviderKind.allCases.map(\.label)).count == 4,
+                    "Every provider needs its own native setting label")
+        let bytes = try JSONEncoder().encode(RuntimeProviderKind.allCases)
+        try require(try JSONDecoder().decode([RuntimeProviderKind].self, from: bytes) ==
+                    RuntimeProviderKind.allCases, "Provider identities must round trip")
+    }),
     ("Identity separation and typed JSON round trip", {
         for game in Fixtures.games {
             try require(game.id != game.editionID, "Product and edition are distinct")

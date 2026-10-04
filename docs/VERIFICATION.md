@@ -4,6 +4,51 @@ Foundation recorded 2026-10-03; subsequent native/read-only milestones are
 identified separately below. None establishes successful human authentication,
 game download, install or gameplay.
 
+## Separate four-provider native configuration and pure-plan consumption
+
+The source revision following auth correction619 adds selectable Apple GPTK3,
+GPTK4, legitimately user-installed/licensed CrossOver and standalone/source-built
+Wine to the shared native Settings Form. Initial selection is nil. Provider,
+engine and graphics metadata are independently declared; required nullable
+keys are present as JSON null, not omitted or populated with guessed versions.
+The canonical source producer is
+`9ef0f298481fb48840734b538e0f6d22e1c98ff3`, separate from auth producer943.
+
+A new owned isolated stage, `app-runtime-providers-Pb0cum`, builds native
+release source. All **658 checks pass**, zero failures:
+15 core +352 management +60 presentation +144 mock session +87 private host.
+The85 new/extended management checks include actual canonical four-preset
+outgoing key/null parity, five positive configurations/four invalid configurations,
+required-null omission, independent component/configuration identity, schema
+conditional provenance, exact echo/path/generation correlation, evidence
+promotion, extra/duplicate/escaped-duplicate/wrong-type/oversized/truncated/
+multiple/nonUTF8 responses, invalid metadata and actual mock subprocesses.
+Neutral child processes validate actual stdin plus explicit EOF, return fresh
+generations, exercise unavailable old engines and valid-looking nonzero exits,
+bounded stderr, signals, deadline escalation and cancellation/reaping. They
+never execute a runtime/provider or invoke authentication. Ten additional
+detached native checks exercise selection/binding/clearing and constrained
+Form allocation, not screenshots, VoiceOver or live visual conformance.
+
+The isolated launcher SHA256 is
+`3a7e704cb4a169f612e6dcfd7e6423ec0c70caad6bf41ce0e165582d21cde532`;
+host SHA256 is
+`8e0b55a2bcc8bde04bb72fe0319c64959cabc2e011f653feb718c7352c26d696`.
+The reviewed auth-host source has no diff from619; stage executable hashes are
+not evidence of packaging or deployment. All56 Package/Sources/Tests compiler,
+resource and fixture inputs match the local source after LF normalization; the
+input manifest SHA256 is
+`c1ec82d17a0366625449e393427f2f66bc13a4991f780c3bfdedac9b7c41b9c3`.
+All28 protected public files match
+before/after, including deployed97e launcher, signed4d04/unsigned304 engines,
+adjacent provenance, original releaseac497, bundled resources/signature files
+and the untouched anonymous preview1a1. No signing, packaging, desktop action,
+reference capture, provider/runtime/game inspection, Keychain/status query or
+production-engine invocation occurred. Runtime installation/inspection, device
+preflight, per-game results, launch, license/distribution and save lifecycle are
+still separate unfulfilled gates. Hosted evidence for619 does not qualify this
+new provider revision; its publication needs its own automatic normal-push run.
+
 ## Reviewed opaque-ticket correction and protected human handoff
 
 The twenty-one-pair diagnostics-only pairing used producer
@@ -91,8 +136,14 @@ review delta. C95, twenty-one diagnostics, private schema/fixture, crypto,
 production URL/client/UA/header policy and header source remain unchanged.
 Current deployed artifacts and the old anonymous preview are not modified.
 No signing, packaging, deployment, GUI action, credential/Keychain/provider
-operation or authentication-success claim is included. Same-context paired
-review closure is still required.
+operation or authentication-success claim is included. Retained SAME review
+turn10 closed both surgical corrections against unchanged auth producer943,
+with no significant new source regression. The exact619 normal-push hosted
+[run37208819522](https://github.com/dragoshont/xodus-macos-app/actions/runs/37208819522)
+also succeeded on actual Xcode27.0 build27A266a, SDK27.0 and macOS27.0:
+14+267+50+144+87=562, zero failures, plus SVG reproducibility. The parent
+independently retrieved metadata and the full public log. These are source/
+headless qualifications, not live authentication, biometric or deployment GO.
 
 ## Consolidated native header and Swift authentication host: source-only evidence
 

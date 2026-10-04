@@ -17,6 +17,8 @@ Push-Location $root
 try {
     python tools\sync_contract.py
     if ($LASTEXITCODE -ne 0) { throw 'Schema resource generation failed.' }
+    python tools\sync_runtime_provider_contract.py --check
+    if ($LASTEXITCODE -ne 0) { throw 'Pinned runtime provider schema resource differs.' }
     & tar -cf $archive Package.swift Sources Tests tools docs README.md PRODUCT.md DESIGN.md LICENSE
     if ($LASTEXITCODE -ne 0) { throw 'Public source archive failed.' }
     & scp @options $archive "${SshTarget}:${RemoteDirectory}/xodus-public-app-transfer.tar"

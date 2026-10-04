@@ -147,6 +147,7 @@ struct LiveSettingsView: View {
                     Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.secondary)
                 }
             }
+            RuntimeProviderSection(settings: state.runtimeSettings, backendPath: session.backendPath)
             Section("Account") {
                 LabeledContent("Status", value: session.accountLabel)
                 Button("Open account") { state.showingAccount = true }

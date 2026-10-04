@@ -32,6 +32,17 @@ Develop and verify native code on the user's Mac over trusted SSH, using isolate
 
 **User-decided:** original app code/docs/art use GPL-3.0-only, matching the user's stated Xodus licensing intent without assuming an "or later" grant.
 
+**User-directed runtime follow-up:** selectable Apple GPTK3, Apple GPTK4,
+legitimately user-installed/licensed CrossOver, and user-selected standalone or
+source-built Wine. GPTK4 is only the current external trial default, not a
+product-wide selection or compatibility rule. Engine provenance/version and
+graphics backend/provenance/version are independent: Wine 11 plus D3DMetal 4
+is a composition, not an older GPTK Wine version. Configuration, installation,
+device preflight and per-game verification remain distinct. Prefix generations
+must be isolated, without silent reuse/migration/deletion of bottles or saves.
+This separate source follow-up does not change the frozen authentication
+contract, enable launch, import trial proof or establish redistribution rights.
+
 **Proposed/pending:** macOS 14 deployment baseline; exact supported hardware/storage policy; third-party runtime redistribution; distribution/signing model; source of authoritative ownership and package authorization; subscription expiry behavior; compatibility verification governance. See [decision register](docs/RESEARCH.md).
 
 ## Brand commitments

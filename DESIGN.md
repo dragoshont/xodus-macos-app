@@ -77,6 +77,14 @@ modern rendering and constrained-window toolbar placement remain live gates.
 
 ## Original imagery and licensing
 
+Runtime Settings reuse the existing grouped native Form, standard Picker,
+TextField, DisclosureGroup and buttons; no new navigation, decorative material
+or custom control chrome. The four choices start unselected. Advanced component
+declarations remain separate from the primary provider choice, and configuration
+planning never advertises installation or verified gameplay. Fixture mode
+disables planning. Detached controls/layout checks are not a live visual,
+VoiceOver or compositor-conformance claim.
+
 Primary 2048 x 1152 scenes (sunset cliff harbor/ship, textured planetary vista/explorer, alpine lake/forest) are original authored CoreGraphics/ImageIO illustrations. `tools/RenderOriginalArt.swift` reproduces them. Secondary desert/forest/ocean worlds have original SVG source generated with Python's standard library and rasterized via native WebKit.
 
 All are **stylized fixture placeholders, not game screenshots or real covers**. No external images, account data, paid assets, trademarks or AI-image service was used. Sources/provenance and original PNGs are GPL-3.0-only. Production must use properly sourced title-specific catalog art with an explicit rights/caching policy.
