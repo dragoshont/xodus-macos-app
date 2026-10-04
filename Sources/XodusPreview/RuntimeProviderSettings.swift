@@ -143,7 +143,7 @@ struct RuntimeProviderSection: View {
             }
             if let plan = settings.plan {
                 LabeledContent("Planned generation", value: plan.generationID)
-                Text("Not installed or inspected. Device preflight not performed. No game verified; Play remains unavailable.")
+                Text("Installation not inspected. Device preflight not performed. No game verified; Play remains unavailable.")
                     .foregroundStyle(.secondary)
                 Text("No existing bottle, prefix or saves were reused, migrated or deleted. This plan creates no files.")
                     .font(.caption).foregroundStyle(.secondary)

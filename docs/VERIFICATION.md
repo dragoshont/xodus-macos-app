@@ -31,14 +31,17 @@ detached native checks exercise selection/binding/clearing and constrained
 Form allocation, not screenshots, VoiceOver or live visual conformance.
 
 The isolated launcher SHA256 is
-`3a7e704cb4a169f612e6dcfd7e6423ec0c70caad6bf41ce0e165582d21cde532`;
+`655e837b8d38760c71921f3cd0bbf0b1667ad98ffde94c31661e39c22a08fc14`;
 host SHA256 is
 `8e0b55a2bcc8bde04bb72fe0319c64959cabc2e011f653feb718c7352c26d696`.
 The reviewed auth-host source has no diff from619; stage executable hashes are
 not evidence of packaging or deployment. All56 Package/Sources/Tests compiler,
 resource and fixture inputs match the local source after LF normalization; the
 input manifest SHA256 is
-`c1ec82d17a0366625449e393427f2f66bc13a4991f780c3bfdedac9b7c41b9c3`.
+`e40d814ece271ee6cc88d5d42cecf956ba2cfa9de43e314ce66385e97dd786f0`.
+An additive one-string follow-up to `f6a8ad0` says "Installation not inspected",
+not "Not installed": uninspected user-installed CrossOver must not be declared
+absent. The unchanged full658 suite also passes this final source.
 All28 protected public files match
 before/after, including deployed97e launcher, signed4d04/unsigned304 engines,
 adjacent provenance, original releaseac497, bundled resources/signature files
