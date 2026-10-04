@@ -132,6 +132,27 @@ final class LiveSession: ObservableObject {
         }
     }
 
+    var accountFailureSummary: String? {
+        guard let flow = authentication?.flow, flow.state == .failed else { return nil }
+        guard let failure = flow.error else {
+            return "Failure stage is unavailable. No successful sign-in or credential commit was assumed."
+        }
+        let reason: String
+        switch failure.code {
+        case "AUTH_CANCELLED":
+            reason = "The sign-in flow was cancelled. No new connection was assumed."
+        case "AUTH_EXPIRED":
+            reason = "The sign-in flow expired. No completion was assumed."
+        case "AUTH_INVALID":
+            reason = "The sign-in session could not be validated. The failing step is not identified by this engine."
+        case "NETWORK_UNAVAILABLE":
+            reason = "The sign-in flow could not reach a required service. No completion was assumed."
+        default:
+            reason = "No successful sign-in or credential commit was assumed."
+        }
+        return "Sign-in failure code: \(failure.code). \(reason)"
+    }
+
     func supports(_ command: ManagementCommand) -> Bool { hello?.supports(command) == true }
 
     func chooseBackend() {

@@ -86,6 +86,22 @@ enum NativeChecks {
                   "A fresh status read is required to recover from failed sign-in preparation")
             await uncertain.disconnect()
 
+            for scenario in ["failedflow", "failedflownocode"] {
+                let failed = session(scenario)
+                await failed.connect()
+                await failed.refreshAccount()
+                await failed.beginSignIn()
+                let summary = failed.accountFailureSummary ?? ""
+                check(failed.authentication?.flow?.state == .failed && failed.isReady && !failed.signInPending
+                      && !summary.isEmpty && !summary.contains("Original synthetic upstream wording")
+                      && !summary.contains("disconnect") && !summary.contains("saved sign-in"),
+                      "Failed auth flow surfaces a local safe reason without raw upstream message or success")
+                check(scenario == "failedflow" ? summary.contains("AUTH_INVALID")
+                      : summary.contains("Failure stage is unavailable") && !summary.contains("AUTH_INVALID"),
+                      "Auth summary preserves the validated failure code and never invents a missing cause")
+                await failed.disconnect()
+            }
+
             let unavailable = session("transientauth")
             await unavailable.connect()
             await unavailable.refreshAccount()

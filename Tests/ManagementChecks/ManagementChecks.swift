@@ -615,7 +615,8 @@ enum MockBackend {
             if ["inspection", "inspectionmissing", "inspectionmismatch"].contains(scenario) {
                 supported.insert(.inspectInstallation)
             }
-            if ["expired", "expiredpermission", "transientauth", "latecancel", "humanwait", "hangmutation", "beginfail"].contains(scenario) {
+            if ["expired", "expiredpermission", "transientauth", "latecancel", "humanwait", "hangmutation", "beginfail",
+                "failedflow", "failedflownocode"].contains(scenario) {
                 supported.formUnion([.authBegin, .authCancel])
             }
             var loggedOut = false, flowStarted = false, cancelledLate = false
@@ -639,6 +640,19 @@ enum MockBackend {
                     if scenario == "mismatch" { result["protocol"] = .object(["major": .integer(2), "minor": .integer(0)]) }
                     try emit(.object(result))
                 } else {
+                    if ["failedflow", "failedflownocode"].contains(scenario), command == "auth.begin" {
+                        let failure: JSONValue = scenario == "failedflownocode" ? .null : .object([
+                            "code": .string("AUTH_INVALID"), "retryable": .bool(false),
+                            "message": .string("Original synthetic upstream wording must not enter the app summary.")
+                        ])
+                        try emit(.object(result(request, data: .object([
+                            "state": .string("signedOut"), "credentialStore": .string("macOSKeychain"),
+                            "audience": .null, "expiresAt": .null, "entitlementAuthorized": .bool(false),
+                            "flow": .object(["flowID": .string("fixture-failed-flow"),
+                                             "state": .string("failed"), "error": failure])
+                        ]))))
+                        continue
+                    }
                     if scenario == "querynodetails", command == "catalog.query" {
                         try emitFailure(request, code: "PACKAGE_UNAVAILABLE")
                         continue

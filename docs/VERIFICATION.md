@@ -41,6 +41,26 @@ Microsoft/Keychain prompts were not inspected, approved or automated, and no
 automatic retry occurred. The running pair was retained for diagnosis; no
 success-shaped fallback or invented account state is recorded.
 
+### Safe failed-flow reporting correction (source only)
+
+The running retry build displayed only generic failed-flow copy, although its
+typed in-memory flow includes an optional error. That tuple is not exposed by
+this deployed UI, so the attempt's exact code/stage is **unavailable**, not guessed.
+No memory dump, debugger, new status/provider request or another sign-in was
+used to recover it. Current presence-only observations found one owned app
+window and no remaining auth child; they do not prove whether a Microsoft
+window appeared earlier.
+
+Added a source-only native summary showing the validated failure code with
+local static wording, never raw upstream message/exception/XML. AUTH_INVALID
+does not imply stored credentials are invalid or advise deleting them, and a
+missing code explicitly leaves the cause unknown. Four new failure-reporting
+regressions passed within **55 native session checks**, zero failures, against
+mock children only. The current 79003/79007 app/engine remained unchanged at the
+signed hash above; this correction is not yet deployed and cannot retrospectively
+recover the first attempt. Any finer static stage diagnostic requires a
+coordinated, reviewed producer/consumer delta before another human attempt.
+
 ## Store search and adversarial-review app fixes
 
 ### Current inspection pairing and additional client fixes

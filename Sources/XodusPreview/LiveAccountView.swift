@@ -44,6 +44,11 @@ struct LiveAccountView: View {
                         Label("Sign-in cancelled. No new connection was assumed.", systemImage: "xmark.circle")
                     } else if flow.state == .failed {
                         Label("Sign-in did not complete. Try again when you are ready.", systemImage: "exclamationmark.circle")
+                        if let summary = session.accountFailureSummary {
+                            Text(summary).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("xodus.account.failureSummary")
+                        }
                     }
                 }
                 if session.authentication?.state == .expired || session.authentication?.state == .invalid {

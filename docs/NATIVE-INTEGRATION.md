@@ -129,6 +129,13 @@ button once through AXPress, using `auth.begin`. The app subsequently displayed
 its fixed failed-flow message, not saved credentials or successful sign-in.
 No Microsoft credentials, code, consent or Keychain decision was automated or
 read; there was no automatic retry. The flow's failure needs further diagnosis.
+The retry build's generic label does not expose its in-memory optional error,
+so no exact failure code/stage was recovered. A subsequent source-only native
+correction shows validated flow failure codes with local wording, never raw
+messages, and explicitly preserves unknown stage when evidence is absent.
+It is not deployed to the held retry app; no debugger/status call/retry was used
+to recover the old tuple. Static stage diagnostics need an agreed reviewed
+producer delta before further human entry.
 
 ## Developer application
 
