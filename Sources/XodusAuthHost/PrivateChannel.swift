@@ -67,7 +67,8 @@ actor PrivateChannel {
         return result
     }
 
-    func write(_ data: Data, deadline: ContinuousClock.Instant) async throws {
+    func write(_ data: Data, deadline: ContinuousClock.Instant,
+               afterDelivery: (@Sendable () async -> Void)? = nil) async throws {
         guard !stopped, !writing, !data.isEmpty, data.count <= PrivateJSON.maximumBytes else {
             throw HostFailure.protocolInvalid
         }
@@ -88,6 +89,7 @@ actor PrivateChannel {
                 else if sent < 0 && [EINTR, EAGAIN, EWOULDBLOCK].contains(errno) { continue }
                 else { throw HostFailure.channelClosed }
             }
+            await afterDelivery?()
         }.value
         guard !stopped else { throw HostFailure.channelClosed }
     }

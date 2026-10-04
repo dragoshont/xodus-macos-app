@@ -105,6 +105,7 @@ final class AuthHostController: NSObject, NSApplicationDelegate, NSWindowDelegat
             NSApp.activate()
         case .navigate(let url):
             guard let browser else { throw HostFailure.protocolInvalid }
+            try await drainOutput()
             try await send(.ready)
             guard !ending else { return }
             guard let deadline = session.deadline, ContinuousClock.now < deadline else {
@@ -114,9 +115,10 @@ final class AuthHostController: NSObject, NSApplicationDelegate, NSWindowDelegat
         case .close(let disposition):
             ending = true
             stopView()
-            await outputTask?.value
-            guard !outputFailed else { await channel.stop(); exit(1) }
-            do { try await send(.closed(disposition)) }
+            do {
+                try await drainOutput()
+                try await send(.closed(disposition))
+            }
             catch { await channel.stop(); exit(1) }
             await channel.stop()
             exit(disposition.exitCode)
@@ -159,6 +161,11 @@ final class AuthHostController: NSObject, NSApplicationDelegate, NSWindowDelegat
             deadline = min(session.deadline ?? .now, .now.advanced(by: .seconds(2)))
         }
         try await channel.write(data, deadline: deadline)
+    }
+
+    private func drainOutput() async throws {
+        try await HostOutputFence.drain(outputTask, failed: { outputFailed })
+        guard !workerUnavailable else { throw HostFailure.channelClosed }
     }
 
     private func stopView() {

@@ -104,6 +104,19 @@ enum AuthHostChecks {
             var wrongType = da.fields.mapValues(PrivateValue.string)
             wrongType["K"] = .number("1")
             rejects("Issuer field number cannot become a string") { _ = try LegacyDA(.object(wrongType)) }
+            check(try LegacyNotification(synthetic) == .da(da),
+                  "Flat seven-field legacy notification decodes verbatim before the invoke branch")
+            check(try LegacyNotification(.object(["DAProperty": synthetic])) == .da(da),
+                  "Existing wrapped legacy notification remains supported")
+            var missingField = da.fields.mapValues(PrivateValue.string)
+            missingField.removeValue(forKey: "K")
+            var extraField = da.fields.mapValues(PrivateValue.string)
+            extraField["extra"] = .string("synthetic-forbidden")
+            for malformed in [missingField, wrongType, extraField] {
+                rejects("Malformed, nonstring or extra-field flat notification is rejected") {
+                    _ = try LegacyNotification(.object(malformed))
+                }
+            }
             let context = "opaque \"provider\" context\\\nnot-a-uuid"
             let callback = try PrivateJSON.parse(Data(LegacyBridge.callback(context: context).utf8))
             guard case .object(let object) = callback, case .object(let body) = object["value"] else {
@@ -176,6 +189,7 @@ enum AuthHostChecks {
             _ = try expired.encode(.failed(.deadlineExpired), now: start.advanced(by: .milliseconds(2)))
             check(expired.terminal, "Expiry produces only a terminal failure, never an authorization-budget extension")
             try await channelChecks(check: check)
+            try await outputFenceChecks(check: check)
             try await browserChecks(check: check)
         } catch {
             check(false, "Bounded private host check setup or execution failed")
@@ -276,6 +290,103 @@ enum AuthHostChecks {
         }
     }
 
+    private actor DeliveryHold {
+        private var held = false
+        private var released = false
+        private var observed: CheckedContinuation<Void, Never>?
+        private var completion: CheckedContinuation<Void, Never>?
+
+        func park() async {
+            held = true
+            observed?.resume()
+            observed = nil
+            if !released { await withCheckedContinuation { completion = $0 } }
+        }
+
+        func waitUntilHeld() async {
+            if !held { await withCheckedContinuation { observed = $0 } }
+        }
+
+        func release() {
+            released = true
+            completion?.resume()
+            completion = nil
+        }
+    }
+
+    private static func outputFenceChecks(check: (Bool, String) -> Void) async throws {
+        let sockets = try pair()
+        let writer = try PrivateChannel(descriptor: sockets[0])
+        let peer = try PrivateChannel(descriptor: sockets[1])
+        sockets.forEach { Darwin.close($0) }
+        let hold = DeliveryHold()
+        let data = try synthetic.encoded()
+        let ready = Data(#"{"kind":"ready"}"#.utf8)
+        var completed = false
+        var failed = false
+        let output = Task {
+            do {
+                try await writer.write(data, deadline: .now.advanced(by: .seconds(5)),
+                                       afterDelivery: { await hold.park() })
+            } catch { failed = true }
+            completed = true
+        }
+        let received = try await peer.read(deadline: .now.advanced(by: .seconds(2)))
+        await hold.waitUntilHeld()
+        check(received == data && !completed && !failed,
+              "Actual complete DA frame reaches peer while its detached writer completion is held")
+        do {
+            try await writer.write(ready, deadline: .now.advanced(by: .seconds(2)))
+            check(false, "Unfenced continuation reproduces the outstanding-writer protocol rejection")
+        } catch {
+            check(error as? HostFailure == .protocolInvalid,
+                  "Unfenced continuation reproduces the outstanding-writer protocol rejection")
+        }
+        var entered = false
+        var continued = false
+        var continuationFailed = false
+        let continuation = Task {
+            entered = true
+            do {
+                try await HostOutputFence.drain(output, failed: { failed })
+                try await writer.write(ready, deadline: .now.advanced(by: .seconds(2)))
+                continued = true
+            } catch { continuationFailed = true }
+        }
+        while !entered { await Task.yield() }
+        check(!continued && !continuationFailed && !completed,
+              "Production output fence waits for writer completion before continuation readiness")
+        await hold.release()
+        await continuation.value
+        check(try await peer.read(deadline: .now.advanced(by: .seconds(2))) == ready
+              && completed && continued && !failed && !continuationFailed,
+              "Drained continuation ready follows the complete DA frame without overlapping writes")
+        await writer.stop()
+        await peer.stop()
+
+        let broken = try pair()
+        let failing = try PrivateChannel(descriptor: broken[0])
+        let closed = try PrivateChannel(descriptor: broken[1])
+        broken.forEach { Darwin.close($0) }
+        await closed.stop()
+        var recordedFailure = false
+        let rejected = Task {
+            do { try await failing.write(data, deadline: .now.advanced(by: .seconds(2))) }
+            catch { recordedFailure = true }
+        }
+        await rejected.value
+        var promoted = false
+        do {
+            try await HostOutputFence.drain(rejected, failed: { recordedFailure })
+            promoted = true
+            check(false, "Recorded writer failure rejects continuation or closed acknowledgement")
+        } catch {
+            check(recordedFailure && !promoted && error as? HostFailure == .channelClosed,
+                  "Recorded writer failure rejects continuation or closed acknowledgement")
+        }
+        await failing.stop()
+    }
+
     private static func browserChecks(check: (Bool, String) -> Void) async throws {
         let application = NSApplication.shared
         application.setActivationPolicy(.prohibited)
@@ -308,6 +419,41 @@ enum AuthHostChecks {
         browser.close()
         browser.webViewWebContentProcessDidTerminate(browser.view)
         check(failure == nil, "Closed browser fences stale renderer callbacks")
+
+        let notificationBase = URL(string: "https://auth-host-fixture.invalid/notification")!
+        var missing = try LegacyDA(synthetic).fields.mapValues(PrivateValue.string)
+        missing.removeValue(forKey: "K")
+        var mistyped = try LegacyDA(synthetic).fields.mapValues(PrivateValue.string)
+        mistyped["K"] = .number("1")
+        var extra = try LegacyDA(synthetic).fields.mapValues(PrivateValue.string)
+        extra["extra"] = .string("synthetic-forbidden")
+        for (property, valid) in [(synthetic, true), (.object(missing), false),
+                                  (.object(mistyped), false), (.object(extra), false)] {
+            var notified: LegacyDA?
+            var rejected: HostFailure?
+            let notificationBrowser = NativeAuthBrowser(trust: trust,
+                received: { notified = $0 }, failed: { rejected = $0 })
+            defer { notificationBrowser.close() }
+            try notificationBrowser.loadSyntheticDocument(
+                "<!doctype html><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'unsafe-inline'\"><p>Neutral notification fixture.</p>",
+                baseURL: notificationBase)
+            let until = ContinuousClock.now.advanced(by: .seconds(8))
+            while notificationBrowser.view.isLoading && rejected == nil && ContinuousClock.now < until {
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            _ = try await notificationBrowser.view.callAsyncJavaScript(
+                "window.external.notify(raw); return true;",
+                arguments: ["raw": String(decoding: try property.encoded(), as: UTF8.self)],
+                in: nil, contentWorld: .page)
+            while notified == nil && rejected == nil && ContinuousClock.now < until {
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            check(valid ? notified?.value == synthetic && rejected == nil
+                        : notified == nil && rejected == .bridgeInvalid,
+                  valid ? "Detached WK flat notification forwards exactly seven unchanged strings without finish extraction"
+                        : "Detached WK malformed/type/extra flat notification terminates without issuer promotion")
+            notificationBrowser.close()
+        }
 
         var staticFailure: HostFailure?
         var failureCount = 0

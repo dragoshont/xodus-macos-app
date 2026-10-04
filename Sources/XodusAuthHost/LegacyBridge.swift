@@ -25,6 +25,10 @@ enum LegacyNotification: Equatable {
 
     init(_ value: PrivateValue) throws {
         guard case .object(let object) = value else { throw HostFailure.bridgeInvalid }
+        if Set(object.keys) == LegacyDA.keys {
+            self = .da(try LegacyDA(value))
+            return
+        }
         if let property = object["DAProperty"] {
             self = .da(try LegacyDA(property))
             return

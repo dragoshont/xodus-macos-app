@@ -50,6 +50,50 @@ The observed flow was preserved without agent polling, focus, restart or retry.
 Authentication is now user-paused; current window/worker presence is not
 re-inspected or inferred.
 
+## Paired-review host corrections: separate source evidence
+
+Retained paired review withheld closure on consumer `ced5ff9` for two actual
+host defects: its notification parser rejected the inherited flat seven-field
+DA object, and continuation readiness could race an outstanding detached DA
+writer after its complete frame reached the worker. The preceding 548 checks
+and hosted pass did not cover or prove these paths correct.
+
+The flat object now goes through the existing exact-seven-string `LegacyDA`
+decoder before the invoke branch. Missing, nonstring and extra fields remain
+failures; wrapped notifications and opaque context callbacks remain supported.
+A pure native regression compiled from exact ced5 Git blobs returned expected
+failure exit 1 for a synthetic flat notification. The identical regression
+against corrected source passes. Actual detached WebKit notification fixtures
+also pass the flat-positive and three malformed/type/extra-negative cases,
+without a finish-page extraction fallback or any provider contact.
+
+Continuation readiness and closed acknowledgement share the outstanding-output
+drain and recorded-write-failure fence. A deterministic anonymous-channel test
+holds completion after every DA byte reaches its peer, reproduces the unfenced
+`protocolInvalid` overlap, then proves the shared production fence waits and
+orders readiness after completion. A failed writer cannot promote readiness or
+closed acknowledgement. The internal scheduling hook is absent from normal
+calls and does not change framing or the private contract.
+
+The corrected executable suite passes **562 checks**, zero failures:
+14 core + 267 management + 50 presentation + 144 mock session + **87 private
+host**. The new isolated native release stage's first complete build took
+55.25 seconds. Its host SHA256 is
+`8864a15a3512dc3882a7ea850bc367515c7d43cb23c29cecd6be89924b2b1fe3`;
+launcher SHA256 is
+`5977b420855ddea7aef63096cfb3e47dbd3741887f3ac2589754bc36e6308fcf`.
+Header source is unchanged by Git comparison; these are separate-stage
+executable hashes, not evidence of a deployed UI change.
+All 24 protected public artifact/resource hashes and the original anonymous
+preview executable match after validation.
+Provider configuration groundwork is kept in a separate stash, not this
+review delta. C95, twenty-one diagnostics, private schema/fixture, crypto,
+production URL/client/UA/header policy and header source remain unchanged.
+Current deployed artifacts and the old anonymous preview are not modified.
+No signing, packaging, deployment, GUI action, credential/Keychain/provider
+operation or authentication-success claim is included. Same-context paired
+review closure is still required.
+
 ## Consolidated native header and Swift authentication host: source-only evidence
 
 A bounded source audit confirmed actual AppKit/SwiftUI framework links and
