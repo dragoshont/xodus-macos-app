@@ -36,7 +36,16 @@ Develop and verify native code on the user's Mac over trusted SSH, using isolate
 
 ## Brand commitments
 
-Apple Games for macOS is the actual composition authority, not Xbox. The user explicitly corrected the flat first revision: **centered fully rounded floating transparent navigation, a separate circular account control, immersive artwork behind native chrome, large feature proportions and edge-to-edge detail images**. Use actual macOS 26+ system Liquid Glass, not ordinary material relabelled as glass. SwiftUI/AppKit remains the native framework; UIKit was suggested as a possible means, not a chosen rewrite.
+Apple Games for macOS is the actual composition authority, not Xbox. The user
+initially requested immersive artwork, floating transparent navigation and
+edge-to-edge detail images, then rejected the bespoke rounded menu as non-native.
+The narrow source correction uses a real macOS unified toolbar, centered native
+segmented navigation and a standard account button, preserving artwork and
+information architecture. System controls, type, focus and semantic appearance
+take precedence over hand-rolled pill geometry. Actual macOS 26+ Glass is used
+where available, not ordinary material relabelled as glass. SwiftUI/AppKit remains
+the native framework; UIKit was not a chosen rewrite. The newer navigation is
+source-only until separately reviewed and deployed.
 
 Directly observed Library compact three-column horizontal entries remain useful alongside the user-directed artwork-led featured/Continue Playing area. Each entry keeps access and compatibility separate. Discover has immersive features/browse/shelves, scoped Search, and no checkout promise. Navigation is Library / Discover / Downloads; Library remains the proposed default. No Apple logos/proprietary images/source, invented Friends/Arcade or Xbox-green identity. v0.1 was not approved and is explicitly superseded.
 

@@ -100,7 +100,17 @@ Committed LF bytes and all four sanitized fixture hashes were independently veri
 
 `docs/contracts/management-v1.schema.json` is the producer's canonical scoped schema. `tools/sync_contract.py` copies its exact bytes to the Swift resource. `Tests/ManagementChecks/Fixtures` contains its sanitized public positive/negative/evidence fixtures. No private backend source or real account payload was imported. `foundation-v1.schema.json` preserves the original proposal.
 
-Current engine source is reviewed public
+Current deployed diagnostic engine source is reviewed public
+`e60481fc918b4cc2cc599a5db2aba17a04738872`, paired with app `360e8bf`.
+Preserved immutable input is `xodus-cli-native-consent-v1-47fab28009f9c6c5`,
+SHA256 `47fab28009f9c6c52294095e5684bfce3f86f45e50ddc98655d2b22150f02c8d`;
+the separate signed embedded copy is
+`c50a98b3e0afe4ba6a9b883e6f09ef194b481817eea94f5db190fb2123aceaa8`.
+Deep signature, exact C95 resource/provenance, fresh parent/child ownership and
+nine actual read-only checks passed. This is a local development pairing, not a
+certified runtime or successful sign-in.
+
+The historical first human-entry engine source was
 `2a47eafc930603773583ce4c1d6be89a2f0ccd60`. Its preserved unsigned input is
 `xodus-cli-soap-nonces-v1-57d4500d6de922d6`, SHA256
 `57d4500d6de922d644071ff6749b662c56d75f5f4646da2a884a363169373c0b`;
@@ -110,8 +120,8 @@ C95 schema/operations are unchanged. This is a necessary correction on the real
 Store authentication decoder path: duplicate or empty derived-key nonce IDs
 are rejected rather than silently overwritten/accepted. The producer pin was
 confirmed by the backend before the user-directed retry; no unsigned sealed
-artifact was changed. Historical e3129/da548 and signed2180 pairing is superseded,
-not reused as current authentication readiness proof.
+artifact was changed. Historical e3129/da548, signed2180 and 57d/signed7a6e pairings are preserved,
+not reused as the current diagnostic build.
 
 It retains the reviewed public search/inspection behavior. The source-only app
 R01-R04 fixes closed at `fb66a2d`, R08/R09 at `6750219`; the `db0bf21`
@@ -133,16 +143,29 @@ The retry build's generic label does not expose its in-memory optional error,
 so no exact failure code/stage was recovered. A subsequent source-only native
 correction shows validated flow failure codes with local wording, never raw
 messages, and explicitly preserves unknown stage when evidence is absent.
-It is not deployed to the held retry app; no debugger/status call/retry was used
-to recover the old tuple. Static stage diagnostics need an agreed reviewed
-producer delta before further human entry.
+No debugger/status call/retry was used to recover that old tuple; its cause
+remains unknown. The later reviewed diagnostic source was separately deployed,
+not injected into the original failure.
 The subsequent diagnostic-only source agreement closes the optional details to
 ten exact AUTH_INVALID stage/reason pairs, mapped to local guidance; unknown,
 extra or incompatible values remain unavailable stage and are not retained or
 rendered as diagnostics. See [the exact object](BACKEND-CONTRACT.md).
-The full source suite passed 332 checks; this newer source is not deployed to
-the held retry app. The same retained source review and approved new producer
-artifact are still required before deployment or another human entry.
+Final original diagnostic source `360e8bf` passed 333 full checks and hosted CI.
+The successor continuity reviewer closed that app/producer delta with no
+significant issues; the cancelled original reviewer supplied no report 40/41
+approval. The user-directed close/relaunch used only the verified idle owned app.
+At verification the new pair was app 92655 / child 92660. One new agent-mediated
+native entry returned `AUTH_INVALID/devicePreparation/providerProofInvalid`.
+That legacy classification does **not** establish a cryptographic failure:
+it covers an unsupported device response or absent/invalid proof. No successful
+credential commit, Microsoft UI observation or owned-library proof was inferred.
+
+The next source-only batch replaces bespoke navigation with a system toolbar,
+corrects that local proof wording and adds four agreed static device reasons
+(fourteen closed pairs total). It requires the coordinator's same continuity
+review with the backend response-wrapper refinement before another deployment.
+The held `360e8bf`/signed-c50a app remains unchanged. Native build/test evidence
+and the host file-table blocker are recorded in [verification](VERIFICATION.md).
 
 ## Developer application
 
@@ -178,7 +201,7 @@ launcher Keychain profile, not implicit CLI/private-worker credential import.
 
 ## Evidence and still-open gates
 
-The current app review-fix milestone passed one full `sh tools/check.sh` invocation
+The historical app retirement/export review-fix milestone passed one full `sh tools/check.sh` invocation
 on the Mac: **14 core + 189 management + 24 presentation + 51 native session =
 278 checks**, zero failures. The native session set uses mock child processes and
 the actual `LiveSession` coordinator, not real Keychain/provider operations.

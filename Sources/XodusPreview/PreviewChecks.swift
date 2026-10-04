@@ -56,6 +56,17 @@ enum PreviewChecks {
         state.reset()
         check(state.jobs.isEmpty && !state.installed.contains(game.id),
               "Fixture reset clears queue and simulated installation")
+        for destination in Destination.allCases {
+            state.query = "prior scope"
+            state.accessFilter = .subscription
+            state.sortByTitle = true
+            state.category = .space
+            state.navigationSelection.wrappedValue = destination
+            check(state.destination == destination && state.navigationSelection.wrappedValue == destination
+                  && state.query.isEmpty && state.accessFilter == nil && !state.sortByTitle
+                  && state.category == .all && !state.showingAccount && !state.showingWelcome,
+                  "Native toolbar binding preserves \(destination.rawValue) routing and clears only browse scope")
+        }
         let live = LiveSession()
         check(!state.fixtureMode, "Default application mode does not present fixture games")
         check(live.products.isEmpty, "Live catalog never starts with invented titles")
@@ -66,7 +77,7 @@ enum PreviewChecks {
         check(!live.signInPending && !live.accountBusy, "No unattended native sign-in begins")
         check(live.diagnosticPreview == nil, "No diagnostics or raw engine text are captured at startup")
         check(live.phase == .disconnected, "Presentation checks do not contact Xodus or Keychain")
-        print("24 preview checks, \(failures) failures. No backend connected.")
+        print("27 preview checks, \(failures) failures. No backend connected.")
         return failures == 0
     }
 }

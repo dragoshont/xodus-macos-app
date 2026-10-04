@@ -86,8 +86,11 @@ Every request ID has exactly one terminal result; jobs continue through events. 
 
 ### Optional native-consent failure diagnostics (source agreement)
 
-Agreed producer/consumer diagnostic-only delta, **not deployed to the held
-57d sign-in attempt**. C95/protocol 1.0 stay byte-identical: the existing
+The reviewed original ten-pair delta is deployed in the `360e8bf` / `e60481fc`
+diagnostic pair, not retroactively applied to the first 57d attempt.
+The coordinator and sole consumer subsequently agreed four additive static
+device reasons below; that fourteen-pair source refinement awaits the same
+continuity review and is **not yet deployed**. C95/protocol 1.0 stay byte-identical: the existing
 optional `flow.error.details` object carries exactly three string keys,
 `category`, `stage`, `reason`. Category must be `nativeConsentFailure`; the
 consumer accepts only `AUTH_INVALID` with one of these exact closed pairs:
@@ -100,6 +103,10 @@ consumer accepts only `AUTH_INVALID` with one of these exact closed pairs:
 | `devicePreparation` | `storedCredentialInvalid` |
 | `devicePreparation` | `providerRequestFailed` |
 | `devicePreparation` | `providerProofInvalid` |
+| `devicePreparation` | `registrationProofInvalid` |
+| `devicePreparation` | `tokenResponseInvalid` |
+| `devicePreparation` | `tokenProofInvalid` |
+| `devicePreparation` | `tokenStructureInvalid` |
 | `deviceProof` | `proofUnavailable` |
 | `nativeSignIn` | `pipelineFailed` |
 | `storeProof` | `proofInvalid` |
@@ -122,6 +129,14 @@ handoff from an observed failed exit. Missing/invalid/crashed outcomes use hones
 unavailable-stage diagnostics. Source review and a new approved artifact/pairing
 must precede deployment or another human attempt; this agreement does not
 retrospectively diagnose the earlier failed flow.
+
+`devicePreparation/providerProofInvalid` is the legacy coarse invalid-proof
+classification, **not necessarily a cryptographic failure**. The refinement
+distinguishes failed/missing registration proof, an unsupported/non-single
+device response, rejected checked token proof and unsupported proof structure.
+It carries no HTTP/XML, identity, audience, token, key or decoded-body values.
+Invalid device setup visibly says Microsoft sign-in could not start, without
+promoting a guessed deeper cause or recommending credential deletion.
 
 ## Durable registry and updates
 

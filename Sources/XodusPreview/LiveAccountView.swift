@@ -43,7 +43,7 @@ struct LiveAccountView: View {
                     if flow.state == .cancelled {
                         Label("Sign-in cancelled. No new connection was assumed.", systemImage: "xmark.circle")
                     } else if flow.state == .failed {
-                        Label("Sign-in did not complete. Try again when you are ready.", systemImage: "exclamationmark.circle")
+                        Label(session.accountFailureTitle, systemImage: "exclamationmark.circle")
                         if let summary = session.accountFailureSummary {
                             Text(summary).foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)

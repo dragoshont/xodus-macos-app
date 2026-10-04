@@ -7,8 +7,11 @@ struct RootView: View {
     @FocusState private var searchFocused: Bool
 
     var body: some View {
-        ZStack(alignment: .top) {
-            Color(nsColor: .windowBackgroundColor)
+        VStack(spacing: 0) {
+            Label("Fixture preview - invented content. No real sign-in, downloads or gameplay.",
+                  systemImage: "testtube.2")
+                .font(.caption).foregroundStyle(.secondary)
+                .padding(.vertical, 6)
             if state.destination == .downloads {
                 VStack(spacing: 0) {
                     GameArtwork(kind: "orbit").frame(height: 160).clipped()
@@ -23,20 +26,11 @@ struct RootView: View {
                     }
                 }
             }
-            VStack(spacing: 10) {
-                FloatingNavigation()
-                    .frame(maxWidth: .infinity)
-                    .overlay(alignment: .trailing) { FloatingAccount().padding(.trailing, 24) }
-                Label("Fixture preview - invented content. No real sign-in, downloads or gameplay.",
-                      systemImage: "testtube.2")
-                    .font(.caption)
-                    .padding(.horizontal, 16).padding(.vertical, 8)
-                    .modifier(NativeGlass())
-            }
-            .ignoresSafeArea(.container, edges: .top)
-            .foregroundStyle(.white)
-            .environment(\.colorScheme, .dark)
-            .padding(.top, 16)
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+        .toolbar {
+            XodusToolbar(selection: state.navigationSelection, accountLabel: "Fixture account",
+                         accountSymbol: "person.crop.circle") { state.showingWelcome = true }
         }
         .onAppear {
             PreviewWindow.configure()

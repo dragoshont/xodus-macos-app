@@ -123,6 +123,27 @@ actor Checks {
             check(try frame.decode(WireFailure.self).nativeConsentFailure == nil,
                   "Cancellation/expiry/non-auth codes cannot borrow AUTH_INVALID diagnostic stage evidence")
         }
+        for diagnostic in [NativeConsentFailure.registrationProofInvalid, .tokenResponseInvalid,
+                           .tokenProofInvalid, .tokenStructureInvalid] {
+            var extra = diagnostic.details.object ?? [:]
+            extra["secret"] = .string("Original refined-device private sentinel")
+            var mismatched = diagnostic.details.object ?? [:]
+            mismatched["stage"] = .string("storeProof")
+            let rejected: [(String, JSONValue)] = [
+                ("AUTH_INVALID", .object(extra)), ("AUTH_INVALID", .object(mismatched)),
+                ("AUTH_CANCELLED", diagnostic.details), ("AUTH_EXPIRED", diagnostic.details),
+                ("INTERNAL_ERROR", diagnostic.details)
+            ]
+            var discarded = true
+            for (code, details) in rejected {
+                let frame: JSONValue = .object(["code": .string(code), "retryable": .bool(false),
+                    "message": .string("Original refined upstream sentinel"), "details": details])
+                let typed = try frame.decode(WireFailure.self)
+                let encoded = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(typed))
+                discarded = discarded && typed.nativeConsentFailure == nil && encoded["details"] == nil
+            }
+            check(discarded, "Refined device diagnostics require exact keys/stage/AUTH_INVALID without private-field retention")
+        }
         let registryResults = positive.filter { $0["data"]?["installations"]?.array != nil }
         check(!registryResults.isEmpty, "Producer corpus includes installed-registry evidence")
         for frame in registryResults {

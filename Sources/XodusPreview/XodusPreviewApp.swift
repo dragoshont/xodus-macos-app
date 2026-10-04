@@ -47,7 +47,7 @@ struct XodusPreviewApp: App {
                 .onAppear { delegate.liveSession = session }
         }
         .defaultSize(width: 1200, height: 860)
-        .windowStyle(.hiddenTitleBar)
+        .windowToolbarStyle(.unified)
         .commands {
             CommandMenu("Navigate") {
                 Button("Library") { state.navigate(.library) }.keyboardShortcut("1")

@@ -15,8 +15,11 @@ struct LiveRootView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
-            Color(nsColor: .windowBackgroundColor)
+        VStack(spacing: 0) {
+            Label(session.isReady ? "Live Xodus connection - development build" : "Xodus for Mac - development build",
+                  systemImage: session.isReady ? "cable.connector" : "hammer")
+                .font(.caption).foregroundStyle(.secondary)
+                .padding(.vertical, 6)
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     hero
@@ -28,30 +31,12 @@ struct LiveRootView: View {
                     .padding(30)
                 }
             }
-            VStack(spacing: 10) {
-                FloatingNavigation()
-                    .frame(maxWidth: .infinity)
-                    .overlay(alignment: .trailing) {
-                        Button { state.showingAccount = true } label: {
-                            Image(systemName: session.authentication?.state == .credentialPresent
-                                  ? "person.crop.circle.fill" : "person.crop.circle")
-                                .font(.title2).frame(width: 48, height: 48).modifier(NativeGlass())
-                        }
-                        .buttonStyle(.plain).padding(.trailing, 24)
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel(session.accountLabel)
-                        .accessibilityIdentifier("xodus.account")
-                        .accessibilityAddTraits(.isButton)
-                        .accessibilityAction { state.showingAccount = true }
-                    }
-                Label(session.isReady ? "Live Xodus connection - development build" : "Xodus for Mac - development build",
-                      systemImage: session.isReady ? "cable.connector" : "hammer")
-                    .font(.caption).padding(.horizontal, 16).padding(.vertical, 8).modifier(NativeGlass())
-            }
-            .foregroundStyle(.white)
-            .environment(\.colorScheme, .dark)
-            .ignoresSafeArea(.container, edges: .top)
-            .padding(.top, 16)
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+        .toolbar {
+            XodusToolbar(selection: state.navigationSelection, accountLabel: session.accountLabel,
+                         accountSymbol: session.authentication?.state == .credentialPresent
+                             ? "person.crop.circle.fill" : "person.crop.circle") { state.showingAccount = true }
         }
         .onAppear {
             PreviewWindow.configure()

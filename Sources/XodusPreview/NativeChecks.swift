@@ -82,7 +82,8 @@ enum NativeChecks {
             check(!uncertain.accountStatusCurrent && !uncertain.canSignIn,
                   "Failed sign-in preparation invalidates pre-mutation status before another attempt")
             let preparationSummary = uncertain.errorMessage ?? ""
-            check(preparationSummary.contains("AUTH_INVALID") && preparationSummary.contains("Stage: stageUnavailable")
+            check(preparationSummary.hasPrefix("Microsoft sign-in could not start.")
+                  && preparationSummary.contains("AUTH_INVALID") && preparationSummary.contains("Stage: stageUnavailable")
                   && !preparationSummary.contains("disconnect") && !preparationSummary.contains("saved sign-in")
                   && !preparationSummary.contains("Original preparation upstream sentinel"),
                   "Request-level sign-in failure never implies invalid saved credentials or deletion advice")
@@ -116,11 +117,19 @@ enum NativeChecks {
                 check(failed.authentication?.flow?.error?.nativeConsentFailure == diagnostic
                       && summary.contains("Stage: \(diagnostic.stage)") && summary.contains("Reason: \(diagnostic.rawValue)")
                       && !summary.contains("Original synthetic upstream wording") && failed.isReady
-                      && failed.authentication?.entitlementAuthorized == false && !failed.signInPending,
+                      && failed.authentication?.entitlementAuthorized == false && !failed.signInPending
+                      && (diagnostic.stage != "devicePreparation"
+                          || failed.accountFailureTitle == "Microsoft sign-in could not start."),
                       "Known closed auth stage/reason is locally mapped without upstream text or entitlement promotion")
                 if diagnostic == .pipelineFailed {
                     check(summary.contains("does not establish that a browser appeared or consent completed"),
                           "Native pipeline diagnostic never invents observed Microsoft UI or successful consent")
+                }
+                if diagnostic == .providerProofInvalid {
+                    check(summary.contains("did not provide a valid sign-in proof")
+                          && !summary.contains("cryptograph") && !summary.contains("signature")
+                          && !summary.contains("disconnect") && !summary.contains("delete"),
+                          "Device-proof shape or missing-proof failure never invents a cryptographic cause or credential deletion")
                 }
                 await failed.disconnect()
             }

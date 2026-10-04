@@ -48,6 +48,10 @@ final class AppState: ObservableObject {
     @Published var lowSpace = false
     @Published var message: String?
 
+    var navigationSelection: Binding<Destination> {
+        Binding(get: { self.destination }, set: { self.navigate($0) })
+    }
+
     var visibleGames: [Game] {
         guard inventory != .empty && inventory != .failed else { return [] }
         let games = Fixtures.games.filter {

@@ -4,6 +4,75 @@ Foundation recorded 2026-10-03; subsequent native/read-only milestones are
 identified separately below. None establishes successful human authentication,
 game download, install or gameplay.
 
+## Reviewed diagnostic pair and observed retry
+
+Source review closed app `f680410` -> `360e8bf3a2eb7efc087ccce2ed4d2bf93fc16369`
+and producer `232a4a82` -> `e60481fc918b4cc2cc599a5db2aba17a04738872`
+with no significant issues. Historical R01-R19 closures are preserved.
+The cancelled original reviewer provided no report 40/41 approval.
+Final `360e8bf` passed **333 full checks** and hosted run
+[37189001182](https://github.com/dragoshont/xodus-macos-app/actions/runs/37189001182).
+
+The e604 immutable CLI is 79,687,480 bytes, mode 0500, SHA256
+`47fab28009f9c6c52294095e5684bfce3f86f45e50ddc98655d2b22150f02c8d`.
+Its adjacent mode-0400 provenance SHA256 is
+`02c9710e56713dedfc80b144dad4f86d5e34903d6a5201e9778836c6b2a4f762`.
+Both were independently verified before embedding; the original stayed unchanged.
+The separate signed engine SHA256 is
+`c50a98b3e0afe4ba6a9b883e6f09ef194b481817eea94f5db190fb2123aceaa8`;
+the app executable SHA256 is
+`3858dd0fb32370c5ef0b92a866f11a6225d31edc208512b7283381d2a583915e`.
+All 66 public build inputs matched reviewed Git blobs, allowing only Windows
+text CRLF/LF equivalence. C95 source/resource/embedded bytes, plist and deep
+signature matched. The previous signed-7a6e bundle was preserved.
+The release passed 24 presentation and 74 mock-native checks; the signed pair
+passed **nine actual read-only checks**, without beginning authentication or
+performing catalog network queries.
+
+Fresh ownership was app 92655 / engine 92660, exact embedded path and parent.
+The old 79003 / 79007 pair exited through graceful owned-app quit after its
+Account sheet had already closed; no signal or other-window action was used.
+A fresh enabled native Account AXPress was activated once as newly directed.
+The app reported only the closed static tuple
+`AUTH_INVALID/devicePreparation/providerProofInvalid`, with the authored
+failed-flow label, zero pending Cancel controls and zero owned auth children at
+observation. The legacy reason is **not necessarily a cryptographic failure**.
+Deeper live cause remains unproven. No provider page, credentials, code, raw
+message, approval or OS decision was read or automated.
+
+## Source-only system toolbar and device-proof refinement
+
+The user rejected the bespoke rounded menu. The source correction uses real
+macOS `ToolbarItem`/segmented `Picker`, a native Account button and macOS 26+
+`ToolbarSpacer`, retaining routes, scope-reset behavior and original artwork.
+The earlier candidate passed 27 presentation / 75 mock-native checks. Its
+offline fixture-only AX pass confirmed native `AXRadioButton` mouse selection
+for all three destinations, Command-1/2/3 selection and fit at 820-point width,
+plus an enabled native Account `AXButton`, without opening onboarding or a
+backend. One batched fixture-only inspection and one confirmation exported only
+the original app-owned fixture views, not the desktop or live Account.
+The final native-builder cached export omitted selected text/parts of hero
+rendering; it is not proof of compositor fidelity or final visual legibility.
+No additional capture/polish loop was performed. Live visual/assistive coverage
+remains a release gate, not a claimed pass from these exports.
+
+The same source batch corrects coarse device-proof copy, visibly explains that
+device setup prevented Microsoft sign-in from starting, and extends only the
+agreed exact three-key diagnostics from ten to fourteen closed pairs.
+Unknown/extra/mismatched/non-AUTH diagnostics still do not survive parsing.
+The running 360e8bf/c50a bundle was not replaced.
+
+**Local final-suite hold:** the default builder hit host-wide ENFILE 23.
+The supported native builder with one job/indexing disabled compiled the final
+source successfully, then passed **14 core + 233 management + 27 presentation**
+checks. The native run stopped at 61 checks with six reconnect/inspection/timeout
+failures during the same host-pressure incident; this is **not a passing final
+native run**. Both build systems' resource failures are retained as a blocker,
+not relabelled as source success. The existing hosted Mac CI must establish the
+complete final run before review/deployment. No global limits, other processes
+or private file paths were changed/inspected. Exact owned app/engine descriptor
+counts were eight/ten, not evidence of an owned descriptor leak.
+
 ## User-directed sign-in retry with reviewed nonce correction
 
 The backend explicitly confirmed reviewed producer

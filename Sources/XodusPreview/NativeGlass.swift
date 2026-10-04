@@ -30,57 +30,34 @@ struct GlassAction: View {
     }
 }
 
-struct FloatingNavigation: View {
-    @EnvironmentObject private var state: AppState
+struct XodusToolbar: ToolbarContent {
+    let selection: Binding<Destination>
+    let accountLabel: String
+    let accountSymbol: String
+    let openAccount: () -> Void
 
-    private var navigation: some View {
-        HStack(spacing: 4) {
-            ForEach(Destination.allCases) { destination in
-                Button { state.navigate(destination) } label: {
-                    Text(destination.rawValue)
-                        .font(.headline)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 11)
-                        .background {
-                            if state.destination == destination {
-                                Capsule().fill(Color.accentColor.opacity(0.18))
-                            }
-                        }
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            Picker("Navigate Xodus", selection: selection) {
+                ForEach(Destination.allCases) { destination in
+                    Text(destination.rawValue).tag(destination)
+                        .accessibilityIdentifier("xodus.navigation.\(destination.rawValue.lowercased())")
                 }
-                .buttonStyle(.plain)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(destination.rawValue)
-                .accessibilityIdentifier("xodus.navigation.\(destination.rawValue.lowercased())")
-                .accessibilityAddTraits(.isButton)
-                .accessibilityAddTraits(state.destination == destination ? .isSelected : [])
-                .accessibilityAction { state.navigate(destination) }
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            .accessibilityLabel("Navigate Xodus")
+            .accessibilityIdentifier("xodus.navigation")
         }
-
-        .padding(6)
-        .modifier(NativeGlass())
-    }
-
-    var body: some View {
         if #available(macOS 26, *) {
-            GlassEffectContainer(spacing: 12) { navigation }
-        } else {
-            navigation
+            ToolbarSpacer(.flexible, placement: .primaryAction)
         }
-    }
-
-}
-
-struct FloatingAccount: View {
-    @EnvironmentObject private var state: AppState
-    var body: some View {
-        Button { state.showingWelcome = true } label: {
-            Image(systemName: "person.crop.circle")
-                .font(.title2)
-                .frame(width: 48, height: 48)
-                .modifier(NativeGlass())
+        ToolbarItem(placement: .primaryAction) {
+            Button(accountLabel, systemImage: accountSymbol, action: openAccount)
+                .labelStyle(.iconOnly)
+                .help(accountLabel)
+                .accessibilityIdentifier("xodus.account")
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Fixture account")
     }
 }

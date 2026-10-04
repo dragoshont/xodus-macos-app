@@ -18,18 +18,24 @@ on run arguments
         if (count of elements) > 3000 then error "Accessibility bound exceeded."
         set navigationMatches to {}
         repeat with element in elements
+            set identifier to ""
             if exists attribute "AXIdentifier" of element then
                 set identifier to value of attribute "AXIdentifier" of element
-                if identifier is in navigationIDs then
-                    if identifier is "xodus.catalog.search" then
-                        if role of element is not "AXTextField" then error "Search identifier is not a native text field."
-                    else
-                        if role of element is not "AXButton" then error "Navigation identifier is not an actionable button."
-                    end if
-                    log ("navigation=" & identifier)
-                    if requestedAction is not "snapshot" and identifier is my targetIdentifier(requestedAction) then
-                        set end of navigationMatches to contents of element
-                    end if
+            end if
+            if identifier is not in navigationIDs and role of element is "AXRadioButton" then
+                set identifier to my nativeNavigationIdentifier(element)
+            end if
+            if identifier is in navigationIDs then
+                if identifier is "xodus.catalog.search" then
+                    if role of element is not "AXTextField" then error "Search identifier is not a native text field."
+                else if identifier is in {"xodus.navigation.library", "xodus.navigation.discover", "xodus.navigation.downloads"} then
+                    if role of element is not in {"AXButton", "AXRadioButton"} then error "Navigation target is not a native button or segment."
+                else
+                    if role of element is not "AXButton" then error "Navigation identifier is not an actionable button."
+                end if
+                log ("navigation=" & identifier & " role=" & role of element)
+                if requestedAction is not "snapshot" and identifier is my targetIdentifier(requestedAction) then
+                    set end of navigationMatches to contents of element
                 end if
             end if
             repeat with fieldName in {"AXTitle", "AXDescription", "AXValue"}
@@ -107,6 +113,21 @@ on run arguments
         end if
     end tell
 end run
+
+on nativeNavigationIdentifier(element)
+    tell application "System Events"
+        if role of element is not "AXRadioButton" then return ""
+        repeat with fieldName in {"AXTitle", "AXDescription"}
+            if exists attribute (fieldName as text) of element then
+                set labelValue to value of attribute (fieldName as text) of element
+                if labelValue is "Library" then return "xodus.navigation.library"
+                if labelValue is "Discover" then return "xodus.navigation.discover"
+                if labelValue is "Downloads" then return "xodus.navigation.downloads"
+            end if
+        end repeat
+    end tell
+    return ""
+end nativeNavigationIdentifier
 
 on isNamedButton(element, expectedName)
     tell application "System Events"

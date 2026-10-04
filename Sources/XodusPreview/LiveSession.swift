@@ -144,6 +144,13 @@ final class LiveSession: ObservableObject {
         return Self.describeSignInFailure(code: failure.code)
     }
 
+    var accountFailureTitle: String {
+        if authentication?.flow?.error?.nativeConsentFailure?.stage == "devicePreparation" {
+            return "Microsoft sign-in could not start."
+        }
+        return "Sign-in did not complete. Try again when you are ready."
+    }
+
     private static func describeSignInFailure(code: String) -> String {
         let reason: String
         switch code {
@@ -174,7 +181,15 @@ final class LiveSession: ObservableObject {
         case .providerRequestFailed:
             "A provider request during device preparation failed. Its network or service cause is not established; report this diagnostic."
         case .providerProofInvalid:
-            "The device-preparation response could not be cryptographically validated. Do not bypass validation; report this diagnostic."
+            "The device-preparation response did not provide a valid sign-in proof. Report this diagnostic before another attempt."
+        case .registrationProofInvalid:
+            "Microsoft device registration did not provide a valid sign-in proof. Report this diagnostic before another attempt."
+        case .tokenResponseInvalid:
+            "The device sign-in response did not contain one supported result. Report this diagnostic before another attempt."
+        case .tokenProofInvalid:
+            "The device sign-in result lacked a valid token proof. Report this diagnostic before another attempt."
+        case .tokenStructureInvalid:
+            "The device sign-in proof did not have the required supported structure. Report this diagnostic before another attempt."
         case .proofUnavailable:
             "Device proof was unavailable. No validated sign-in or package access was established; report this diagnostic."
         case .pipelineFailed:
@@ -476,7 +491,7 @@ final class LiveSession: ObservableObject {
             accountBusy = false
             accountStatusCurrent = false
             if case let ManagementError.backendError(code, _) = error {
-                errorMessage = Self.describeSignInFailure(code: code)
+                errorMessage = "Microsoft sign-in could not start. " + Self.describeSignInFailure(code: code)
             } else { errorMessage = Self.describe(error) }
         }
     }
