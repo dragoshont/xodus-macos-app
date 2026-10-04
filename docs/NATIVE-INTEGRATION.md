@@ -106,8 +106,10 @@ Its ad-hoc-signed embedded copy has SHA256
 `2180d02dca9300d08c91384207fed6acebdeaaa9d0c309bc0fd28a7fcf7b2296`.
 It includes the retained-review-closed R05/R06/R07 producer fixes; its inspection
 adapter/primitives were approved by that same review. The source-only app
-R01-R04 fixes closed at `fb66a2d`. Current app R08/R09 fixes need review of their
-new immutable revision before human sign-in readiness. Historical producer
+R01-R04 fixes closed at `fb66a2d`, R08/R09 at `6750219`; the `db0bf21`
+picker/consumer delta had no significant issues. Subsequently confirmed R10
+shared-retirement fixes need review of their new immutable revision before
+human sign-in readiness. Historical producer
 hashes, including superseded `58f5` and `35f0`, remain in
 [verification](VERIFICATION.md); they are not current readiness builds.
 **Provider consent remains separate from read-only/schema/build verification.**
@@ -125,7 +127,7 @@ open dist/Xodus.app
 
 The `.app` includes a release executable, required SwiftPM resources, original native icon and a development bundle identifier. An optional explicit management-engine argument embeds a matching local development build. Its native auth worker re-executes the same binary and returns its session through a backend-private inherited socket; the app receives status only. It is ad-hoc signed and locally verified, **not notarized or released**. No Wine/runtime payload, real library or credential cache is bundled.
 
-Settings provides a native engine picker, account controls, explicit catalog market/language, advanced public-product lookup and a bounded redacted diagnostic preview. Backend discovery in a developer bundle does not establish signed runtime certification.
+Settings provides a native engine picker, account controls, explicit catalog market/language, advanced public-product lookup and a bounded redacted diagnostic preview. After preview, a native save panel can save exactly the displayed counts-only summary atomically off the main actor. Unreviewed/stale preview and nonlocal destinations are rejected; filesystem errors are visible, not success. No account data, raw logs, URLs or personal paths enter this summary. Backend discovery in a developer bundle does not establish signed runtime certification.
 
 Default LaunchServices startup was exercised with `open Xodus.app`, no mode,
 backend flag or environment override. After fixing the automatic account read,
@@ -148,12 +150,13 @@ launcher Keychain profile, not implicit CLI/private-worker credential import.
 ## Evidence and still-open gates
 
 The current app review-fix milestone passed one full `sh tools/check.sh` invocation
-on the Mac: **14 core + 189 management + 24 presentation + 32 native session =
-259 checks**, zero failures. The native session set uses mock child processes and
+on the Mac: **14 core + 189 management + 24 presentation + 51 native session =
+278 checks**, zero failures. The native session set uses mock child processes and
 the actual `LiveSession` coordinator, not real Keychain/provider operations.
 It covers R01-R04 recovery, permission-preserving disconnect gating,
 failed-mutation freshness, genuine empty query, stop-search fencing, selected
-inspection scope and R08/R09. Five delayed edits with old view tasks cancelled
+inspection scope, R08/R09, fourteen R10 overlapping-retirement/startup checks and
+five reviewed-summary file/error/privacy checks. Five delayed edits with old view tasks cancelled
 produce only two requests with maximum concurrency one; the newest captured
 query/locale completes without a manual refresh or producer capacity error.
 Management
@@ -180,5 +183,21 @@ exit with a six-second bound around existing exact-PID escalation. Failed shutdo
 is explicit, retains the retiring client and blocks reconnect, fixture switching
 and application termination until reconciled. Repeated worker reconnect checks
 pass; there is no unbounded private run-loop wait.
+
+R10 additionally keeps retiring ownership in a shared operation before the first
+suspension. Concurrent disconnect/fixture/quit callers await the same outcome;
+failure never clears or replaces the retiring client. Connection reservation,
+lifecycle revision and waiter gating fence the entire reconnect, including
+post-negotiation/snapshot continuations. Engine selection and reconnect are
+disabled during the transition. Actual held-EOF children exercise overlap and
+a test-only short negative observation; production still uses six seconds.
+The real application subsequently quit/relaunched with both owned processes
+observed gone before another instance opened.
+
+`tools/check_diagnostics_ui.applescript` passed actual native Settings,
+counts-only preview and save-panel cancellation. It does not log picker contents,
+choose a destination or write a file. Programmatic file regressions use only
+owned original synthetic roots and clean them up. R10 and this new source delta
+still require the same retained review; no human sign-in has been initiated.
 
 Native provider-consent/cancellation integration, source-backed discovery/search and explicit installed import are ongoing, not waived. Full owned-PC inventory/audience, legacy package authorization, safe staged installation/hash/expanded-size semantics, signed exact gameplay runtime, save-preserving updates/rollback, full VoiceOver/localization/min-OS and distribution remain open. No install or play action is enabled merely because Xbox Live sign-in succeeds. The user-directed full journey and coordinator-owned adversarial review remain completion prerequisites; this persisted client milestone is not final completion.

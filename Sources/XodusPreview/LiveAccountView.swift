@@ -120,11 +120,14 @@ struct LiveSettingsView: View {
                     .foregroundStyle(.secondary)
                 LabeledContent("Build", value: session.backendPath.isEmpty ? "Not selected" : URL(fileURLWithPath: session.backendPath).lastPathComponent)
                 HStack {
-                    Button("Choose Xodus build") { session.chooseBackend() }.disabled(session.phase == .connecting)
+                    Button("Choose Xodus build") { session.chooseBackend() }.disabled(session.connectionTransitioning)
                     Spacer()
                     Button(session.isReady ? "Reconnect" : "Connect") { Task { await session.connect() } }
-                        .disabled(session.backendPath.isEmpty || session.phase == .connecting)
-                    if session.isReady { Button("Disconnect") { Task { await session.disconnect() } } }
+                        .disabled(session.backendPath.isEmpty || session.connectionTransitioning)
+                    if session.isReady {
+                        Button("Disconnect") { Task { await session.disconnect() } }
+                            .disabled(session.connectionTransitioning)
+                    }
                 }
                 if let hello = session.hello {
                     LabeledContent("Management", value: "1.0")
@@ -162,9 +165,31 @@ struct LiveSettingsView: View {
             }
             Section("Diagnostics") {
                 Button("Preview redacted diagnostic summary") { Task { await session.previewDiagnostics() } }
-                    .disabled(!session.supports(.diagnostics))
+                    .disabled(!session.supports(.diagnostics) || session.diagnosticSaving || session.diagnosticPreviewing)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Preview redacted diagnostic summary")
+                    .accessibilityIdentifier("xodus.diagnostics.preview")
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { Task { await session.previewDiagnostics() } }
                 if let preview = session.diagnosticPreview {
                     Text(preview).font(.callout).textSelection(.enabled)
+                    Button("Save reviewed summary...") { session.chooseDiagnosticDestination() }
+                        .disabled(session.diagnosticSaving)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Save reviewed diagnostic summary")
+                        .accessibilityIdentifier("xodus.diagnostics.save")
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityAction { session.chooseDiagnosticDestination() }
+                    Text("Only the summary shown above is saved, not raw engine logs or account data.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if session.diagnosticPreviewing { ProgressView("Preparing summary") }
+                if session.diagnosticSaving { ProgressView("Saving summary") }
+                if session.diagnosticSaved {
+                    Label("Diagnostic summary saved.", systemImage: "checkmark.circle")
+                }
+                if let error = session.diagnosticExportError {
+                    Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.secondary)
                 }
             }
             Section("Original design preview") {

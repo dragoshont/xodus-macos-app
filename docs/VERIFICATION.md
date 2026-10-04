@@ -9,7 +9,8 @@ game download, install or gameplay.
 ### Current inspection pairing and additional client fixes
 
 One full Mac `sh tools/check.sh` invocation passed **14 core + 189 management +
-24 presentation + 32 native session = 259 checks**, zero failures. The preceding
+24 presentation + 51 native session = 278 checks**, zero failures. The earlier
+`6750219` milestone independently passed 259 checks. The preceding
 212-check `fb66a2d` app revision separately
 [passed hosted CI](https://github.com/dragoshont/xodus-macos-app/actions/runs/37162534769);
 that success is not attributed to the newer delta. Current native source
@@ -25,7 +26,10 @@ plus the latest captured query/market/language. Five delayed edits at 300 ms,
 cancelling prior view tasks, issue only two requests with max concurrency one
 against a mock that enforces the producer's four-operation limit. Latest scope
 results arrive without manual refresh; stop drops unsent queued work. These
-new fixes require review of their persisted revision before human readiness.
+fixes were subsequently closed by the same retained review at `6750219`; the
+`db0bf21` picker/consumer follow-up had no significant issues. A later confirmed
+R10 retirement race is fixed below and still needs retained-review closure before
+human readiness.
 
 Canonical schema/fixtures at producer `e3129cee422305657b945d35daf2f780ffe98e2b`:
 SHA256 `c95c3fabdf114f89329d2361e76421e7b47be4c113f56c2381e64d437e44f749`,
@@ -77,6 +81,45 @@ unchanged. `InspectCancel` in the committed helper confines every interaction
 to the exact owned bundle/window, bounds traversal/waits and never logs picker
 directory names. A single bounded own-window scroll supports the below-fold
 Library action; ambiguous targets or existing modals are refused.
+
+### Shared retirement and complete reconnect fencing (R10)
+
+The retained reviewer found that clearing the client before awaiting close let
+another disconnect return true early, and competing reconnect continuations
+could create or replace ownership. Retirement now publishes a shared closing
+operation before suspension and keeps its client owned until observed exit.
+All callers await that same result; failed observation retains the old client.
+A reserved whole-connect operation, lifecycle revision and disconnect-waiter
+gate cover negotiation, snapshot and subsequent startup continuations.
+
+Fourteen new actual LiveSession/mock-child checks hold the child alive for
+1.4 seconds after stdin EOF. Concurrent disconnect/fixture/quit guards cannot
+return early; reconnect starts no second process. Overlapping complete reconnects
+create exactly one replacement, and a superseding disconnect prevents that
+replacement. A test-only 200 ms observation budget exercises a real negative
+exit observation while the child is still alive: all callers receive false from
+one shared observer, old ownership survives retry, and a new engine is allowed
+only after eventual exit is observed. Production remains bounded to six seconds.
+Suspended hello/snapshot continuations are separately fenced and recoverable.
+
+The release bundle rebuilt and passed actual folder-picker cancellation,
+noninteractive Account/status/Close and reviewed-summary save-panel cancellation.
+All 22 signed producer read-only checks passed again. App 89107 / child 89111
+then exited normally before relaunch; current app 89731 / child 89734 passed
+Account/status/Close with the same signed engine hash. No auth consent occurred.
+R10 source closure remains pending, not inferred from these tests.
+
+### Reviewed counts-only diagnostic summary export
+
+Native Settings now offers a file destination only after preparing the displayed
+summary. Exactly that private-set counts-only text is atomically written off the
+main actor, never raw engine text, account identity, paths, tokens or URLs.
+Five native regressions cover absent preview/no write, exact saved bytes,
+visible filesystem failure with preview preserved, nonlocal destination rejection
+and disconnect invalidation. The actual native save panel opened and cancelled
+without selecting a destination. Earlier helper scripting errors are not counted
+as passes; corrected helpers passed and their compiled temporary files were
+removed. This is a limited summary, not a full engine-log export.
 
 Live upstream zero-source behavior is **not observed**: arbitrary nonsense can
 return suggested cards. The empty-source regression remains scoped to

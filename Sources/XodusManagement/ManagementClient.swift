@@ -147,7 +147,11 @@ public actor ManagementClient {
     }
 
     @discardableResult
-    public func close() async -> Bool {
+    public func close(observationTimeout: Duration = .seconds(6)) async -> Bool {
+        guard observationTimeout > .zero, observationTimeout <= .seconds(6) else {
+            logger.error("Invalid owned-process shutdown observation budget.")
+            return false
+        }
         if !stopped {
             stopped = true
             resolveAll(.disconnected)
@@ -159,7 +163,7 @@ public actor ManagementClient {
         let exited = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
             DispatchQueue(label: "Xodus.management.shutdown").async {
                 // Foundation waitUntilExit can stall its private run loop after an observed child exit.
-                let deadline = ContinuousClock.now.advanced(by: .seconds(6))
+                let deadline = ContinuousClock.now.advanced(by: observationTimeout)
                 while child.isRunning, ContinuousClock.now < deadline {
                     Thread.sleep(forTimeInterval: 0.02)
                 }

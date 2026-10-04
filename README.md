@@ -66,6 +66,13 @@ Core, presentation and `swift run XodusManagementChecks` are dependency-free exe
 
 `swift run XodusPreview --live-check` exercises the actual native session coordinator against synthetic subprocesses: expired-profile recovery, permission failures, transient/late-cancel reconciliation and failed-page continuation. It exits before creating a window and performs no Microsoft or Keychain operation.
 
+Native Settings can preview and save a **counts-only diagnostic summary** through
+a native file picker. Only the reviewed summary is saved, not raw engine logs,
+account identifiers, tokens, URLs or personal paths. Writes are atomic and run
+off the main actor; failures remain explicit. Overlapping disconnect/reconnect
+operations share bounded shutdown ownership rather than starting another engine
+before the old child exits.
+
 `sh tools/check.sh` runs the complete native/management/fixture check sequence. GitHub Actions repeats it on a hosted Mac and checks SVG regeneration; a workflow definition is not itself a claim that a particular revision passed hosted CI.
 
 Own-view exports use `--export-preview <directory>` for fixtures or `--export-live <directory>` for a **disconnected**, non-account live shell. They export this app's Library, Discover and Downloads view hierarchy and exit; they do not capture the desktop/other apps or establish Glass-compositor fidelity.

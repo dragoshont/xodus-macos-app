@@ -12,20 +12,23 @@ The user directed autonomous native development after foundation `44d7338`. This
 | --- | --- | --- | --- |
 | C-TRANSPORT | implemented-client | Codable1.0 models, producer-schema validation, bounded supervised stdin/stdout JSONL, correlated results, separate human/read deadlines, EOF/nonzero handling and bounded owned-process cleanup | 189 Mac management checks, explicit failed-shutdown gates and actual bounded engine checks; no gameplay implication |
 | C-ACCOUNT | implemented-client | Isolated Store profile status/sign-in/poll/cancel/logout, expired-profile recovery, safe pending status, no automatic deletion or blind mutation retry | Noninteractive GUI status verified; native synthetic R01-R03 regressions pass; human provider consent and retained-review closure remain open |
-| C-CATALOG | implemented-client | Real PC Game Pass discovery and Microsoft Store network query, separate observed-cache search, one active/latest queued scope, visible per-item and source-level failures | Actual Store/discovery pages and GUI search/continuation; R06/R07 closed, R08/R09 new client fixes await retained closure; live zero-source not observed, no ownership inference |
+| C-CATALOG | implemented-client | Real PC Game Pass discovery and Microsoft Store network query, separate observed-cache search, one active/latest queued scope, visible per-item and source-level failures | Actual Store/discovery pages and GUI search/continuation; R06-R09 closed; live zero-source not observed, no ownership inference |
 | C-ACTIVITY | implemented-client | Real catalog-check enqueue/cancel/retry, fenced snapshot/revision/sequence reconciliation and terminal protection | Actual read-only snapshot verified; game installation/recovery remains separate |
 | C-INSTALLED | implemented-client | Typed managed-registry snapshot and separate user-selected read-only marker inspection, directory-only native picker, unknown retail identity/access/full integrity | Actual synthetic 196-byte metadata/digest/version/no-write/error checks pass; no external-game test, scan, adoption, registration or launch implied |
 | C-BUNDLE | implemented-client | Release `.app`, required resources, original icon generator, local ad-hoc signing/plist verification | Mac bundle/resource/self-check/own-view evidence; no notarization/runtime certification/public distribution |
+| C-DIAGNOSTICS | implemented-client | Previewable counts-only summary; native user-chosen save destination, atomic background write, explicit failure and stale/nonlocal guards | Five native file/privacy regressions and actual save-panel cancellation; no raw-log/account/path export or full support report |
 
 Current app review-fix milestone: **14 core + 189 management + 24 presentation +
-32 native session = 259 checks**, zero failures, plus twenty-two actual signed
+51 native session = 278 checks**, zero failures, plus twenty-two actual signed
 engine checks, including original isolated marker inspection and owned exit.
 Anonymous startup does not read Keychain;
 explicit Account opening checks status noninteractively. Owned-window navigation,
 Check status/Close and sustained engine lifetime were verified without consent.
 Producer e3129/da548 includes retained-review-closed R05/R06/R07 and enabled
-inspection. App R01-R04 closed at fb66; new R08/R09 fixes need retained review of
-their persisted revision. Live zero-source remains unobserved, not inferred from
+inspection. App R01-R04 closed at fb66, R08/R09 at 675; db0 picker/consumer had no
+significant issues. New R10 shared retiring ownership/complete reconnect fences
+pass fourteen actual overlapping held-child/failed-observation/startup checks
+but require retained source closure. Live zero-source remains unobserved, not inferred from
 nonsense queries that can return suggestions.
 This is not full VoiceOver, provider consent or final review closure. Fixture
 arrays/jobs remain in `--fixture`; no client milestone waives the full real journey.
@@ -68,7 +71,7 @@ Dependencies are prerequisites, not a promise of execution order or access. D-ID
 
 **Actual native command:** `sh tools/check.sh` builds and runs core, management,
 presentation and native session dependency-free checks on the isolated Mac.
-Foundation ran 29; the current app milestone runs 259. `swift test` did not pass
+Foundation ran 29; the current app milestone runs 278. `swift test` did not pass
 because XCTest/Testing are absent in that CLT; no fake shim is provided. Hosted
 workflow results must be read separately. Actual producer probes use explicit
 immutable engines and isolated app-adapter state, not private game roots.

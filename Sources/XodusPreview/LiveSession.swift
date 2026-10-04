@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import AppKit
 import Foundation
+import UniformTypeIdentifiers
 import XodusManagement
 
-enum ConnectionPhase { case disconnected, connecting, ready, failed }
+enum ConnectionPhase { case disconnected, connecting, disconnecting, ready, failed }
 
 @MainActor
 final class LiveSession: ObservableObject {
     @Published private(set) var phase: ConnectionPhase = .disconnected
+    @Published private(set) var connectionTransitioning = false
     @Published private(set) var hello: ManagementHello?
     @Published private(set) var authentication: AuthenticationStatus?
     @Published private(set) var products: [CatalogProduct] = []
@@ -34,8 +36,17 @@ final class LiveSession: ObservableObject {
     @Published var market = "US" { didSet { if market != oldValue { invalidateCatalogScope() } } }
     @Published var language = "en-US" { didSet { if language != oldValue { invalidateCatalogScope() } } }
     @Published var lookupID = ""
-    @Published var diagnosticPreview: String?
+    @Published private(set) var diagnosticPreview: String?
+    @Published private(set) var diagnosticPreviewing = false
+    @Published private(set) var diagnosticSaving = false
+    @Published private(set) var diagnosticSaved = false
+    @Published private(set) var diagnosticExportError: String?
     private var client: ManagementClient?
+    private var lifecycleRevision = 0
+    private var connectOperationID: UUID?
+    private var disconnectWaiters = 0
+    private var closingOperation: ClosingOperation?
+    private let shutdownClient: @Sendable (ManagementClient) async -> Bool
     private var eventTask: Task<Void, Never>?
     private var authTask: Task<Void, Never>?
     private var generation = 0
@@ -61,7 +72,15 @@ final class LiveSession: ObservableObject {
         let queryGeneration: Int
     }
 
-    init(configuration: BackendConfiguration? = nil) {
+    private struct ClosingOperation {
+        let id: UUID
+        let client: ManagementClient
+        let task: Task<Bool, Never>
+    }
+
+    init(configuration: BackendConfiguration? = nil,
+         shutdownClient: @escaping @Sendable (ManagementClient) async -> Bool = { await $0.close() }) {
+        self.shutdownClient = shutdownClient
         self.configuration = configuration
         if let configuration {
             backendPath = configuration.executable.path
@@ -101,6 +120,7 @@ final class LiveSession: ObservableObject {
 
     var accountLabel: String {
         if phase == .connecting { return "Connecting to Xodus" }
+        if phase == .disconnecting { return "Disconnecting from Xodus" }
         guard isReady else { return "Connect Xodus" }
         if signInPending { return "Finish Microsoft sign-in" }
         switch authentication?.state {
@@ -115,6 +135,10 @@ final class LiveSession: ObservableObject {
     func supports(_ command: ManagementCommand) -> Bool { hello?.supports(command) == true }
 
     func chooseBackend() {
+        guard !connectionTransitioning else {
+            errorMessage = "Wait for the current connection transition to finish before choosing another engine."
+            return
+        }
         let panel = NSOpenPanel()
         panel.title = "Choose a trusted Xodus management build"
         panel.canChooseDirectories = false
@@ -130,25 +154,36 @@ final class LiveSession: ObservableObject {
     }
 
     func connect() async {
-        guard phase != .connecting, !backendPath.isEmpty else {
+        guard !connectionTransitioning, !backendPath.isEmpty else {
             if backendPath.isEmpty { errorMessage = "Choose your trusted Xodus build in Settings first." }
             return
         }
-        guard await disconnect() else { return }
+        let operationID = UUID()
+        connectOperationID = operationID
+        lifecycleRevision += 1
+        let revision = lifecycleRevision
+        updateConnectionTransition()
+        defer {
+            if connectOperationID == operationID { connectOperationID = nil }
+            updateConnectionTransition()
+        }
+        let state = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+            .appendingPathComponent("Library/Application Support/Xodus/Management", isDirectory: true)
+        let target = configuration ?? BackendConfiguration(
+            executable: URL(fileURLWithPath: backendPath), stateDirectory: state)
+        guard await retireClient(), revision == lifecycleRevision else { return }
         phase = .connecting
         errorMessage = nil
         let token = generation
         do {
             let connection = try ManagementClient()
             client = connection
-            let state = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
-                .appendingPathComponent("Library/Application Support/Xodus/Management", isDirectory: true)
-            let negotiated = try await connection.connect(configuration ?? BackendConfiguration(
-                executable: URL(fileURLWithPath: backendPath), stateDirectory: state))
-            guard token == generation else { await connection.close(); return }
+            let negotiated = try await connection.connect(target)
+            guard token == generation, revision == lifecycleRevision, client === connection else { return }
             hello = negotiated
             phase = .ready
             if supports(.jobs) { try await reconcileActivity() }
+            guard token == generation, revision == lifecycleRevision, client === connection else { return }
             eventTask = Task { [weak self] in
                 do {
                     for try await event in connection.events {
@@ -169,15 +204,32 @@ final class LiveSession: ObservableObject {
             }
             // Credential-store authorization belongs to explicit Account actions, not anonymous startup.
             await refreshInstalled()
+            guard token == generation, revision == lifecycleRevision, client === connection else { return }
             await search("")
         } catch {
-            guard token == generation else { return }
+            guard token == generation, revision == lifecycleRevision else { return }
             await connectionFailed(error)
         }
     }
 
     @discardableResult
     func disconnect() async -> Bool {
+        lifecycleRevision += 1
+        disconnectWaiters += 1
+        updateConnectionTransition()
+        defer {
+            disconnectWaiters -= 1
+            updateConnectionTransition()
+        }
+        return await retireClient()
+    }
+
+    private func updateConnectionTransition() {
+        connectionTransitioning = connectOperationID != nil || closingOperation != nil || disconnectWaiters > 0
+    }
+
+    private func retireClient() async -> Bool {
+        if let operation = closingOperation { return await finishRetirement(operation) }
         generation += 1
         authenticationGeneration += 1
         queryGeneration += 1
@@ -189,8 +241,6 @@ final class LiveSession: ObservableObject {
         queuedCatalog = nil
         eventTask = nil
         authTask = nil
-        let previous = client
-        client = nil
         hello = nil
         authentication = nil
         accountStatusCurrent = false
@@ -211,22 +261,46 @@ final class LiveSession: ObservableObject {
         discoveryCheckedAt = nil
         discoveryRevision = nil
         diagnosticPreview = nil
-        phase = .disconnected
+        diagnosticPreviewing = false
+        diagnosticSaved = false
+        diagnosticExportError = nil
+        phase = .disconnecting
         searching = false
         catalogStopped = false
         lookupBusy = false
         accountBusy = false
-        if let previous, !(await previous.close()) {
-            client = previous
-            phase = .failed
-            errorMessage = Self.describe(ManagementError.shutdownFailed)
-            return false
+        guard let previous = client else {
+            phase = .disconnected
+            return true
         }
-        return true
+        let shutdown = shutdownClient
+        let operation = ClosingOperation(id: UUID(), client: previous,
+                                         task: Task { await shutdown(previous) })
+        closingOperation = operation
+        updateConnectionTransition()
+        return await finishRetirement(operation)
+    }
+
+    private func finishRetirement(_ operation: ClosingOperation) async -> Bool {
+        let closed = await operation.task.value
+        if closingOperation?.id == operation.id {
+            closingOperation = nil
+            if closed {
+                client = nil
+                phase = .disconnected
+            } else {
+                // Keep the retiring client owned; no replacement can start without observing its exit.
+                phase = .failed
+                errorMessage = Self.describe(ManagementError.shutdownFailed)
+            }
+            updateConnectionTransition()
+        }
+        return closed
     }
 
     private func connectionFailed(_ error: Error) async {
-        guard await disconnect() else { return }
+        let revision = lifecycleRevision + 1
+        guard await disconnect(), revision == lifecycleRevision else { return }
         phase = .failed
         errorMessage = Self.describe(error)
     }
@@ -724,8 +798,13 @@ final class LiveSession: ObservableObject {
     }
 
     func previewDiagnostics() async {
-        guard supports(.diagnostics), let client else { return }
+        guard supports(.diagnostics), let client, !diagnosticSaving, !diagnosticPreviewing else { return }
+        diagnosticPreviewing = true
+        diagnosticPreview = nil
+        diagnosticSaved = false
+        diagnosticExportError = nil
         let token = generation
+        defer { if token == generation { diagnosticPreviewing = false } }
         do {
             let value = try await client.request(.diagnostics)
             guard token == generation else { return }
@@ -735,6 +814,46 @@ final class LiveSession: ObservableObject {
         } catch {
             guard token == generation else { return }
             errorMessage = Self.describe(error)
+        }
+    }
+
+    func chooseDiagnosticDestination() {
+        guard diagnosticPreview != nil, !diagnosticSaving, !diagnosticPreviewing else {
+            diagnosticExportError = "Preview the current diagnostic summary before saving."
+            return
+        }
+        diagnosticSaved = false
+        diagnosticExportError = nil
+        let panel = NSSavePanel()
+        panel.title = "Save reviewed diagnostic summary"
+        panel.nameFieldStringValue = "Xodus-diagnostics.txt"
+        panel.allowedContentTypes = [.plainText]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        Task { await saveDiagnosticSummary(to: url) }
+    }
+
+    func saveDiagnosticSummary(to destination: URL) async {
+        guard let preview = diagnosticPreview, !diagnosticSaving, !diagnosticPreviewing else {
+            diagnosticExportError = "Preview the current diagnostic summary before saving."
+            return
+        }
+        diagnosticSaved = false
+        diagnosticExportError = nil
+        guard destination.isFileURL, destination.host == nil || destination.host == "",
+              destination.path.hasPrefix("/"), !destination.hasDirectoryPath else {
+            diagnosticExportError = "Choose a local text file for this diagnostic summary."
+            return
+        }
+        diagnosticSaving = true
+        defer { diagnosticSaving = false }
+        let data = Data(preview.utf8)
+        do {
+            try await Task.detached(priority: .userInitiated) {
+                try data.write(to: destination, options: .atomic)
+            }.value
+            diagnosticSaved = true
+        } catch {
+            diagnosticExportError = "The summary could not be saved. Choose a writable destination and try again."
         }
     }
 

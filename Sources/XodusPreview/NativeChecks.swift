@@ -22,12 +22,29 @@ enum NativeChecks {
             }
             fflush(stdout)
         }
-        func session(_ scenario: String) -> LiveSession {
+        func configuration(_ scenario: String) -> BackendConfiguration {
             let executable = URL(fileURLWithPath: CommandLine.arguments[0])
                 .deletingLastPathComponent().appendingPathComponent("XodusManagementChecks")
             let state = FileManager.default.temporaryDirectory
                 .appendingPathComponent("XodusNativeChecks-\(UUID().uuidString)").appendingPathComponent(scenario)
-            return LiveSession(configuration: BackendConfiguration(executable: executable, stateDirectory: state))
+            return BackendConfiguration(executable: executable, stateDirectory: state)
+        }
+        func session(_ scenario: String) -> LiveSession { LiveSession(configuration: configuration(scenario)) }
+        func trace(_ configuration: BackendConfiguration) throws -> [String] {
+            try String(contentsOf: configuration.stateDirectory.appendingPathComponent("lifecycle.log"),
+                       encoding: .utf8).split(separator: "\n").map(String.init)
+        }
+        func cleanLifecycle(_ configuration: BackendConfiguration) throws {
+            try FileManager.default.removeItem(at: configuration.stateDirectory.deletingLastPathComponent())
+        }
+        func waitForTrace(_ marker: String, _ configuration: BackendConfiguration) async throws {
+            let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+            while true {
+                if FileManager.default.fileExists(atPath: configuration.stateDirectory.appendingPathComponent("lifecycle.log").path),
+                   try trace(configuration).contains(marker) { return }
+                guard ContinuousClock.now < deadline else { throw ManagementError.requestTimedOut }
+                try await Task.sleep(for: .milliseconds(20))
+            }
         }
         do {
             let expired = session("expired")
@@ -201,6 +218,125 @@ enum NativeChecks {
                       "Missing or differently scoped inspection is an explicit error, never empty installed success")
                 await rejected.disconnect()
             }
+
+            let slowConfiguration = configuration("retireslow")
+            let retiring = LiveSession(configuration: slowConfiguration)
+            await retiring.connect()
+            var firstFinished = false, secondFinished = false, fixtureAllowed = false, quitAllowed = false
+            let firstClose = Task { let result = await retiring.disconnect(); firstFinished = true; return result }
+            try await wait { retiring.phase == .disconnecting }
+            let secondClose = Task { let result = await retiring.disconnect(); secondFinished = true; return result }
+            let fixtureClose = Task { let result = await retiring.disconnect(); fixtureAllowed = result; return result }
+            let quitClose = Task { let result = await retiring.disconnect(); quitAllowed = result; return result }
+            let overlappingReconnect = Task { await retiring.connect() }
+            try await Task.sleep(for: .milliseconds(150))
+            let heldTrace = try trace(slowConfiguration)
+            check(!firstFinished && !secondFinished && !fixtureAllowed && !quitAllowed
+                  && retiring.connectionTransitioning && heldTrace.contains("stdin.closed") && !heldTrace.contains("exiting"),
+                  "Actual child held after stdin EOF prevents early disconnect, fixture or quit success")
+            await overlappingReconnect.value
+            check(try trace(slowConfiguration).filter { $0 == "started" }.count == 1,
+                  "Reconnect during shared retirement cannot start a second engine")
+            let sharedResults = await [firstClose.value, secondClose.value, fixtureClose.value, quitClose.value]
+            check(sharedResults.allSatisfy { $0 } && !retiring.connectionTransitioning,
+                  "All overlapping disconnect callers observe the same completed child exit")
+            await retiring.connect()
+            let reconnectA = Task { await retiring.connect() }
+            try await wait { retiring.phase == .disconnecting }
+            let reconnectB = Task { await retiring.connect() }
+            await reconnectA.value
+            await reconnectB.value
+            check(try retiring.isReady && trace(slowConfiguration).filter { $0 == "started" }.count == 3,
+                  "Overlapping complete reconnect transitions spawn exactly one replacement, not two post-close engines")
+            let superseded = Task { await retiring.connect() }
+            try await wait { retiring.phase == .disconnecting }
+            let supersedingClose = Task { await retiring.disconnect() }
+            await superseded.value
+            let supersedingResult = await supersedingClose.value
+            check(try supersedingResult && retiring.phase == .disconnected
+                  && trace(slowConfiguration).filter { $0 == "started" }.count == 3,
+                  "Disconnect supersedes an entire pending reconnect before its post-close spawn")
+            try cleanLifecycle(slowConfiguration)
+
+            let failedConfiguration = configuration("retirefailed")
+            let observer = ShutdownCheckObserver()
+            let unobserved = LiveSession(configuration: failedConfiguration,
+                                        shutdownClient: { await observer.close($0) })
+            await unobserved.connect()
+            let failedA = Task { await unobserved.disconnect() }
+            try await wait { unobserved.phase == .disconnecting }
+            let failedB = Task { await unobserved.disconnect() }
+            let failedFixture = Task { await unobserved.disconnect() }
+            let failedQuit = Task { await unobserved.disconnect() }
+            await unobserved.connect()
+            let failedResults = await [failedA.value, failedB.value, failedFixture.value, failedQuit.value]
+            let observedAttempts = await observer.attempts
+            check(try failedResults.allSatisfy { !$0 } && observedAttempts == 1 && unobserved.phase == .failed
+                  && unobserved.errorMessage != nil && !trace(failedConfiguration).contains("exiting"),
+                  "Actual failed short exit observation is shared and retains old ownership; fixture and quit remain blocked")
+            await unobserved.connect()
+            check(try !unobserved.isReady && trace(failedConfiguration).filter { $0 == "started" }.count == 1,
+                  "A retry cannot overwrite an unobserved retiring child with a new engine")
+            await observer.useDefaultBudget()
+            check(await unobserved.disconnect(), "Retained ownership can reconcile the original child's eventual exit")
+            await unobserved.connect()
+            check(try unobserved.isReady && trace(failedConfiguration).filter { $0 == "started" }.count == 2,
+                  "A new engine is allowed only after the retained child's exit is actually observed")
+            check(await unobserved.disconnect(), "Recovered lifecycle test releases its last actual child")
+            try cleanLifecycle(failedConfiguration)
+
+            for scenario in ["retirehello", "retiresnapshot"] {
+                let startupConfiguration = configuration(scenario)
+                let starting = LiveSession(configuration: startupConfiguration)
+                let startup = Task { await starting.connect() }
+                try await waitForTrace(scenario == "retirehello" ? "hello.wait" : "snapshot.wait", startupConfiguration)
+                let duplicate = Task { await starting.connect() }
+                let interruption = Task { await starting.disconnect() }
+                await duplicate.value
+                let interrupted = await interruption.value
+                await startup.value
+                check(try interrupted && starting.phase == .disconnected && starting.hello == nil
+                      && !starting.connectionTransitioning
+                      && trace(startupConfiguration).filter { $0 == "started" }.count == 1,
+                      "Disconnect fences suspended negotiation/snapshot continuations without stale startup or second spawn")
+                await starting.connect()
+                check(starting.isReady && !starting.connectionTransitioning,
+                      "A fenced startup does not strand future explicit connection attempts")
+                await starting.disconnect()
+                try cleanLifecycle(startupConfiguration)
+            }
+
+            let diagnostics = session("diagnostics")
+            await diagnostics.connect()
+            let exportRoot = FileManager.default.temporaryDirectory.appendingPathComponent("XodusDiagnosticChecks-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: exportRoot, withIntermediateDirectories: false,
+                                                   attributes: [.posixPermissions: 0o700])
+            defer {
+                do { try FileManager.default.removeItem(at: exportRoot) }
+                catch { check(false, "Owned synthetic diagnostic export cleanup failed") }
+            }
+
+            let output = exportRoot.appendingPathComponent("summary.txt")
+            await diagnostics.saveDiagnosticSummary(to: output)
+            check(diagnostics.diagnosticExportError != nil && !FileManager.default.fileExists(atPath: output.path),
+                  "Diagnostic export requires a current reviewed preview and creates no unreviewed file")
+            await diagnostics.previewDiagnostics()
+            guard let reviewed = diagnostics.diagnosticPreview else { throw ManagementError.invalidPayload }
+            await diagnostics.saveDiagnosticSummary(to: output)
+            check(try String(contentsOf: output, encoding: .utf8) == reviewed && diagnostics.diagnosticSaved,
+                  "Export saves exactly the reviewed counts-only summary, without raw backend data")
+            await diagnostics.saveDiagnosticSummary(to: exportRoot.appendingPathComponent("missing/summary.txt"))
+            check(diagnostics.diagnosticExportError != nil && !diagnostics.diagnosticSaved
+                  && diagnostics.diagnosticPreview == reviewed,
+                  "Filesystem export failure is visible, never success, and preserves the reviewed summary for retry")
+            guard let remote = URL(string: "https://example.invalid/diagnostics") else { throw ManagementError.invalidPayload }
+            await diagnostics.saveDiagnosticSummary(to: remote)
+            check(diagnostics.diagnosticExportError != nil && !diagnostics.diagnosticSaved,
+                  "Diagnostic export rejects nonlocal destinations without writing")
+            await diagnostics.disconnect()
+            await diagnostics.saveDiagnosticSummary(to: output)
+            check(diagnostics.diagnosticExportError != nil && !diagnostics.diagnosticSaved,
+                  "Disconnect invalidates diagnostic preview before another export")
         } catch {
             check(false, (error as? ManagementError)?.localizedDescription ?? "Native fixture regression did not complete.")
         }
@@ -215,4 +351,16 @@ enum NativeChecks {
             try await Task.sleep(for: .milliseconds(50))
         }
     }
+}
+
+private actor ShutdownCheckObserver {
+    private(set) var attempts = 0
+    private var budget: Duration = .milliseconds(200)
+
+    func close(_ client: ManagementClient) async -> Bool {
+        attempts += 1
+        return await client.close(observationTimeout: budget)
+    }
+
+    func useDefaultBudget() { budget = .seconds(6) }
 }

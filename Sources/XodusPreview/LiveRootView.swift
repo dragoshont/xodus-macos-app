@@ -59,7 +59,8 @@ struct LiveRootView: View {
         }
         .task {
             if !CommandLine.arguments.contains("--export-live"),
-               session.phase == .disconnected, !session.backendPath.isEmpty { await session.connect() }
+               session.phase == .disconnected, !session.connectionTransitioning,
+               !session.backendPath.isEmpty { await session.connect() }
         }
         .task(id: "\(state.destination.rawValue):\(state.query):\(session.market):\(session.language):\(session.isReady)") {
             guard state.destination == .discover else { return }
@@ -143,7 +144,7 @@ struct LiveRootView: View {
                     Button("Open Settings", action: openSettings.callAsFunction)
                     if !session.backendPath.isEmpty {
                         Button("Reconnect") { Task { await session.connect() } }
-                            .disabled(session.phase == .connecting)
+                            .disabled(session.connectionTransitioning)
                     }
                 } else {
                     Button("Open account") { state.showingAccount = true }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import Foundation
 import CryptoKit
+import Darwin
 import XodusManagement
 
 @main
@@ -589,9 +590,25 @@ enum MockBackend {
               CommandLine.arguments.indices.contains(index + 1) else { exit(2) }
         let scenario = URL(fileURLWithPath: CommandLine.arguments[index + 1]).lastPathComponent
         do {
+            let lifecycleDirectory = URL(fileURLWithPath: CommandLine.arguments[index + 1])
+            let lifecycleScenario = ["retireslow", "retirefailed", "retirehello", "retiresnapshot"].contains(scenario)
+            func trace(_ entry: String) throws {
+                guard lifecycleScenario else { return }
+                try FileManager.default.createDirectory(at: lifecycleDirectory, withIntermediateDirectories: true,
+                                                        attributes: [.posixPermissions: 0o700])
+                let file = lifecycleDirectory.appendingPathComponent("lifecycle.log")
+                let descriptor = open(file.path, O_WRONLY | O_CREAT | O_APPEND, 0o600)
+                guard descriptor >= 0 else { throw ManagementError.writeFailed }
+                let bytes = Data("\(entry)\n".utf8)
+                let written = bytes.withUnsafeBytes { write(descriptor, $0.baseAddress, $0.count) }
+                let closed = Darwin.close(descriptor)
+                guard written == bytes.count, closed == 0 else { throw ManagementError.writeFailed }
+            }
+            try trace("started")
             let frames = try fixture("positive").array ?? []
             var hello = frames.first(where: { $0["data"]?["schema"] != nil })?["data"]?.object ?? [:]
             var supported: Set<ManagementCommand> = [.authStatus, .authLogout, .jobs]
+            if scenario == "diagnostics" { supported.insert(.diagnostics) }
             if ["discoveryfail", "discoveryrecover"].contains(scenario) { supported.insert(.discover) }
             if ["queryfail", "badqueryfail", "queryempty", "queryslow", "querynodetails",
                 "querynulldetails", "querycoalesce"].contains(scenario) { supported.insert(.query) }
@@ -611,6 +628,10 @@ enum MockBackend {
                 let request = try JSONDecoder().decode(JSONValue.self, from: Data(line.utf8))
                 let command = request["command"]?.string ?? ""
                 if command == "hello" {
+                    if scenario == "retirehello" {
+                        try trace("hello.wait")
+                        Thread.sleep(forTimeInterval: 0.4)
+                    }
                     if scenario == "prompt" { print("Synthetic interactive prompt"); fflush(stdout); continue }
                     if scenario == "oversize" { print(String(repeating: "x", count: JSONLineFramer.maximumBytes + 1)); fflush(stdout); continue }
                     if scenario == "partial" { FileHandle.standardOutput.write(Data("{\"kind\":".utf8)); exit(0) }
@@ -797,7 +818,14 @@ enum MockBackend {
                     if scenario == "exit" { exit(7) }
                     if scenario == "timeout" { Thread.sleep(forTimeInterval: 5); continue }
                     let data: JSONValue
-                    if command == "jobs.snapshot" {
+                    if command == ManagementCommand.diagnostics.rawValue, scenario == "diagnostics" {
+                        guard let summary = frames.first(where: { $0["data"]?["jobCount"] != nil })?["data"] else { exit(3) }
+                        data = summary
+                    } else if command == "jobs.snapshot" {
+                        if scenario == "retiresnapshot" {
+                            try trace("snapshot.wait")
+                            Thread.sleep(forTimeInterval: 0.4)
+                        }
                         data = .object(["sessionID": .string("fixture-session"), "watermark": .integer(0), "jobs": .array([])])
                     } else {
                         data = .object(["state": .string("signedOut"), "credentialStore": .string("macOSKeychain"),
@@ -816,6 +844,11 @@ enum MockBackend {
                     if scenario == "wrongid" { response["requestID"] = .string("fixture-unexpected") }
                     try emit(.object(response))
                 }
+            }
+            if lifecycleScenario {
+                try trace("stdin.closed")
+                Thread.sleep(forTimeInterval: 1.4)
+                try trace("exiting")
             }
             exit(0)
         } catch { exit(3) }
