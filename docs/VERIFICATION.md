@@ -13,9 +13,13 @@ One full Mac `sh tools/check.sh` invocation passed **14 core + 189 management +
 `6750219` milestone independently passed 259 checks. The preceding
 212-check `fb66a2d` app revision separately
 [passed hosted CI](https://github.com/dragoshont/xodus-macos-app/actions/runs/37162534769);
-that success is not attributed to the newer delta. Current native source
+that success is not attributed to the newer delta. Earlier native source
 `6750219cf547b693d29ee162d796b9b39c37ca70` independently
 [passed hosted CI](https://github.com/dragoshont/xodus-macos-app/actions/runs/37165029761).
+Current R10/diagnostic-summary native source
+`f967f5c09a91f60bd82c91db6ab342de2a95d585` independently
+[passed hosted CI](https://github.com/dragoshont/xodus-macos-app/actions/runs/37167088810),
+including all 278 native/core/management/presentation checks and SVG regeneration.
 
 The same retained reviewer closed app R01-R04 at `fb66a2d` and backend R05-R07.
 Two subsequently confirmed app findings are fixed with new regressions:
