@@ -47,6 +47,7 @@ enum NativeChecks {
             }
         }
         do {
+            try await ApplicationTerminationChecks.run(check: check)
             let expired = session("expired")
             await expired.connect()
             check(expired.isReady && !expired.canSignIn, "Unchecked account cannot blindly retry a mutation")
@@ -401,18 +402,24 @@ enum NativeChecks {
             try await wait { unobserved.phase == .disconnecting }
             let failedB = Task { await unobserved.disconnect() }
             let failedFixture = Task { await unobserved.disconnect() }
-            let failedQuit = Task { await unobserved.disconnect() }
+            let quitRuntime = RuntimeProviderSettings()
+            let quitCoordinator = ApplicationTerminationCoordinator()
+            let failedQuit = Task { await quitCoordinator.shutdown(session: unobserved, runtime: quitRuntime) }
             await unobserved.connect()
             let failedResults = await [failedA.value, failedB.value, failedFixture.value, failedQuit.value]
             let observedAttempts = await observer.attempts
             check(try failedResults.allSatisfy { !$0 } && observedAttempts == 1 && unobserved.phase == .failed
                   && unobserved.errorMessage != nil && !trace(failedConfiguration).contains("exiting"),
                   "Actual failed short exit observation is shared and retains old ownership; fixture and quit remain blocked")
+            check(!quitRuntime.applicationTerminating && !unobserved.applicationTerminating,
+                  "Refused normal termination restores interactions only after both cleanup attempts finish")
             await unobserved.connect()
             check(try !unobserved.isReady && trace(failedConfiguration).filter { $0 == "started" }.count == 1,
                   "A retry cannot overwrite an unobserved retiring child with a new engine")
             await observer.useDefaultBudget()
-            check(await unobserved.disconnect(), "Retained ownership can reconcile the original child's eventual exit")
+            check(await quitCoordinator.shutdown(session: unobserved, runtime: quitRuntime),
+                  "Retry through the normal termination coordinator reconciles the retained child's eventual exit")
+            unobserved.applicationTerminating = false
             await unobserved.connect()
             check(try unobserved.isReady && trace(failedConfiguration).filter { $0 == "started" }.count == 2,
                   "A new engine is allowed only after the retained child's exit is actually observed")

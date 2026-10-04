@@ -44,6 +44,12 @@ cleanup stops and reaps only its owned planning child. No provider path is read,
 prefix created, save migrated or installation/device/game evidence promoted.
 See [the separately pinned provider contract](RUNTIME-PROVIDERS.md).
 
+Application termination is an app-lifetime fence, not just a management-client
+disconnect. It blocks new planning/connect requests, joins cancelled planning
+through owned cleanup/reap and composes both shutdown results. A failed
+cleanup refuses termination and retains reconciliation ownership; a normal
+exit cannot orphan a planning child when the management connection is absent.
+
 `ProductID` identifies a catalog product; edition identity, package identity/version, market, language and architecture remain separate. Entitlement is purchase/subscription/none/unknown, with provenance/time and expiry where supplied. Installability is downloadable/blocked/unknown with a reason and pinned package. Compatibility is verified/experimental/unsupported/unknown with OS/architecture/runtime fingerprint. Local installation has its own version/runtime/state; no boolean `supported` or title-string lookup.
 
 The Rust management layer owns credential proof/SOAP, the isolated Keychain

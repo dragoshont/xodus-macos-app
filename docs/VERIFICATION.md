@@ -6,6 +6,67 @@ game download, install or gameplay.
 
 ## Separate four-provider native configuration and pure-plan consumption
 
+### Canonical quit-lifetime correction
+
+Retained review found a real source blocker in747: normal app termination
+awaited management disconnect but not the independently owned runtime-plan
+task. With no management connection, Quit could orphan that planning child.
+`PreviewDelegate` now uses the shared `ApplicationTerminationCoordinator`,
+which fences new planning/connect requests, cancels and joins the active plan
+through bounded owned-child cleanup/reap, and composes that result with existing
+management disconnect. Quit is permitted only when both succeed. A failed
+shutdown retains ownership, surfaces an error, refuses Quit and supports a
+bounded retry; no stale plan is adopted while terminating.
+
+The actual normal coordinator, not just manual task cancellation, is exercised
+against neutral owned children: zero management connection, pending plan,
+SIGTERM ignored and escalated to SIGKILL, concurrent/repeated Quit, prior
+cancellation/failure, explicit management-shutdown refusal and retry. No
+NSApplication termination event/window or real engine is used by these checks.
+
+New owned stage `app-runtime-quit-final-aJUrSa` is assembled from immutable Git
+tree blobs, not a Windows working-tree tar. All58 Package/Sources/Tests inputs,
+including raw binary resources, match exact Git blob identities before and
+after compilation/checks, with no line-ending normalization in that comparison.
+Raw SHA256 input manifest:
+`e37b63af4b71265291c4b790739390e125dec10e9c537b797f4cc6f6bc267b0a`.
+SDK27.0 / Swift6.4 arm64 native RELEASE build takes50.72 seconds. One full
+bounded suite passes **668 checks**, zero failures:
+15 core +352 management +60 presentation +154 mock session +87 private host.
+Launcher SHA256:
+`5505dd7e6cab234198eee16a1e612859c23a05b5ed01bb2c94c5a799ffcb7186`;
+host SHA256:
+`063d0fe5aafc34c71e71110e22ff8180f8be0f38fb60affaa7fbe3c505021b6d`.
+All28 protected public artifact/resource hashes remain unchanged. Auth-host,
+binding, header and C95 contract sources/policies are unchanged; only the
+normal app-lifetime fence is composed with existing management shutdown.
+This is source/headless evidence, not a live Quit, provider/authentication,
+biometric, visual, packaging or deployment result. Retained same-context
+source review remains a separate gate.
+
+### Historical intermediate staging and independent hosted evidence
+
+The earlier `app-runtime-providers-Pb0cum` transfer retained38 Swift/Package
+CRLF inputs plus the artwork provenance JSON. Its56-input manifest compared
+LF-normalized text, not literal compiled Git bytes. Those earlier658 runs and
+3a7e/655e/8e0b executable hashes are **local intermediate-stage evidence**, not
+exact-f6 Git qualification. This distinction is not retrofitted into their
+original manifests. Stage `app-runtime-finalgit-owjAT2` subsequently assembled
+literal Git747 bytes, verified all56 raw inputs before/after, and independently
+passed658; that was before the new Quit correction and cannot qualify it.
+Both earlier stages are preserved.
+
+Exact f6 normal-push
+[run37211014588](https://github.com/dragoshont/xodus-macos-app/actions/runs/37211014588)
+passed actual Xcode27.0 build27A266a, SDK27.0, macOS27.0 and658/0 plus SVG
+reproducibility. Exact747
+[run37211343959](https://github.com/dragoshont/xodus-macos-app/actions/runs/37211343959)
+also passed the same SDK/runtime and658/0/SVG, independently verified by the
+parent from metadata and the public log. Neither hosted result qualifies the
+subsequent Quit correction; its normal-push run needs separate qualification.
+
+### Provider selection and strict pure-plan behavior
+
 The source revision following auth correction619 adds selectable Apple GPTK3,
 GPTK4, legitimately user-installed/licensed CrossOver and standalone/source-built
 Wine to the shared native Settings Form. Initial selection is nil. Provider,

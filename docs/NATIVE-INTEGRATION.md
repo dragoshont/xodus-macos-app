@@ -100,6 +100,14 @@ publish a late plan. No component path picker/inspection, provider launch,
 prefix creation, save reuse, install/play promotion or production-engine trial
 is included.
 
+Normal application termination now fences new planning/connect requests and
+awaits both management disconnect and runtime-plan cancel/cleanup/reap through
+one shared coordinator. A missing management connection never bypasses the
+planning shutdown. Failure refuses Quit with explicit state and permits
+reconciliation/retry, rather than abandoning an owned process. The normal
+coordinator is checked using actual neutral children, without an NSApplication
+Quit event, GUI manipulation or production engine.
+
 Source producer is independently frozen
 `9ef0f298481fb48840734b538e0f6d22e1c98ff3`; schema LF SHA256
 `90c094e4585af059b5ebcfc3201260362e88aa642b50ec0388a03427260d55e9`

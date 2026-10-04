@@ -10,6 +10,7 @@ enum ConnectionPhase { case disconnected, connecting, disconnecting, ready, fail
 final class LiveSession: ObservableObject {
     @Published private(set) var phase: ConnectionPhase = .disconnected
     @Published private(set) var connectionTransitioning = false
+    var applicationTerminating = false
     @Published private(set) var hello: ManagementHello?
     @Published private(set) var authentication: AuthenticationStatus?
     @Published private(set) var products: [CatalogProduct] = []
@@ -237,6 +238,7 @@ final class LiveSession: ObservableObject {
     }
 
     func connect() async {
+        guard !applicationTerminating else { return }
         guard !connectionTransitioning, !backendPath.isEmpty else {
             if backendPath.isEmpty { errorMessage = "Choose your trusted Xodus build in Settings first." }
             return

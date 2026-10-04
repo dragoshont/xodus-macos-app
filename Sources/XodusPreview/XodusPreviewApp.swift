@@ -6,14 +6,15 @@ import XodusCore
 @MainActor
 final class PreviewDelegate: NSObject, NSApplicationDelegate {
     var liveSession: LiveSession?
+    var runtimeSettings: RuntimeProviderSettings?
+    let termination = ApplicationTerminationCoordinator()
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard let liveSession else { return .terminateNow }
         Task {
-            let closed = await liveSession.disconnect()
+            let closed = await termination.shutdown(session: liveSession, runtime: runtimeSettings)
             sender.reply(toApplicationShouldTerminate: closed)
         }
         return .terminateLater
@@ -42,7 +43,10 @@ struct XodusPreviewApp: App {
                 .environmentObject(state)
                 .environmentObject(session)
                 .frame(minWidth: 820, minHeight: 600)
-                .onAppear { delegate.liveSession = session }
+                .onAppear {
+                    delegate.liveSession = session
+                    delegate.runtimeSettings = state.runtimeSettings
+                }
         }
         .defaultSize(width: 1200, height: 860)
         .windowStyle(.hiddenTitleBar)
@@ -69,6 +73,10 @@ struct XodusPreviewApp: App {
             }
                 .environmentObject(state)
                 .environmentObject(session)
+                .onAppear {
+                    delegate.liveSession = session
+                    delegate.runtimeSettings = state.runtimeSettings
+                }
         }
     }
 }

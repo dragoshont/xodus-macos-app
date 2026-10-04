@@ -72,6 +72,12 @@ public actor RuntimePlanClient {
 
     public init() {}
 
+    public func closeOwnedProcess() async throws {
+        guard let process = child else { return }
+        try await stop(process)
+        child = nil
+    }
+
     public func plan(executable: URL, configuration: RuntimeProviderConfiguration,
                      timeoutSeconds: TimeInterval = 5) async throws -> RuntimeConfigurationPlan {
         guard child == nil else { throw RuntimePlanningError.shutdownFailed }

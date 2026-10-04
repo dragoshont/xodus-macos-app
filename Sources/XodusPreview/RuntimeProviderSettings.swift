@@ -9,16 +9,19 @@ final class RuntimeProviderSettings: ObservableObject {
     @Published private(set) var plan: RuntimeConfigurationPlan?
     @Published private(set) var planning = false
     @Published private(set) var errorMessage: String?
+    @Published private(set) var applicationTerminating = false
     private let client = RuntimePlanClient()
     private var task: Task<Void, Never>?
     private var revision = UUID()
 
     func select(_ provider: RuntimeProviderKind?) {
+        guard !applicationTerminating else { return }
         invalidate()
         configuration = provider.map(RuntimeProviderConfiguration.preset)
     }
 
     func update(_ change: (inout RuntimeProviderConfiguration) -> Void) {
+        guard !applicationTerminating else { return }
         guard var value = configuration else { return }
         invalidate()
         change(&value)
@@ -39,7 +42,7 @@ final class RuntimeProviderSettings: ObservableObject {
     }
 
     func makePlan(executable: URL) {
-        guard let configuration, !planning else { return }
+        guard let configuration, !planning, !applicationTerminating else { return }
         invalidate()
         let captured = revision
         planning = true
@@ -62,6 +65,33 @@ final class RuntimeProviderSettings: ObservableObject {
         Binding(get: { self.configuration?[keyPath: path] ?? "" },
                 set: { text in self.update { $0[keyPath: path] = text.isEmpty ? nil : text } })
     }
+
+    var hasOwnedPlanningProcess: Bool {
+        get async { await client.hasOwnedProcess }
+    }
+
+    func beginApplicationTermination() {
+        applicationTerminating = true
+        invalidate()
+    }
+
+    func shutdownForApplicationTermination() async -> Bool {
+        beginApplicationTermination()
+        if let pending = task {
+            pending.cancel()
+            await pending.value
+        }
+        do {
+            try await client.closeOwnedProcess()
+            guard !(await client.hasOwnedProcess) else { throw RuntimePlanningError.shutdownFailed }
+            return true
+        } catch {
+            errorMessage = RuntimePlanningError.shutdownFailed.localizedDescription
+            return false
+        }
+    }
+
+    func resumeAfterTerminationRefusal() { applicationTerminating = false }
 }
 
 struct RuntimeProviderSection: View {
@@ -77,7 +107,7 @@ struct RuntimeProviderSection: View {
                     Text(provider.label).tag(Optional(provider))
                 }
             }
-            .disabled(settings.planning)
+            .disabled(settings.planning || settings.applicationTerminating)
             Text("Configuration only. This does not inspect, download or license a runtime, create a prefix, or enable Play.")
                 .foregroundStyle(.secondary)
             if let configuration = settings.configuration {
@@ -86,7 +116,7 @@ struct RuntimeProviderSection: View {
                         .foregroundStyle(.secondary)
                 }
                 TextField("Provider version (unknown if blank)", text: settings.text(\.providerVersion))
-                    .disabled(settings.planning)
+                    .disabled(settings.planning || settings.applicationTerminating)
                 DisclosureGroup("Declared engine and graphics components") {
                     if configuration.provider == .standaloneWine {
                         Picker("Wine source", selection: Binding(
@@ -127,7 +157,7 @@ struct RuntimeProviderSection: View {
                         TextField("Graphics SHA-256 (unknown if blank)", text: settings.text(\.graphics.artifactSha256))
                     }
                 }
-                .disabled(settings.planning)
+                .disabled(settings.planning || settings.applicationTerminating)
                 Text("Versions and hashes are your declarations, not installation or gameplay evidence. Engine and graphics identities are independent; changing either requires a fresh isolated plan.")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -135,7 +165,8 @@ struct RuntimeProviderSection: View {
                 Button("Plan isolated configuration") {
                     settings.makePlan(executable: URL(fileURLWithPath: backendPath))
                 }
-                .disabled(settings.configuration == nil || backendPath.isEmpty || settings.planning)
+                .disabled(settings.configuration == nil || backendPath.isEmpty || settings.planning
+                          || settings.applicationTerminating)
                 if settings.planning {
                     ProgressView().controlSize(.small)
                     Button("Cancel planning") { settings.cancel() }
