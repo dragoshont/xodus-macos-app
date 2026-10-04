@@ -91,9 +91,13 @@ diagnostic pair, not retroactively applied to the first 57d attempt.
 The subsequent fourteen-pair refinement was reviewed and deployed in the
 `da0adc0` / `bace09c` pair. After its observed coarse `tokenStructureInvalid`
 failure, the coordinator and sole consumer explicitly agreed four further static
-subsites with the producer before implementation. This eighteen-pair source
-delta is **not yet deployed** and still requires the same continuity review,
-native producer gates and a new immutable pairing. C95/protocol 1.0 stay byte-identical: the existing
+subsites with the producer before implementation. That eighteen-pair delta was
+reviewed and deployed in the `5ae30fd` / `2acb452` pair. Its actual retry returned
+coarse `tokenCipherInvalid`, not a successful authentication window.
+The coordinator and sole app then explicitly agreed only three additional
+cipher subsites before producer implementation. This twenty-one-pair source
+delta is **not yet deployed** and requires the same continuity review, native
+producer gates and a new immutable pairing. C95/protocol 1.0 stay byte-identical: the existing
 optional `flow.error.details` object carries exactly three string keys,
 `category`, `stage`, `reason`. Category must be `nativeConsentFailure`; the
 consumer accepts only `AUTH_INVALID` with one of these exact closed pairs:
@@ -114,6 +118,9 @@ consumer accepts only `AUTH_INVALID` with one of these exact closed pairs:
 | `devicePreparation` | `tokenAudienceInvalid` |
 | `devicePreparation` | `tokenCipherInvalid` |
 | `devicePreparation` | `tokenSecretInvalid` |
+| `devicePreparation` | `tokenXmlBoundInvalid` |
+| `devicePreparation` | `tokenXmlParseInvalid` |
+| `devicePreparation` | `tokenCipherEncodingInvalid` |
 | `deviceProof` | `proofUnavailable` |
 | `nativeSignIn` | `pipelineFailed` |
 | `storeProof` | `proofInvalid` |
@@ -158,6 +165,19 @@ lengths, versions, keys, XML/HTTP, identity or a presumed cryptographic/provider
 rejection. No validation is weakened and no new provider request is authorized.
 Whether live data contains XML Schema base64 whitespace remains unproven;
 isolated producer fixtures or a parser correction cannot establish that cause.
+
+The three later subsites retain all eighteen older pairs, including coarse
+`tokenCipherInvalid`. `tokenXmlBoundInvalid` identifies the existing 64-KiB
+serialized-credential guard; `tokenXmlParseInvalid` identifies a failed standalone
+EncryptedData reparse; `tokenCipherEncodingInvalid` identifies checked
+XML-base64 decoding failure. These are static source definitions, not live
+payload evidence. Local copy says only processing limit exceeded, required
+format unreadable or encoding unprocessable, without a numeric limit, length,
+offset, bytes, XML/parser text, keys or exceptions. Empty cipher and expiry-syntax
+guards retain their existing coarse reason. No crypto, nonce, base64 policy,
+bound, proof, expiry, scope or lifecycle check changes. The agreement authorizes
+diagnostic refinement only, not acceptance of opaque/base64url/unpadded data,
+new provider requests or a claim of server rejection, user fault or a live cause.
 
 ## Durable registry and updates
 

@@ -306,6 +306,7 @@ public enum NativeConsentFailure: String, CaseIterable, Equatable, Sendable {
     case workerOutcomeUnavailable
     case registrationProofInvalid, tokenResponseInvalid, tokenProofInvalid, tokenStructureInvalid
     case tokenKindInvalid, tokenAudienceInvalid, tokenCipherInvalid, tokenSecretInvalid
+    case tokenXmlBoundInvalid, tokenXmlParseInvalid, tokenCipherEncodingInvalid
 
     public var stage: String {
         switch self {
@@ -313,7 +314,8 @@ public enum NativeConsentFailure: String, CaseIterable, Equatable, Sendable {
         case .clientUnavailable: "clientInitialization"
         case .credentialStorageUnavailable, .storedCredentialInvalid, .providerRequestFailed, .providerProofInvalid,
              .registrationProofInvalid, .tokenResponseInvalid, .tokenProofInvalid, .tokenStructureInvalid,
-             .tokenKindInvalid, .tokenAudienceInvalid, .tokenCipherInvalid, .tokenSecretInvalid:
+             .tokenKindInvalid, .tokenAudienceInvalid, .tokenCipherInvalid, .tokenSecretInvalid,
+             .tokenXmlBoundInvalid, .tokenXmlParseInvalid, .tokenCipherEncodingInvalid:
             "devicePreparation"
         case .proofUnavailable: "deviceProof"
         case .pipelineFailed: "nativeSignIn"

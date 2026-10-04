@@ -141,6 +141,12 @@ enum NativeChecks {
                     subsiteCopy = "The device sign-in token payload could not be processed."
                 case .tokenSecretInvalid:
                     subsiteCopy = "The device sign-in proof was missing or invalid."
+                case .tokenXmlBoundInvalid:
+                    subsiteCopy = "The device sign-in payload exceeded the supported processing limit."
+                case .tokenXmlParseInvalid:
+                    subsiteCopy = "The device sign-in payload could not be read in the required format."
+                case .tokenCipherEncodingInvalid:
+                    subsiteCopy = "The device sign-in payload encoding could not be processed."
                 default:
                     subsiteCopy = nil
                 }
@@ -149,14 +155,21 @@ enum NativeChecks {
                           && !summary.contains("cryptograph") && !summary.contains("signature")
                           && !summary.contains("Microsoft rejected") && !summary.contains("disconnect")
                           && !summary.contains("delete") && !summary.contains("4096")
-                          && !summary.contains("version4") && !summary.contains("base64") && !summary.contains("STS"),
+                          && !summary.contains("version4") && !summary.contains("base64") && !summary.contains("STS")
+                          && !summary.contains("64KiB") && !summary.contains("65536")
+                          && !summary.contains("offset") && !summary.contains("your fault"),
                           "Static token subsite copy reports only the agreed guard category, not values or a guessed cause")
                 }
                 await failed.disconnect()
             }
             for diagnostic in [NativeConsentFailure.tokenKindInvalid, .tokenAudienceInvalid,
-                               .tokenCipherInvalid, .tokenSecretInvalid] {
-                for suffix in ["extra", "unknown", "mismatched", "cancelcode", "expirycode", "internalcode"] {
+                               .tokenCipherInvalid, .tokenSecretInvalid,
+                               .tokenXmlBoundInvalid, .tokenXmlParseInvalid, .tokenCipherEncodingInvalid] {
+                var suffixes = ["extra", "unknown", "mismatched", "cancelcode", "expirycode", "internalcode"]
+                if [.tokenXmlBoundInvalid, .tokenXmlParseInvalid, .tokenCipherEncodingInvalid].contains(diagnostic) {
+                    suffixes += ["malformed", "category", "missing"]
+                }
+                for suffix in suffixes {
                     let failed = session("failedstage-\(diagnostic.rawValue)-\(suffix)")
                     await failed.connect()
                     await failed.refreshAccount()
@@ -168,7 +181,7 @@ enum NativeChecks {
                           && !summary.contains("Original extra-field sentinel")
                           && !summary.contains("Original synthetic upstream wording")
                           && failed.accountFailureTitle != "Microsoft sign-in could not start.",
-                          "Actual mock-child subsite rejects extra/unknown/stage/non-AUTH details without secret retention or guessed preparation")
+                          "Actual mock-child subsite rejects malformed/extra/unknown/stage/non-AUTH details without secret retention or guessed preparation")
                     await failed.disconnect()
                 }
             }

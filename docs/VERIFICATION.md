@@ -4,7 +4,83 @@ Foundation recorded 2026-10-03; subsequent native/read-only milestones are
 identified separately below. None establishes successful human authentication,
 game download, install or gameplay.
 
-## Agreed static token subsites: source-only checks
+## Agreed minimal cipher subsites: source-only checks
+
+The coordinator approved and the sole app explicitly agreed with the producer
+before implementation to only `tokenXmlBoundInvalid`, `tokenXmlParseInvalid`
+and `tokenCipherEncodingInvalid`. The exact twenty-one-reason set preserves
+all eighteen older pairs and coarse `tokenCipherInvalid`; AUTH_INVALID-only
+gating, exact three string keys and C95 bytes remain unchanged. Local copy
+reports a supported processing limit, unreadable required format or
+unprocessable encoding, never a numeric bound, data or an assumed cause.
+
+One isolated one-job/index-disabled native build succeeded in 11.18 seconds.
+The complete executable suite passed **440 checks** (14 core + 255 management +
+27 presentation + 144 native), zero failures. Every reason passed schema/decode
+and exact round trip. Per-reason rejection checks discard secret extra keys,
+unknown reason/category, mismatched stage, malformed type, missing stage and
+cancellation/expiry/non-AUTH details. The three new subsites additionally passed
+27 actual mock-child presentation rejection cases and three honest local-copy
+checks. Invalid diagnostics never become a preparation stage or entitlement
+authority; the known preparation title remains visible without deletion advice.
+
+This is a diagnostic refinement, **not an acceptance fix or live-cause proof**.
+No layout/navigation, account lifecycle, provider request, actual sign-in or
+bundle change occurred. Build/check temporary logs were cleaned. The deployed
+b168 app, separately signed 125a engine and original unsigned 8a4b input below
+were independently hashed unchanged after the suite. This source delta still
+requires the same combined continuity review, producer native gates and a new
+immutable engine before pairing/retest. User-directed UI auditing remains
+deferred until authentication reaches its genuine owned-window/human gate.
+
+## Reviewed eighteen-pair deployment and observed cipher failure
+
+The same continuity reviewer closed producer
+`bace09c` -> `2acb452a7ee66b2c9d3ad75ecf85e2be2f94fbc3` and consumer
+`da0adc0` -> `5ae30fd4bd4e17cb235857e5c41fba1627c317f7` with no significant
+issues. Producer native evidence recorded 54 passing checks. Exact consumer
+source independently passed **398 checks** plus SVG verification in
+[hosted run 37193138334](https://github.com/dragoshont/xodus-macos-app/actions/runs/37193138334).
+
+The immutable arm64 CLI is `xodus-cli-xml-proof-v1-8a4b8d56aad18841`,
+79,399,592 bytes, mode 0500, SHA256
+`8a4b8d56aad18841326834e5ad57860072560f4739963323875ffa52d41a545b`.
+Mode-0400 provenance is 8,666 bytes, SHA256
+`2d7b372e3df8030ade83952d35f73f6cae74cf61075082ddd9aabd08c62438a6`.
+Its mode-0400 public LF source archive is 5,130,240 bytes, SHA256
+`9d1366907990d156d540c65be4ab7335ce5fae2ee1acc92d1e11bfeec9f583b0`;
+mode-0400 native evidence SHA256 is
+`773767f6f288519033abf57802dedf57a1bf1343949e1c48d2eab9c03654fa01`.
+Hashes, sizes/modes, source pin, native features and absence of plaintext features
+were verified before transition. No sealed original was signed or modified.
+
+Fresh exact-owned app 18444 / child 18448 had enabled terminal Account controls,
+zero pending Cancel/progress/auth children and no conflicting window. Account
+closed and the owned pair exited through graceful quit, with no signals or
+other-window actions. The reviewed app release built in 10.26 seconds and passed
+27 presentation checks and nine actual signed read-only checks. C95 resources,
+plist, deep strict signature and arm64 architecture matched. The separate
+signed embedded CLI SHA256 is
+`125a05dd0a2a577cc8fc71e4d3eaf324b9c70b3d409a54fd5b0eeef17ad45cf4`;
+app executable SHA256 is
+`b168a78e42bffc40bbb8e65379a3b117734939b4c2b4926f6aac06746e199607`.
+The old bundle and unsigned inputs were preserved; probe/build temporary files
+were cleaned. Fresh LaunchServices ownership was app 41090 / engine 41093,
+exact parent 41090. A transient Account-readiness guard refused before any auth
+entry; later unique enabled native controls were verified without a status requery.
+
+One authorized native Sign in AXPress returned
+**`AUTH_INVALID/devicePreparation/tokenCipherInvalid`**. Pending Cancel controls,
+progress indicators and owned auth children were zero; an owned native
+authentication window was not observed. This is the new reviewed pair's result,
+not the older 342/5d attempt. It was immediately routed to the coordinator and
+sole backend. No raw provider data, page/title, credentials, approval or
+forensic status request was read or automated. The specific grouped guard and
+live whitespace cause remain unknown. The unchanged failing pair is retained,
+not blindly retried; UI auditing/correction is deferred until authentication's
+genuine owned-window/human gate.
+
+## Historical eighteen-pair source-only checks
 
 The coordinator approved, and the sole app explicitly agreed directly with
 the producer before implementation, four additive `devicePreparation` reasons:
@@ -29,9 +105,8 @@ These are **source-only, mock-child regressions**, not new provider observations
 No Keychain/Microsoft operation, live Account action, bundle replacement,
 navigation polish or authentication retry occurred. Build/check temporary logs
 were removed after their results were captured. The running reviewed da0/bace
-pair below remains the operational baseline. This additive source delta awaits
-the same continuity review, producer native gates and a new immutable artifact
-before pairing or another agent-mediated entry. It does not establish that the
+pair remained unchanged during that source-only phase. The later reviewed
+deployment is recorded above. This source evidence does not establish that the
 live proof contains whitespace or retrospectively choose a narrower cause.
 
 ## Reviewed native-toolbar pair and latest observed retry

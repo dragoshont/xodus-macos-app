@@ -101,16 +101,16 @@ Committed LF bytes and all four sanitized fixture hashes were independently veri
 `docs/contracts/management-v1.schema.json` is the producer's canonical scoped schema. `tools/sync_contract.py` copies its exact bytes to the Swift resource. `Tests/ManagementChecks/Fixtures` contains its sanitized public positive/negative/evidence fixtures. No private backend source or real account payload was imported. `foundation-v1.schema.json` preserves the original proposal.
 
 Current deployed diagnostic engine source is reviewed public
-`bace09c1be95ff35864b8c8593b974b2aeee934f`, paired with app
-`da0adc00d337ba27c914f5e47ce3c2b11b8000de`.
-Preserved immutable input is `xodus-cli-device-proof-v1-34214ee29b3582a6`,
-SHA256 `34214ee29b3582a6d146ccd029991a70949514c58bcaa99f834db930d41e96ca`;
+`2acb452a7ee66b2c9d3ad75ecf85e2be2f94fbc3`, paired with app
+`5ae30fd4bd4e17cb235857e5c41fba1627c317f7`.
+Preserved immutable input is `xodus-cli-xml-proof-v1-8a4b8d56aad18841`,
+SHA256 `8a4b8d56aad18841326834e5ad57860072560f4739963323875ffa52d41a545b`;
 the separate signed embedded copy is
-`5d6bb07936559ea44a0fd81ad96ed7e118bf6346d8d09a83f8212a543ee1329a`.
+`125a05dd0a2a577cc8fc71e4d3eaf324b9c70b3d409a54fd5b0eeef17ad45cf4`.
 Deep signature, exact C95 resource/provenance, fresh parent/child ownership and
 nine actual read-only checks passed. This is a local development pairing, not a
-certified runtime or successful sign-in. The previous reviewed e604/360e8bf
-47f/c50a pairing and all older immutable inputs remain preserved.
+certified runtime or successful sign-in. The previous bace/da0 342/5d and
+e604/360e8bf 47f/c50a pairings and all older immutable inputs remain preserved.
 
 The historical first human-entry engine source was
 `2a47eafc930603773583ce4c1d6be89a2f0ccd60`. Its preserved unsigned input is
@@ -181,7 +181,7 @@ the unchanged failing engine is not repeatedly retried. Exact hashes,
 historical local failures and independently passing evidence are recorded in
 [verification](VERIFICATION.md).
 
-### Agreed static token subsites (source only)
+### Reviewed static token subsites and observed cipher failure
 
 The coordinator and sole consumer explicitly agreed four additive
 `devicePreparation` reasons with the producer before implementation:
@@ -191,11 +191,29 @@ coarse `tokenStructureInvalid`, and accepts only the exact three string keys
 for `AUTH_INVALID` / `nativeConsentFailure`. Static local copy explains only
 unsupported format, unmatched context, unprocessable payload or missing/invalid
 proof; no values or assumed provider/cryptographic cause are shown.
-Decoder/round-trip/privacy and actual mock-child presentation regressions are
-part of this source-only batch. The currently deployed bace/da0 pair is untouched;
-same-reviewer closure, producer native gates and a new sealed engine must precede
-replacement or retry. This refinement does not retrospectively identify which
-structure guard failed in the observed attempt.
+The complete 398-check app suite passed locally and in hosted CI. The same
+continuity review closed both source deltas, and the producer passed 54 native
+checks before sealing. Deployment preserved originals and separately signed the
+copied engine after fresh idle-flow guards and graceful exact-owned retirement.
+One authorized native entry on app 41090 / engine 41093 returned
+`AUTH_INVALID/devicePreparation/tokenCipherInvalid`, with zero pending Cancel
+controls, progress indicators, owned auth children or observed auth windows.
+The particular bound/parse/encoding guard is still unknown; a parser regression
+does not prove the live proof contained whitespace.
+
+### Agreed minimal cipher subsites (source only)
+
+The coordinator and sole app explicitly agreed only `tokenXmlBoundInvalid`,
+`tokenXmlParseInvalid` and `tokenCipherEncodingInvalid` before implementation.
+All eighteen older reasons remain accepted, including coarse `tokenCipherInvalid`.
+Exact keys, AUTH_INVALID-only gating, C95 and lifecycle behavior remain unchanged.
+Local copy reports only a supported processing limit, unreadable required format
+or unprocessable encoding; no numeric limit, data or assumed crypto/provider
+cause is shown. This twenty-one-pair source batch does not relax token acceptance.
+The currently deployed 8a4b/125a pair is untouched; same-reviewer closure,
+producer native gates and a new sealed engine must precede another pairing or
+entry. Authentication remains first priority; the user-directed modern native
+UI audit/correction is deferred until a genuine owned login window/human gate.
 
 ## Developer application
 

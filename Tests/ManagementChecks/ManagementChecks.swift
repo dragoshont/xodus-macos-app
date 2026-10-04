@@ -86,8 +86,9 @@ actor Checks {
             "bootstrapInvalid", "clientUnavailable", "credentialStorageUnavailable", "storedCredentialInvalid",
             "providerRequestFailed", "providerProofInvalid", "proofUnavailable", "pipelineFailed", "proofInvalid",
             "workerOutcomeUnavailable", "registrationProofInvalid", "tokenResponseInvalid", "tokenProofInvalid",
-            "tokenStructureInvalid", "tokenKindInvalid", "tokenAudienceInvalid", "tokenCipherInvalid", "tokenSecretInvalid"
-        ], "Static subsite allowlist contains exactly eighteen reasons and preserves all fourteen older reasons")
+            "tokenStructureInvalid", "tokenKindInvalid", "tokenAudienceInvalid", "tokenCipherInvalid", "tokenSecretInvalid",
+            "tokenXmlBoundInvalid", "tokenXmlParseInvalid", "tokenCipherEncodingInvalid"
+        ], "Static subsite allowlist contains exactly twenty-one reasons and preserves all eighteen older reasons")
         for diagnostic in NativeConsentFailure.allCases {
             let frame: JSONValue = .object(["code": .string("AUTH_INVALID"), "retryable": .bool(false),
                 "message": .string("Original upstream diagnostic sentinel is not UI copy."), "details": diagnostic.details])
@@ -131,7 +132,8 @@ actor Checks {
         }
         for diagnostic in [NativeConsentFailure.registrationProofInvalid, .tokenResponseInvalid,
                            .tokenProofInvalid, .tokenStructureInvalid, .tokenKindInvalid,
-                           .tokenAudienceInvalid, .tokenCipherInvalid, .tokenSecretInvalid] {
+                           .tokenAudienceInvalid, .tokenCipherInvalid, .tokenSecretInvalid,
+                           .tokenXmlBoundInvalid, .tokenXmlParseInvalid, .tokenCipherEncodingInvalid] {
             var extra = diagnostic.details.object ?? [:]
             extra["secret"] = .string("Original refined-device private sentinel")
             var mismatched = diagnostic.details.object ?? [:]
@@ -748,6 +750,9 @@ enum MockBackend {
                                 case "cancelcode": failureObject["code"] = .string("AUTH_CANCELLED")
                                 case "expirycode": failureObject["code"] = .string("AUTH_EXPIRED")
                                 case "internalcode": failureObject["code"] = .string("INTERNAL_ERROR")
+                                case "malformed": details["reason"] = .integer(1)
+                                case "category": details["category"] = .string("unrecognizedCategory")
+                                case "missing": details.removeValue(forKey: "stage")
                                 default: exit(3)
                                 }
                                 failureObject["details"] = .object(details)

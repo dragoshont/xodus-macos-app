@@ -198,6 +198,12 @@ final class LiveSession: ObservableObject {
             "The device sign-in token payload could not be processed. Report this diagnostic before another attempt."
         case .tokenSecretInvalid:
             "The device sign-in proof was missing or invalid. Report this diagnostic before another attempt."
+        case .tokenXmlBoundInvalid:
+            "The device sign-in payload exceeded the supported processing limit. Report this diagnostic before another attempt."
+        case .tokenXmlParseInvalid:
+            "The device sign-in payload could not be read in the required format. Report this diagnostic before another attempt."
+        case .tokenCipherEncodingInvalid:
+            "The device sign-in payload encoding could not be processed. Report this diagnostic before another attempt."
         case .proofUnavailable:
             "Device proof was unavailable. No validated sign-in or package access was established; report this diagnostic."
         case .pipelineFailed:
