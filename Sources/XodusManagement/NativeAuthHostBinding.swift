@@ -57,7 +57,12 @@ public struct NativeAuthHostBinding: Sendable {
         let metadata = bundle.resourceURL?.appendingPathComponent("XodusAuthHost.json")
         let hasExecutable = FileManager.default.fileExists(atPath: executable.path)
         let hasMetadata = metadata.map { FileManager.default.fileExists(atPath: $0.path) } == true
-        if !hasExecutable && !hasMetadata { return nil }
+        if !hasExecutable && !hasMetadata {
+            guard bundle.bundleURL.pathExtension.lowercased() != "app" else {
+                throw ManagementError.nativeAuthHostUnavailable
+            }
+            return nil
+        }
         guard hasExecutable, hasMetadata, let metadata,
               metadata.isFileURL, metadata.standardizedFileURL.path == metadata.path,
               metadata.resolvingSymlinksInPath().path == metadata.path,
@@ -68,7 +73,7 @@ public struct NativeAuthHostBinding: Sendable {
               case .string(let source) = object["sourceCommit"],
               source.range(of: "^[0-9a-f]{40}$", options: .regularExpression) != nil,
               bytes == Data("{\"sha256\": \"\(hash)\", \"sourceCommit\": \"\(source)\", \"version\": 1}\n".utf8) else {
-            throw ManagementError.backendUnavailable
+            throw ManagementError.nativeAuthHostUnavailable
         }
         return Self(executable: executable, sha256: hash)
     }

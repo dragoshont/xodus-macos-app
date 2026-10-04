@@ -76,7 +76,7 @@ public enum JSONValue: Codable, Equatable, Sendable {
 
 public enum ManagementError: Error, Equatable, Sendable, LocalizedError {
     case invalidFrame, invalidPayload, invalidRequest, frameTooLarge, truncatedFrame, unsupportedSchema
-    case backendUnavailable, startFailed, alreadyConnected, disconnected, outputOverflow, credentialStoreUnavailable
+    case backendUnavailable, nativeAuthHostUnavailable, startFailed, alreadyConnected, disconnected, outputOverflow, credentialStoreUnavailable
     case requestTimedOut, unexpectedResult, writeFailed, capabilityMissing(String)
     case shutdownFailed
     case backendStopped(Int32), backendError(String, retryable: Bool), invalidEvent
@@ -94,6 +94,8 @@ public enum ManagementError: Error, Equatable, Sendable, LocalizedError {
         case .truncatedFrame: "The engine ended a response before it was complete. Reconnect to recover."
         case .unsupportedSchema: "The bundled management contract is unavailable or incompatible."
         case .backendUnavailable: "Choose an executable Xodus management build in Settings."
+        case .nativeAuthHostUnavailable:
+            "This app's native sign-in helper is missing or does not match its recorded version and hash. Rebuild or reinstall the paired development app. No sign-in was started."
         case .credentialStoreUnavailable:
             "Xodus cannot access your Mac's Keychain. Review its native permission prompt or unlock the Keychain, then check status again. Your saved credentials were not replaced."
         case .startFailed: "The Xodus engine could not start. Check the selected build and state directory."

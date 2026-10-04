@@ -57,8 +57,11 @@ public actor ManagementClient {
         let input = Pipe(), output = Pipe(), diagnostics = Pipe()
         let child = Process()
         child.executableURL = configuration.executable
+        let nativeArguments: [String]
+        do { nativeArguments = try configuration.nativeAuthHost?.validatedArguments() ?? [] }
+        catch { throw ManagementError.nativeAuthHostUnavailable }
         child.arguments = ["manage", "--protocol", "1", "--state-dir", configuration.stateDirectory.path]
-            + (try configuration.nativeAuthHost?.validatedArguments() ?? [])
+            + nativeArguments
         // Inherit operational context, not unrelated application tokens or debug/proxy settings.
         child.environment = ProcessInfo.processInfo.environment.filter {
             ["HOME", "PATH", "TMPDIR", "LANG", "LC_ALL", "SSL_CERT_FILE", "SSL_CERT_DIR"].contains($0.key)

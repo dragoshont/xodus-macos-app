@@ -4,6 +4,29 @@ Foundation recorded 2026-10-03; subsequent native/read-only milestones are
 identified separately below. None establishes successful human authentication,
 game download, install or gameplay.
 
+## Additive native-helper preflight correction
+
+Windows source inspection found that a packaged app missing both the helper
+and receipt could silently omit its binding. The additive correction rejects
+that case before starting management, preserves nil binding for unpackaged
+anonymous checks and gives invalid helper admission a static actionable error.
+Neutral checks cover both missing, receipt-only, helper-only, canonical/invalid
+metadata, invalid helper before engine launch and clean failed-preflight shutdown.
+No helper/engine fixture is executed by the new preflight checks.
+
+These changes require their own exact-source native compile/check result;
+the earlier668 result does not qualify them. The existing normal-push workflow
+is GitHub-hosted: the prior exact43 run's job reports runner group `GitHub Actions`
+and `Hosted Compute Agent`, image `xcode-27-arm64`. Its checked-in steps run
+local Python/Swift neutral checks and SVG reproducibility, with no SSH, deployment
+or shared-Mac hook. No new workflow or manual dispatch is needed.
+
+Engine source admission remains an independent manual release gate, not a
+HELLO/helper-receipt inference. No new943/9ef CLI seal or versioned engine
+provenance format is created by this correction. No shared-Mac action, current
+pair mutation, provider/account request, signing, packaging or live-auth claim
+is part of this source qualification.
+
 ## Separate four-provider native configuration and pure-plan consumption
 
 ### Canonical quit-lifetime correction

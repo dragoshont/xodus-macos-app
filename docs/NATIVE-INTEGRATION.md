@@ -318,23 +318,55 @@ popup denial, close, EOF and deadline failures are explicit static outcomes.
 Rust retains SOAP/proof processing, helper reaping and atomic credential commit.
 
 Configuration binds a fixed owned bundle executable, protocol version and
-SHA256 through nonsecret flags; incomplete or invalid bundle metadata fails
-cleanly, without PATH selection. The packaging script now includes the helper,
+SHA256 through nonsecret flags. A packaged `.app` missing both helper and receipt,
+an incomplete receipt pair or an invalid helper fails before engine launch,
+with a static helper-specific recovery message and without PATH selection.
+Unpackaged anonymous/developer checks may still omit the binding. This local
+helper check does not qualify the selected engine or attest its source.
+The packaging script now includes the helper,
 resources and post-sign metadata from clean source, but has not been executed.
 The deployed e7 producer lacks the new concurrent engine-EOF guardian; the
 paired producer must implement it through issuance, cleanup and publication,
 then pass the agreed engine-only death/write-half/race tests and combined review.
 Matching C95 alone is not this pairing gate.
 
+The reviewed producer is `9ef0f298481fb48840734b538e0f6d22e1c98ff3`,
+including auth producer `94353b5cc3196a2b73b89655855ec50c31d35b81`.
+The old e7/304 engine does not support the three native-host flags; omitting them
+selects its old legacy path, not the new Swift host. HELLO's supported auth
+capabilities, version and C95 hash do not establish this producer pairing.
+`XODUS_BACKEND_PATH` and the explicit developer engine picker remain supported,
+but an override cannot borrow approval from the bundled helper or bundled engine.
+
+There is no committed/versioned engine-provenance loader, and the older owner's
+sealed e7 provenance is not evidence for943/9ef. Until a separate admission
+contract is established, native-login assembly requires an independent manual
+gate: verify the newly approved unsigned CLI and adjacent provenance against
+externally pinned source/tree, hash, size, profile and feature evidence before
+copying; record and verify the separately signed copy's different hash afterward.
+The packager's executable check alone is insufficient. Do not reuse304/4d04,
+infer source from HELLO or a binary hash, or fabricate a seal. Build only in a
+new isolated canonical-Git stage, verify the final helper receipt/hash/version,
+resources and complete bundle, and preserve the prior app as rollback. A verified
+pair is launch readiness, not successful authentication.
+
 Detached synthetic WebKit/channel checks are not a provider trial, OS passkey
 association, biometric-prompt diagnosis or authenticated/committed account.
+Apple's [Supporting passkeys](https://developer.apple.com/documentation/authenticationservices/supporting-passkeys)
+requires an associated domain for WKWebView passkeys; migrating this legacy
+flow to Swift does not establish Microsoft association. Apple's
+[public-key-credential browser entitlement](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.web-browser.public-key-credential)
+is an approved browser capability, not an ad-hoc launcher fix. Unknown passkey
+eligibility is not a reason to block a possible password/code flow, change client
+IDs or disable MFA. The reported prompt's cause remains unknown.
 Production stdio is discarded and core dumps are disabled where possible;
 OS crash-report suppression is not promised. GUI focus/input/capture/inspection
 and deployment remain paused while the user's game work owns the desktop.
 
 ## Developer application
 
-On the isolated Mac:
+Only after explicit desktop/CPU release, source/paired-artifact approval and
+fresh owned-process checks, in a new isolated canonical-source stage:
 
 ```sh
 sh tools/check.sh

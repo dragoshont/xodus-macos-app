@@ -60,7 +60,7 @@ actor Checks {
 
     func run() async throws {
         try await runtimePlanChecks()
-        try hostBindingChecks()
+        try await hostBindingChecks()
         let validator = try ContractValidator()
         let positive = try fixture("positive").array ?? []
         check(positive.count == 79, "Pinned producer corpus contains 79 positive frames")
@@ -69,7 +69,7 @@ actor Checks {
             catch { check(false, "Producer positive frame \(index + 1)") }
         }
 
-        func hostBindingChecks() throws {
+        func hostBindingChecks() async throws {
             let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
                 .appendingPathComponent("XodusHostBindingChecks-\(UUID().uuidString)")
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false,
@@ -84,6 +84,8 @@ actor Checks {
             try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: executable.path)
             let hash = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
             let binding = NativeAuthHostBinding(executable: executable, sha256: hash)
+            check(try NativeAuthHostBinding.bundled(in: .module) == nil,
+                  "Unpackaged anonymous checks do not require a bundled native helper")
             check(try binding.validatedArguments() == [
                 "--native-auth-host", executable.path, "--native-auth-host-sha256", hash,
                 "--native-auth-host-version", "1"
@@ -128,27 +130,54 @@ actor Checks {
             try FileManager.default.copyItem(at: executable, to: helper)
             guard let bundle = Bundle(url: app) else { throw ManagementError.backendUnavailable }
             let metadata = resources.appendingPathComponent("XodusAuthHost.json")
+            try FileManager.default.removeItem(at: helper)
+            do {
+                _ = try NativeAuthHostBinding.bundled(in: bundle)
+                check(false, "A packaged app missing both helper and receipt cannot silently omit the binding")
+            } catch {
+                check(error as? ManagementError == .nativeAuthHostUnavailable,
+                      "A packaged app missing both helper and receipt cannot silently omit the binding")
+            }
+            try FileManager.default.copyItem(at: executable, to: helper)
             let source = String(repeating: "0", count: 40)
             let canonical = Data("{\"sha256\": \"\(hash)\", \"sourceCommit\": \"\(source)\", \"version\": 1}\n".utf8)
             try canonical.write(to: metadata)
             check(try NativeAuthHostBinding.bundled(in: bundle)?.validatedArguments().first == "--native-auth-host",
                   "Bundled helper metadata creates only the fixed owned executable binding")
+            try FileManager.default.removeItem(at: helper)
+            do { _ = try NativeAuthHostBinding.bundled(in: bundle); check(false, "Receipt alone cannot supply a helper") }
+            catch { check(error as? ManagementError == .nativeAuthHostUnavailable, "Receipt alone cannot supply a helper") }
+            try FileManager.default.copyItem(at: executable, to: helper)
             for malformed in [
                 Data("{\"sha256\":\"\(hash)\",\"sha256\":\"\(hash)\",\"sourceCommit\":\"\(source)\",\"version\":1}".utf8),
                 Data("{\"sha256\":\"\(hash)\",\"sourceCommit\":\"\(source)\",\"version\":1,\"unknown\":true}".utf8)
             ] {
                 try malformed.write(to: metadata)
                 do { _ = try NativeAuthHostBinding.bundled(in: bundle); check(false, "Noncanonical duplicate/extra binding metadata is rejected") }
-                catch { check(error as? ManagementError == .backendUnavailable,
+                catch { check(error as? ManagementError == .nativeAuthHostUnavailable,
                               "Noncanonical duplicate/extra binding metadata is rejected") }
             }
             try FileManager.default.removeItem(at: metadata)
             do { _ = try NativeAuthHostBinding.bundled(in: bundle); check(false, "Incomplete bundle pairing cannot fall back") }
-            catch { check(error as? ManagementError == .backendUnavailable, "Incomplete bundle pairing cannot fall back") }
+            catch { check(error as? ManagementError == .nativeAuthHostUnavailable, "Incomplete bundle pairing cannot fall back") }
             guard mkfifo(metadata.path, 0o600) == 0 else { throw ManagementError.backendUnavailable }
             do { _ = try NativeAuthHostBinding.bundled(in: bundle); check(false, "FIFO metadata is rejected without blocking") }
-            catch { check(error as? ManagementError == .backendUnavailable, "FIFO metadata is rejected without blocking") }
+            catch { check(error as? ManagementError == .nativeAuthHostUnavailable, "FIFO metadata is rejected without blocking") }
             try FileManager.default.removeItem(at: metadata)
+            let client = try ManagementClient()
+            do {
+                _ = try await client.connect(BackendConfiguration(
+                    executable: executable, stateDirectory: root.appendingPathComponent("unused-state"),
+                    nativeAuthHost: NativeAuthHostBinding(executable: helper, sha256: String(repeating: "0", count: 64))))
+                check(false, "Invalid helper admission fails actionably before attempting engine launch")
+            } catch {
+                check(error as? ManagementError == .nativeAuthHostUnavailable,
+                      "Invalid helper admission fails actionably before attempting engine launch")
+            }
+            check(await client.close(), "Failed helper preflight leaves no owned engine to retire")
+            check(ManagementError.nativeAuthHostUnavailable.localizedDescription.contains("native sign-in helper")
+                  && !ManagementError.nativeAuthHostUnavailable.localizedDescription.contains("passkey"),
+                  "Helper recovery copy does not claim passkey support or diagnose a provider prompt")
         }
         let negative = try fixture("negative").array ?? []
         check(negative.count == 20, "Pinned producer corpus contains twenty negative frames")
