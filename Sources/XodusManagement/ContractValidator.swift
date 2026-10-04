@@ -33,6 +33,7 @@ public struct ContractValidator: Sendable {
                   matches(value, schema: target, depth: depth + 1) else { return false }
         }
         if let constant = rules["const"], !equal(value, constant) { return false }
+        if let excluded = rules["not"], matches(value, schema: excluded, depth: depth + 1) { return false }
         if let options = rules["enum"]?.array, !options.contains(where: { equal(value, $0) }) { return false }
         if let types = rules["type"] {
             let names = types.array ?? [types]
@@ -74,6 +75,8 @@ public struct ContractValidator: Sendable {
                 }
             }
             if rules["format"]?.string == "date-time", !Self.validDate(string) { return false }
+            if rules["format"]?.string == "uuid",
+               string.count != 36 || UUID(uuidString: string) == nil { return false }
         }
         if let number = value.decimal {
             if let min = rules["minimum"]?.decimal, number < min { return false }

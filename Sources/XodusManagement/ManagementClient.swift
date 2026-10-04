@@ -146,21 +146,28 @@ public actor ManagementClient {
         }
     }
 
-    public func close() async {
+    @discardableResult
+    public func close() async -> Bool {
         if !stopped {
             stopped = true
             resolveAll(.disconnected)
             eventContinuation.finish()
             stopProcess()
         }
-        guard let child = process else { return }
+        guard let child = process else { return true }
         // Reconnect cannot race the previous process's private-directory lock or auth-child cleanup.
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+        let exited = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
             DispatchQueue(label: "Xodus.management.shutdown").async {
-                child.waitUntilExit()
-                continuation.resume()
+                // Foundation waitUntilExit can stall its private run loop after an observed child exit.
+                let deadline = ContinuousClock.now.advanced(by: .seconds(6))
+                while child.isRunning, ContinuousClock.now < deadline {
+                    Thread.sleep(forTimeInterval: 0.02)
+                }
+                continuation.resume(returning: !child.isRunning)
             }
         }
+        if !exited { logger.error("Owned management process did not finish bounded shutdown.") }
+        return exited
     }
 
     private func consume(_ bytes: Data) throws {
@@ -208,12 +215,10 @@ public actor ManagementClient {
             guard let error = value["error"], let code = error["code"]?.string,
                   let retryable = error["retryable"]?.boolean else { throw ManagementError.invalidFrame }
             let failure: ManagementError
-            if waiter.command == .discover, code == "PACKAGE_UNAVAILABLE" {
-                guard let details = error["details"] else { throw ManagementError.invalidPayload }
+            if waiter.command == .discover, code == "PACKAGE_UNAVAILABLE", let details = error["details"] {
                 try validator.validate(details, definition: "failedDiscoveryData")
                 failure = .discoveryFailed(try details.decode(CatalogDiscovery.self))
-            } else if waiter.command == .query, code == "PACKAGE_UNAVAILABLE" {
-                guard let details = error["details"] else { throw ManagementError.invalidPayload }
+            } else if waiter.command == .query, code == "PACKAGE_UNAVAILABLE", let details = error["details"] {
                 try validator.validate(details, definition: "failedQueryData")
                 failure = .queryFailed(try details.decode(CatalogQuery.self))
             } else if code == "AUTH_INVALID", error["details"]?["category"]?.string == "credentialStoreUnavailable",

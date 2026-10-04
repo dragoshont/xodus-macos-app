@@ -53,6 +53,12 @@ whose products cannot be empty. No arbitrary error payload or raw upstream messa
 is displayed. Continuation remains visible even if every item on the first page
 failed. A genuine zero-source query is distinct from failed metadata checks.
 Stopping search fences late results but does not claim to abort HTTP.
+Catalog requests are coalesced into one active request and one latest queued
+query/market/language scope. Cancelling a view task does not free a producer
+operation; newer input replaces the queued scope, and stop drops it. Pagination
+retains its cursor/failure semantics. Source-level `PACKAGE_UNAVAILABLE` without
+batch details stays a recoverable typed error; present malformed/null details
+remain protocol failures rather than being silently discarded.
 The native request allows 45 seconds around the producer's
 30-second whole-page budget; there is no full-feed crawl. Requested locale remains
 the cache scope; exact language is preferred, or an explicit same-base neutral
@@ -69,37 +75,41 @@ including package identity/version and recorded health. An empty management-only
 registry is not evidence that other game folders are absent. Failed status
 refreshes show unknown/error instead of retaining a success-shaped empty result.
 Public catalog `notInstalled` metadata is not treated as a whole-Mac installation
-scan. User-selected, read-only existing-install inspection is the next coordinated
-backend contract, not permission for a blanket private-folder scan.
+scan. User-selected, read-only inspection now uses `installed.inspect` through a native
+directory-only picker with alias resolution disabled. The result must echo the
+selected path exactly and stays separate from the managed registry. The producer
+reads only 196 non-key metadata bytes (156 + 40) from the exact marker; header
+GUID/PDUID/contentID are not Store product/edition/package IDs. Missing, aliased or
+malformed markers produce explicit errors. No scan, adoption, game-file integrity
+claim, entitlement promotion or launch occurs.
 
 ## Producer pin
 
 The current schema/fixture pin is public producer commit
-`9d024ae079daccafb3437e4b0c67aef735d657bb` in `dragoshont/xodus-macos`,
-branch `dragoshont-xodus-launcher-management`: 77 positive, 15 negative and four
+`e3129cee422305657b945d35daf2f780ffe98e2b` in `dragoshont/xodus-macos`,
+branch `dragoshont-xodus-launcher-management`: 79 positive, 20 negative and four
 independent evidence-edge frames. This additive contract includes public
-`catalog.query`; capabilities are negotiated from the running producer, not
+`catalog.query` and read-only `installed.inspect`; capabilities are negotiated from the running producer, not
 copied from a fixture.
 
 Canonical committed schema SHA256:
 
-`655e1ed31772b35a8526ef5a0986557e7f6de689d5c4925ccde7041bc33b5f29`
+`c95c3fabdf114f89329d2361e76421e7b47be4c113f56c2381e64d437e44f749`
 
 Committed LF bytes and all four sanitized fixture hashes were independently verified from immutable public Git objects. A transient GitHub network outage was handled with that exact public-only fallback, not mutable backend source or private data.
 
 `docs/contracts/management-v1.schema.json` is the producer's canonical scoped schema. `tools/sync_contract.py` copies its exact bytes to the Swift resource. `Tests/ManagementChecks/Fixtures` contains its sanitized public positive/negative/evidence fixtures. No private backend source or real account payload was imported. `foundation-v1.schema.json` preserves the original proposal.
 
-The bounded Store/discovery probe used implementation
-`4de9c2b2e7c114854699e3708d41c12fa73e188d`, unsigned input SHA256
-`58f5b80f253d8ee199dc193d3a31cbd1571b641ce309f81bf0430910a6982e83`.
+Current enabled-inspection engine input SHA256:
+`da548dd5abe4c32dc17035817d1a809a31c8eb19e615f26dad079a245cf72178`.
 Its ad-hoc-signed embedded copy has SHA256
-`5ea5b49610fc9887345234e0d66bc9954f3bf1e78716ab25866802c4f48f324b`.
-**That producer is provisional, not review-closed:** the retained reviewer found
-an empty-query cache failure and insufficient repeated-source-cursor normalization
-(R06/R07). Its positive two-page probe does not validate those edge cases.
-A new immutable producer and fresh interoperability evidence are required before
-claiming their closure or human sign-in readiness. Earlier discovery pins and
-hashes remain historical evidence in [verification](VERIFICATION.md).
+`2180d02dca9300d08c91384207fed6acebdeaaa9d0c309bc0fd28a7fcf7b2296`.
+It includes the retained-review-closed R05/R06/R07 producer fixes; its inspection
+adapter/primitives were approved by that same review. The source-only app
+R01-R04 fixes closed at `fb66a2d`. Current app R08/R09 fixes need review of their
+new immutable revision before human sign-in readiness. Historical producer
+hashes, including superseded `58f5` and `35f0`, remain in
+[verification](VERIFICATION.md); they are not current readiness builds.
 **Provider consent remains separate from read-only/schema/build verification.**
 No successful account login is claimed merely because the native UI compiles.
 
@@ -133,22 +143,37 @@ launcher Keychain profile, not implicit CLI/private-worker credential import.
 ## Evidence and still-open gates
 
 The current app review-fix milestone passed one full `sh tools/check.sh` invocation
-on the Mac: **14 core + 156 management + 24 presentation + 18 native session =
-212 checks**, zero failures. The native session set uses mock child processes and
+on the Mac: **14 core + 189 management + 24 presentation + 32 native session =
+259 checks**, zero failures. The native session set uses mock child processes and
 the actual `LiveSession` coordinator, not real Keychain/provider operations.
 It covers R01-R04 recovery, permission-preserving disconnect gating,
-failed-mutation freshness, genuine empty query and stop-search fencing. Management
+failed-mutation freshness, genuine empty query, stop-search fencing, selected
+inspection scope and R08/R09. Five delayed edits with old view tasks cancelled
+produce only two requests with maximum concurrency one; the newest captured
+query/locale completes without a manual refresh or producer capacity error.
+Management
 tests include 31-second synthetic preparation/logout with concurrent public reads.
 The release bundle passed resource, plist and ad-hoc-signature checks; earlier
 disconnected own-view visual confirmation remains separate.
 
-Thirteen actual read-only engine checks passed against the preserved input and
-signed embedded copy: bounded Store/discovery pages, exact session identity,
-registry/diagnostics and checked-title search. Normal native Account status
-resolved noninteractively while anonymous discovery stayed connected beyond
-35 seconds. These results predate R06/R07 closure and do not prove genuine
-empty-source or complete paging behavior. No Microsoft login, logout or Keychain
-approval was attempted. The retained coordinator-owned review must separately
-close the persisted app fixes and all confirmed backend findings.
+Twenty-two actual management checks passed against the signed enabled-inspection
+copy: bounded Store/discovery pages, exact session identity, registry/diagnostics,
+checked-title search, owned-process exit and read-only synthetic marker
+inspection. The original 4096-byte fixture is authored in the committed runner,
+not a real game. Exactly 196 metadata bytes/digest/version and unchanged marker/
+registry bytes were verified; missing, aliased and malformed fixtures returned
+typed errors and the same connection remained usable. Normal native Account
+status, public Halo search and continuation passed bounded own-window checks.
+No Microsoft login, logout or Keychain approval was attempted. **A live upstream
+zero-source query has not been observed**: arbitrary nonsense can return
+suggestions. Deterministic producer/native regressions cover empty-source
+behavior separately, not as live empty-search proof.
+
+Expanded reconnect checks exposed a Foundation `waitUntilExit` stall after the
+owned child had exited; the exact mock-only stack was sampled. Close now observes
+exit with a six-second bound around existing exact-PID escalation. Failed shutdown
+is explicit, retains the retiring client and blocks reconnect, fixture switching
+and application termination until reconciled. Repeated worker reconnect checks
+pass; there is no unbounded private run-loop wait.
 
 Native provider-consent/cancellation integration, source-backed discovery/search and explicit installed import are ongoing, not waived. Full owned-PC inventory/audience, legacy package authorization, safe staged installation/hash/expanded-size semantics, signed exact gameplay runtime, save-preserving updates/rollback, full VoiceOver/localization/min-OS and distribution remain open. No install or play action is enabled merely because Xbox Live sign-in succeeds. The user-directed full journey and coordinator-owned adversarial review remain completion prerequisites; this persisted client milestone is not final completion.

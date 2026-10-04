@@ -39,6 +39,7 @@ The exact implemented parameter/result shapes are in the canonical schema, not i
 | `jobs.pause/resume/cancel/retry` | job ID, expected revision | capability-gated mutations. Cancel acknowledges durable intent and later terminal outcome. Retry cannot bypass verification/authorization. |
 | `jobs.snapshot` / `events.replay` | session ID, after sequence | durable snapshot with watermark, or ordered replay; retention miss requires snapshot. |
 | `installed.snapshot` | managed registry scope | stable installation IDs with package, paths, version, paired runtime, save policy and health. |
+| `installed.inspect` | one explicitly selected absolute local directory | Live but partial external-marker observation only: fixed 196 non-key metadata bytes, unknown retail identity/entitlement/compatibility, unregistered and not launchable. No scan, adoption or file writes. |
 | `game.launch` | installation ID, expected revision | supervised launch job, explicit access/runtime/file validation and eventual process outcome. |
 | `game.update/rollback/remove` | installation ID + pinned plan/revision; consent | failure-safe jobs; default preserve saves; deletion limited to validated manifest-owned content. |
 | `diagnostics.export` | bounded scope, redaction policy | previewable sanitized report, never raw tokens, signed URLs or account identity. |

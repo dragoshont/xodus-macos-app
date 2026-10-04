@@ -61,7 +61,7 @@ struct LiveRootView: View {
             if !CommandLine.arguments.contains("--export-live"),
                session.phase == .disconnected, !session.backendPath.isEmpty { await session.connect() }
         }
-        .task(id: "\(state.destination.rawValue):\(state.query):\(session.isReady)") {
+        .task(id: "\(state.destination.rawValue):\(state.query):\(session.market):\(session.language):\(session.isReady)") {
             guard state.destination == .discover else { return }
             do { try await Task.sleep(for: .milliseconds(250)) }
             catch { return }
@@ -196,6 +196,8 @@ struct LiveRootView: View {
                 }
             }
             Divider()
+            selectedFolderInspection
+            Divider()
             HStack(alignment: .top, spacing: 28) {
                 readiness("Account", session.accountLabel, symbol: "person.crop.circle")
                 readiness("PC access", "Not established by catalog or sign-in", symbol: "key")
@@ -208,6 +210,46 @@ struct LiveRootView: View {
         if !session.isReady { return "Connect your Xodus engine" }
         if session.authentication?.state != .credentialPresent { return "Your library starts with sign-in" }
         return "PC library access is not available yet"
+    }
+
+    private var selectedFolderInspection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("A game folder you choose").font(.title2.bold())
+                Spacer()
+                if session.inspectionBusy { ProgressView().controlSize(.small) }
+                Button("Inspect a game folder") { session.chooseInstallationFolder() }
+                    .disabled(!session.isReady || !session.supports(.inspectInstallation) || session.inspectionBusy)
+            }
+            Text(session.supports(.inspectInstallation)
+                 ? "Read-only marker check in one selected folder. No scan, registration, download or launch."
+                 : "Read-only selected-folder inspection requires a matching engine capability. No other game folders have been scanned.")
+                .font(.callout).foregroundStyle(.secondary)
+            if let error = session.inspectionError {
+                Label(error, systemImage: "exclamationmark.circle")
+                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            if let inspection = session.inspection {
+                LabeledContent("Selected folder",
+                               value: URL(fileURLWithPath: inspection.directory).lastPathComponent)
+                LabeledContent("Container header version", value: inspection.marker.observedPackageVersion)
+                LabeledContent("Marker file",
+                               value: ByteCountFormatter.string(fromByteCount: Int64(inspection.marker.bytes),
+                                                                countStyle: .file))
+                Text("An external Xodus marker was observed. Retail identity, game-file integrity, access and compatibility remain unknown. No registered entry was created; this game cannot be launched from this result.")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                DisclosureGroup("Observed metadata") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Container ID: \(inspection.marker.contentID)")
+                        Text("Header GUID: \(inspection.marker.headerProductGUID)")
+                        Text("Header PDUID: \(inspection.marker.headerPDUID)")
+                        Text("These header identifiers are not Microsoft Store product, edition or package identities. The metadata digest is not full game integrity.")
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.caption).textSelection(.enabled)
+                }
+            }
+        }
     }
     private var libraryExplanation: String {
         if !session.isReady {
@@ -325,6 +367,11 @@ struct LiveRootView: View {
                     Task { await session.refreshCatalog(state.query, more: true) }
                 }
                     .disabled(!session.canLoadMoreCatalog)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Load more catalog results")
+                    .accessibilityIdentifier("xodus.catalog.loadMore")
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { Task { await session.refreshCatalog(state.query, more: true) } }
             }
         }
     }

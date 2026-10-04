@@ -6,6 +6,67 @@ game download, install or gameplay.
 
 ## Store search and adversarial-review app fixes
 
+### Current inspection pairing and additional client fixes
+
+One full Mac `sh tools/check.sh` invocation passed **14 core + 189 management +
+24 presentation + 32 native session = 259 checks**, zero failures. The preceding
+212-check `fb66a2d` app revision separately
+[passed hosted CI](https://github.com/dragoshont/xodus-macos-app/actions/runs/37162534769);
+that success is not attributed to the newer delta.
+
+The same retained reviewer closed app R01-R04 at `fb66a2d` and backend R05-R07.
+Two subsequently confirmed app findings are fixed with new regressions:
+R08 preserves source-level PACKAGE_UNAVAILABLE without optional details and
+allows a subsequent snapshot on the same connection; malformed present details,
+including null, are still rejected. R09 coalesces catalog work into one active
+plus the latest captured query/market/language. Five delayed edits at 300 ms,
+cancelling prior view tasks, issue only two requests with max concurrency one
+against a mock that enforces the producer's four-operation limit. Latest scope
+results arrive without manual refresh; stop drops unsent queued work. These
+new fixes require review of their persisted revision before human readiness.
+
+Canonical schema/fixtures at producer `e3129cee422305657b945d35daf2f780ffe98e2b`:
+SHA256 `c95c3fabdf114f89329d2361e76421e7b47be4c113f56c2381e64d437e44f749`,
+79 positive / 20 negative / four evidence-edge frames. Immutable bytes were
+copied and checked; new UUID and exclusion constraints are enforced by the
+consumer. Enabled-inspection unsigned engine SHA256:
+`da548dd5abe4c32dc17035817d1a809a31c8eb19e615f26dad079a245cf72178`;
+locally signed embedded SHA256:
+`2180d02dca9300d08c91384207fed6acebdeaaa9d0c309bc0fd28a7fcf7b2296`.
+Release compilation, resource/plist and ad-hoc-signature checks passed.
+
+The unsigned producer passed 21 actual checks before the shutdown refinement;
+the signed embedded copy passed **22 actual checks** including observed owned
+exit. The committed `--probe-inspect` runner creates only its own original
+4096-byte synthetic marker under a canonical private test root and removes it.
+Its 196-byte digest/version matches; marker and management.json bytes stay
+unchanged. Missing/aliased/malformed fixtures remain typed failures, and the same
+connection can read the installed snapshot afterward. This is not external-game
+inspection, full integrity, retail mapping, ownership, registration or gameplay.
+Original layout provenance is the pinned public producer smoke helper; no key
+material or real game data is copied.
+
+Normal LaunchServices app PID 65869 / owned child 65872 passed noninteractive
+Account/Check status/Close, real public Halo typing through an exact focused
+native field, and native continuation. The helper refuses to replace a preexisting
+query or type with a sheet open, and logs only authored allowlisted labels.
+No consent/sign-in was initiated. Native picker compilation is separate from an
+actual user-selected external-folder test, which has not occurred.
+
+Live upstream zero-source behavior is **not observed**: arbitrary nonsense can
+return suggested cards. The empty-source regression remains scoped to
+deterministic backend serve tests and actual LiveSession/mock-child checks;
+positive HTTP queries do not strengthen it into a live empty-result claim.
+
+An expanded native run stalled during owned-process close. The exact mock-only
+stack showed Foundation `NSConcreteTask.waitUntilExit` blocked in its private
+run loop after the child was gone. That run was stopped, not counted as passing.
+Bounded six-second exit observation replaced the unbounded wait; failure is
+explicit and prevents reconnect/fixture switch/quit from pretending cleanup
+finished. Three repeated worker reconnects and the complete suite then passed.
+
+### Earlier query milestone (historical)
+
 Recorded 2026-10-04. One complete `sh tools/check.sh` invocation passed **14 core +
 156 management + 24 presentation + 18 native session = 212 checks**, zero
 failures. Native checks execute the actual session coordinator against sanitized
@@ -39,13 +100,13 @@ noninteractive saved-status refresh, explicit Check status and Close. Discover
 retained the engine beyond 35 seconds. These are bounded owned-window authored
 label checks, not successful sign-in or full VoiceOver. No consent was initiated.
 
-**This producer is not review-closed.** The retained reviewer subsequently found
+**This producer was not review-closed at that milestone.** The retained reviewer subsequently found
 R06 (zero-source query cached as an invalid empty registry operation) and R07
 (repeated source-cursor equivalence not fully normalized). Positive two-page
-evidence above cannot close either issue. A new immutable producer must pass the
-committed actual zero-source query/connection-survival probe and backend cursor
-regressions before readiness. App R01-R04 fixes await review of their persisted
-revision; no new reviewer is spawned.
+evidence above could not close either issue. Their later producer closure and
+current pairing are recorded above; live zero-source evidence remains unobserved,
+not fabricated from an arbitrary query. App R01-R04 later closed at `fb66a2d`;
+no new reviewer was spawned.
 
 Hosted startup-fix revision `44f24407ad9562e90a305426771423e3f46864dc`
 [passed its own GitHub Actions run](https://github.com/dragoshont/xodus-macos-app/actions/runs/37159377257).

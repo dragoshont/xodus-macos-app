@@ -1,11 +1,11 @@
 -- SPDX-License-Identifier: GPL-3.0-only
 on run arguments
-    if (count of arguments) is not 2 then error "Usage: exact-owned-app-PID snapshot|Library|Discover|Downloads|Account|CheckStatus|CloseAccount"
+    if (count of arguments) is not 2 then error "Usage: exact-owned-app-PID snapshot|Library|Discover|Downloads|Account|CheckStatus|CloseAccount|SearchHalo|More"
     set ownedPID to (item 1 of arguments) as integer
     set requestedAction to item 2 of arguments
-    if requestedAction is not in {"snapshot", "Library", "Discover", "Downloads", "Account", "CheckStatus", "CloseAccount"} then error "Unsupported action."
-    set navigationIDs to {"xodus.navigation.library", "xodus.navigation.discover", "xodus.navigation.downloads", "xodus.account", "xodus.account.checkStatus", "xodus.account.close"}
-    set safeLabels to {"Library", "Discover", "Downloads", "Account", "Your Library", "Registered on this Mac", "Live Xodus connection - development build", "Xodus for Mac - development build", "Connect your Xodus engine", "Check your saved sign-in or sign in with Microsoft. Public browsing does not read your Keychain.", "Sign in with Microsoft", "Sign-in needs attention"}
+    if requestedAction is not in {"snapshot", "Library", "Discover", "Downloads", "Account", "CheckStatus", "CloseAccount", "SearchHalo", "More"} then error "Unsupported action."
+    set navigationIDs to {"xodus.navigation.library", "xodus.navigation.discover", "xodus.navigation.downloads", "xodus.account", "xodus.account.checkStatus", "xodus.account.close", "xodus.catalog.search", "xodus.catalog.loadMore"}
+    set safeLabels to {"Library", "Discover", "Downloads", "Account", "Your Library", "Registered on this Mac", "Live Xodus connection - development build", "Xodus for Mac - development build", "Connect your Xodus engine", "Check your saved sign-in or sign in with Microsoft. Public browsing does not read your Keychain.", "Sign in with Microsoft", "Sign-in needs attention", "Microsoft Store search results", "PC Game Pass discovery", "No Store matches", "Search stopped"}
     tell application "System Events"
         set ownedProcesses to every application process whose unix id is ownedPID
         if (count of ownedProcesses) is not 1 then error "Exact owned process unavailable."
@@ -21,7 +21,11 @@ on run arguments
             if exists attribute "AXIdentifier" of element then
                 set identifier to value of attribute "AXIdentifier" of element
                 if identifier is in navigationIDs then
-                    if role of element is not "AXButton" then error "Navigation identifier is not an actionable button."
+                    if identifier is "xodus.catalog.search" then
+                        if role of element is not "AXTextField" then error "Search identifier is not a native text field."
+                    else
+                        if role of element is not "AXButton" then error "Navigation identifier is not an actionable button."
+                    end if
                     log ("navigation=" & identifier)
                     if requestedAction is not "snapshot" and identifier is my targetIdentifier(requestedAction) then
                         set end of navigationMatches to contents of element
@@ -39,7 +43,18 @@ on run arguments
             if (count of navigationMatches) is not 1 then error "Exact navigation target unavailable; refusing blind interaction."
             set navigationTarget to item 1 of navigationMatches
             if not enabled of navigationTarget then error "Navigation target is disabled."
-            click navigationTarget
+            if requestedAction is "SearchHalo" then
+                if (count of sheets of ownedWindow) is not 0 then error "Refusing search while a modal sheet is open."
+                if value of attribute "AXDescription" of navigationTarget is not "Search Microsoft Store games" then error "Expected public Store search scope."
+                if value of attribute "AXValue" of navigationTarget is not "" then error "Refusing to replace a preexisting search."
+                set frontmost of ownedProcess to true
+                if not frontmost of ownedProcess then error "Exact owned app is not foreground."
+                set value of attribute "AXFocused" of navigationTarget to true
+                if value of attribute "AXFocused" of navigationTarget is not true then error "Exact native search field is not focused."
+                keystroke "Halo"
+            else
+                click navigationTarget
+            end if
             log ("clicked=" & requestedAction)
         end if
     end tell
@@ -52,5 +67,7 @@ on targetIdentifier(destination)
     if destination is "Account" then return "xodus.account"
     if destination is "CheckStatus" then return "xodus.account.checkStatus"
     if destination is "CloseAccount" then return "xodus.account.close"
+    if destination is "SearchHalo" then return "xodus.catalog.search"
+    if destination is "More" then return "xodus.catalog.loadMore"
     error "Unknown destination."
 end targetIdentifier

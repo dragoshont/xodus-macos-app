@@ -1,6 +1,11 @@
 # UX screens and state flows
 
-**Specification, not a live integration.** The native preview labels every action as a simulation; fixtures never claim real Microsoft access or real compatibility.
+**Full consumer journey specification, not a claim that every step works.**
+The default native development app has real bounded account/catalog/registry and
+selected-folder inspection clients; [current integration evidence](NATIVE-INTEGRATION.md)
+distinguishes those from unfinished inventory/install/play gates. The original
+offline `--fixture` preview labels simulated actions explicitly and never claims
+real Microsoft access or compatibility.
 
 ## Navigation and search
 
@@ -32,6 +37,20 @@ One native Mac window with user-directed **floating fully rounded Library / Disc
 **Update:** fetch new immutable package/runtime pair -> preserve existing runnable registry entry -> stage/verify -> atomic promote -> retain rollback according to storage policy. If pre-promotion failure, current version still runs. Save location is separate; incompatible save formats require title-specific warning, not an unconditional rollback promise.
 
 **Removal:** inspect managed paths -> confirm game-content removal -> remove safe manifest-owned content -> registry tombstone. Preserve saves by default. No recursive removal based on a display title or unvalidated path.
+
+**Selected existing folder:** explicitly choose one exact directory in the
+native folder picker (aliases not implicitly resolved) -> bounded read-only
+streaming-marker metadata -> show selected folder and observed header version,
+with unknown retail identity, game-file integrity, access and compatibility.
+This result is outside the registered Library and cannot enable Play. Missing,
+aliased or malformed markers are visible errors; no scan, adoption, registration
+or file write is performed. Cancelling the picker makes no request.
+
+**Rapid scoped search:** one active catalog request plus the latest queued
+query/market/language; replace queued intermediate edits rather than starting
+every debounce result. Stop drops unsent work and fences active results without
+claiming HTTP cancellation. Source-level failures remain recoverable catalog
+errors; valid all-failure pages retain visible failures and continuation.
 
 ## Status copy and independent evidence
 

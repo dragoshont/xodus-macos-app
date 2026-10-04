@@ -15,8 +15,8 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let liveSession else { return .terminateNow }
         Task {
-            await liveSession.disconnect()
-            sender.reply(toApplicationShouldTerminate: true)
+            let closed = await liveSession.disconnect()
+            sender.reply(toApplicationShouldTerminate: closed)
         }
         return .terminateLater
     }

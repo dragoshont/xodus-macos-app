@@ -20,6 +20,7 @@ enum NativeChecks {
                 failures += 1
                 FileHandle.standardError.write(Data("FAIL: \(name)\n".utf8))
             }
+            fflush(stdout)
         }
         func session(_ scenario: String) -> LiveSession {
             let executable = URL(fileURLWithPath: CommandLine.arguments[0])
@@ -128,6 +129,78 @@ enum NativeChecks {
             check(stopped.isReady && stopped.catalogStopped && stopped.discoveryCheckedAt == nil,
                   "Stopped search discards later bounded results without pretending HTTP was cancelled")
             await stopped.disconnect()
+
+            let sourceFailure = session("querynodetails")
+            await sourceFailure.connect()
+            await sourceFailure.refreshCatalog("Original source query")
+            check(sourceFailure.isReady && sourceFailure.catalogError != nil,
+                  "Source-level PACKAGE_UNAVAILABLE without batch details is a recoverable catalog error")
+            try await sourceFailure.reconcileActivity()
+            check(sourceFailure.isReady && !sourceFailure.activity.needsSnapshot,
+                  "Native snapshot still succeeds on the same connection after a source-level query error")
+            await sourceFailure.disconnect()
+
+            let coalesced = session("querycoalesce")
+            await coalesced.connect()
+            var edits: [Task<Void, Never>] = []
+            for index in 1...5 {
+                if index == 5 { coalesced.market = "FR"; coalesced.language = "fr-FR" }
+                edits.last?.cancel()
+                edits.append(Task { await coalesced.refreshCatalog("Original query \(index)") })
+                if index < 5 { try await Task.sleep(for: .milliseconds(300)) }
+            }
+            for edit in edits { await edit.value }
+            check(coalesced.isReady && coalesced.catalogError == nil
+                  && coalesced.products.first?.title == "Original query 5 [requests=2,max=1]",
+                  "Five delayed edits issue only one in-flight and one latest query, never producer capacity failure")
+            check(coalesced.products.first?.market == "FR" && coalesced.products.first?.language == "fr-FR",
+                  "Latest queued query retains its captured market/language instead of old request scope")
+            await coalesced.disconnect()
+
+            let dropped = session("querycoalesce")
+            await dropped.connect()
+            let active = Task { await dropped.refreshCatalog("Active original query") }
+            try await wait { dropped.searching }
+            let queued = Task { await dropped.refreshCatalog("Queued original query") }
+            try await Task.sleep(for: .milliseconds(300))
+            dropped.stopCatalogSearch()
+            await active.value
+            await queued.value
+            check(dropped.catalogStopped && dropped.discoveryCheckedAt == nil,
+                  "Stop clears the queued latest request while fencing the active bounded result")
+            await dropped.refreshCatalog("After stopped queue")
+            check(dropped.products.first?.title == "After stopped queue [requests=2,max=1]",
+                  "A stopped queued query was never sent; the next explicit search remains usable")
+            check(await dropped.disconnect(), "Stopped-query worker releases its owned process without an unbounded wait")
+            for _ in 0..<3 {
+                await dropped.connect()
+                await dropped.refreshCatalog("Reconnected original query")
+                let ready = dropped.isReady
+                let closed = await dropped.disconnect()
+                check(ready && closed,
+                      "Repeated catalog-worker reconnect waits for owned-child exit and stays usable")
+            }
+
+            let selected = URL(fileURLWithPath: "/synthetic/selected/game")
+            let inspected = session("inspection")
+            await inspected.connect()
+            await inspected.inspectInstallation(at: selected)
+            check(inspected.inspection?.directory == selected.path
+                  && inspected.inspection?.assessment.registered == false
+                  && inspected.inspection?.assessment.launchable == false
+                  && inspected.installedSnapshot == nil,
+                  "Selected-folder inspection remains separate from registry, entitlement and launch")
+            await inspected.disconnect()
+            check(inspected.inspection == nil, "Inspection evidence clears when its engine disconnects")
+
+            for scenario in ["inspectionmissing", "inspectionmismatch"] {
+                let rejected = session(scenario)
+                await rejected.connect()
+                await rejected.inspectInstallation(at: selected)
+                check(rejected.inspection == nil && rejected.inspectionError != nil,
+                      "Missing or differently scoped inspection is an explicit error, never empty installed success")
+                await rejected.disconnect()
+            }
         } catch {
             check(false, (error as? ManagementError)?.localizedDescription ?? "Native fixture regression did not complete.")
         }

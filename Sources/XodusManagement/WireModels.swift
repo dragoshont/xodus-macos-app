@@ -9,6 +9,7 @@ public enum ManagementCommand: String, CaseIterable, Codable, Sendable {
     case discover = "catalog.discover", query = "catalog.query"
     case pause = "jobs.pause", resume = "jobs.resume", cancel = "jobs.cancel", retry = "jobs.retry"
     case jobs = "jobs.snapshot", replay = "events.replay", installed = "installed.snapshot"
+    case inspectInstallation = "installed.inspect"
     case launch = "game.launch", update = "game.update", rollback = "game.rollback", remove = "game.remove"
     case diagnostics = "diagnostics.export"
 
@@ -24,6 +25,7 @@ public enum ManagementCommand: String, CaseIterable, Codable, Sendable {
         case .jobs: "jobsData"
         case .replay: "replayData"
         case .installed: "installedData"
+        case .inspectInstallation: "inspectionData"
         case .diagnostics: "diagnosticsData"
         default: nil
         }
@@ -160,6 +162,52 @@ public struct CatalogSearch: Codable, Equatable, Sendable {
 }
 public struct ProductResult: Codable, Sendable {
     public let product: CatalogProduct
+}
+
+public struct InstallationInspection: Codable, Equatable, Sendable {
+    public let scope: String
+    public let completeness: String
+    public let freshness: String
+    public let checkedAt: String
+    public let directory: String
+    public let marker: InspectionMarker
+    public let assessment: InspectionAssessment
+
+    public func validateSelection(directory: String) throws {
+        guard self.directory == directory, scope == "userSelectedDirectory",
+              completeness == "partial", freshness == "live",
+              marker.relativePath == ".xodus-streaming.msixvc", marker.format == "msft-xvd",
+              assessment.kind == "externalMarkerDetected", !assessment.registered,
+              assessment.retailIdentity == "unknown", assessment.fileVerification == "notPerformed",
+              assessment.entitlement == "unknown", assessment.compatibility == "unknown",
+              !assessment.launchable else { throw ManagementError.invalidPayload }
+    }
+}
+
+public struct InspectionMarker: Codable, Equatable, Sendable {
+    public let relativePath: String
+    public let bytes: UInt64
+    public let observedMetadataSHA256: String
+    public let format: String
+    public let formatVersion: UInt32
+    public let xvdType: UInt32
+    public let contentTypeRaw: UInt32
+    public let volumeFlagsRaw: UInt32
+    public let contentID: String
+    public let headerProductGUID: String
+    public let headerPDUID: String
+    public let observedPackageVersion: String
+}
+
+public struct InspectionAssessment: Codable, Equatable, Sendable {
+    public let kind: String
+    public let registered: Bool
+    public let retailIdentity: String
+    public let fileVerification: String
+    public let entitlement: String
+    public let compatibility: String
+    public let launchable: Bool
+    public let reason: String
 }
 
 public struct DiscoveryFailure: Codable, Equatable, Sendable, Identifiable {

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import Foundation
+import CryptoKit
 import XodusManagement
 
 @main
@@ -16,7 +17,8 @@ enum ManagementChecks {
                     executable: URL(fileURLWithPath: CommandLine.arguments[index + 1]),
                     stateDirectory: URL(fileURLWithPath: CommandLine.arguments[stateIndex + 1])),
                     discover: CommandLine.arguments.contains("--probe-discovery"),
-                    query: CommandLine.arguments.contains("--probe-query"))
+                    query: CommandLine.arguments.contains("--probe-query"),
+                    inspect: CommandLine.arguments.contains("--probe-inspect"))
             } else { try await checks.run() }
         } catch { await checks.check(false, "Check harness: \(safeMessage(error))") }
         exit(await checks.finish() ? 0 : 1)
@@ -57,13 +59,13 @@ actor Checks {
     func run() async throws {
         let validator = try ContractValidator()
         let positive = try fixture("positive").array ?? []
-        check(positive.count == 77, "Pinned producer corpus contains 77 positive frames")
+        check(positive.count == 79, "Pinned producer corpus contains 79 positive frames")
         for (index, frame) in positive.enumerated() {
             do { try validator.validate(frame); check(true, "Producer positive frame \(index + 1)") }
             catch { check(false, "Producer positive frame \(index + 1)") }
         }
         let negative = try fixture("negative").array ?? []
-        check(negative.count == 15, "Pinned producer corpus contains fifteen negative frames")
+        check(negative.count == 20, "Pinned producer corpus contains twenty negative frames")
         for item in negative {
             do {
                 guard let frame = item["frame"] else { throw ManagementError.invalidPayload }
@@ -86,6 +88,29 @@ actor Checks {
             let snapshot = try data.decode(InstalledSnapshot.self)
             check(snapshot.scope == "managementRegistryOnly" && snapshot.registryVersion.major == 1,
                   "Typed installed evidence remains explicitly scoped to its management registry")
+        }
+        guard let inspectionData = positive.first(where: {
+            $0["data"]?["scope"]?.string == "userSelectedDirectory"
+        })?["data"] else { throw ManagementError.invalidPayload }
+        try validator.validate(inspectionData, definition: "inspectionData")
+        let inspection = try inspectionData.decode(InstallationInspection.self)
+        try inspection.validateSelection(directory: inspection.directory)
+        check(!inspection.assessment.registered && !inspection.assessment.launchable
+              && inspection.assessment.retailIdentity == "unknown",
+              "Observed header identifiers never become retail identity, registration or launch permission")
+        do {
+            try inspection.validateSelection(directory: "/different/selected/folder")
+            check(false, "Inspection must correlate exactly to the explicitly selected directory")
+        } catch { check(true, "Inspection must correlate exactly to the explicitly selected directory") }
+        for id in ["00000000-0000-0000-0000-000000000000", "not-a-uuid"] {
+            var changed = inspectionData.object ?? [:]
+            var marker = inspectionData["marker"]?.object ?? [:]
+            marker["contentID"] = .string(id)
+            changed["marker"] = .object(marker)
+            do {
+                try validator.validate(.object(changed), definition: "inspectionData")
+                check(false, "Inspection rejects zero or malformed content identity")
+            } catch { check(true, "Inspection rejects zero or malformed content identity") }
         }
         guard let discoveryData = positive.first(where: { $0["data"]?["corpus"]?.string == "pcGamePassDiscovery" })?["data"],
               let failedPage = positive.first(where: { $0["error"]?["details"]?["corpus"]?.string == "pcGamePassDiscovery" })?["error"]?["details"] else {
@@ -216,7 +241,7 @@ actor Checks {
             _ = try await client.request(.authStatus, params: ["token": .string("synthetic-forbidden-field")])
             check(false, "Credential parameter is rejected before transport")
         } catch { check(error as? ManagementError == .invalidRequest, "Credential parameter is rejected before transport") }
-        await client.close()
+        check(await client.close(), "Owned normal transport closes before reconnect")
         let denied = try ManagementClient()
         _ = try await denied.connect(mockConfiguration("keychain"))
         do {
@@ -226,7 +251,7 @@ actor Checks {
             check(error as? ManagementError == .credentialStoreUnavailable,
                   "Keychain permission failure is not treated as invalid credentials")
         }
-        await denied.close()
+        check(await denied.close(), "Owned inaccessible-store transport closes")
         check(ManagementCommand.authBegin.defaultTimeout == .seconds(600)
               && ManagementCommand.authLogout.defaultTimeout == .seconds(600)
               && ManagementCommand.authStatus.defaultTimeout == .seconds(30),
@@ -243,7 +268,7 @@ actor Checks {
         _ = try await loggingOut.decode(AuthenticationStatus.self)
         _ = try await human.request(.jobs)
         check(true, "Preparation and logout exceeding thirty seconds preserve the connection")
-        await human.close()
+        check(await human.close(), "Owned human-wait transport closes")
         let uncertain = try ManagementClient()
         _ = try await uncertain.connect(mockConfiguration("hangmutation"))
         do {
@@ -254,13 +279,13 @@ actor Checks {
             check(error as? ManagementError == .requestTimedOut,
                   "Mutation deadline never synthesizes success or blindly retries")
         }
-        await uncertain.close()
+        check(await uncertain.close(), "Owned uncertain-mutation transport closes")
         let reconciled = try ManagementClient()
         _ = try await reconciled.connect(mockConfiguration("normal"))
         let reconciledStatus = try await reconciled.request(.authStatus).decode(AuthenticationStatus.self)
         check(reconciledStatus.state == .signedOut,
               "After an uncertain mutation, reconnect reads authoritative status before another mutation")
-        await reconciled.close()
+        check(await reconciled.close(), "Owned reconciliation transport closes")
         let discoveryFailure = try ManagementClient()
         _ = try await discoveryFailure.connect(mockConfiguration("discoveryfail"))
         do {
@@ -274,8 +299,8 @@ actor Checks {
                       "Transport preserves only schema-validated all-failure discovery details")
             } else { check(false, "Transport preserves only schema-validated all-failure discovery details") }
         }
-        await discoveryFailure.close()
-        for scenario in ["queryfail", "badqueryfail"] {
+        check(await discoveryFailure.close(), "Owned failed-discovery transport closes")
+        for scenario in ["queryfail", "badqueryfail", "querynodetails", "querynulldetails"] {
             let queryFailure = try ManagementClient()
             _ = try await queryFailure.connect(mockConfiguration(scenario))
             do {
@@ -288,12 +313,20 @@ actor Checks {
                 if scenario == "queryfail", case .queryFailed(let page) = error {
                     check(page.products.isEmpty && !page.failures.isEmpty,
                           "Transport preserves schema-validated failed query details only")
+                } else if scenario == "querynodetails" {
+                    check(error == .backendError("PACKAGE_UNAVAILABLE", retryable: false),
+                          "Source-level query failure without details stays a recoverable typed error")
+                    _ = try await queryFailure.request(.jobs).decode(JobsSnapshot.self)
+                    check(true, "Source-level query failure preserves the same connection for snapshots")
+                } else if scenario == "querynulldetails" {
+                    check(error == .invalidFrame || error == .invalidPayload,
+                          "Present null query details are rejected, not treated as absent")
                 } else {
                     check(scenario == "badqueryfail" && error == .invalidPayload,
                           "Transport rejects malformed all-failure query details")
                 }
             }
-            await queryFailure.close()
+            check(await queryFailure.close(), "Owned query-error transport closes")
         }
         for scenario in ["prompt", "oversize", "partial", "mismatch", "wrongid", "wrongshape", "eof", "exit", "timeout"] {
             let bad = try ManagementClient()
@@ -302,11 +335,12 @@ actor Checks {
                 _ = try await bad.request(.authStatus, timeout: .milliseconds(200))
                 check(false, "Transport rejects \(scenario)")
             } catch { check(error is ManagementError, "Transport rejects \(scenario) without raw diagnostic text") }
-            await bad.close()
+            check(await bad.close(), "Owned rejected transport \(scenario) closes")
         }
     }
 
-    func probe(_ configuration: BackendConfiguration, discover: Bool = false, query: Bool = false) async throws {
+    func probe(_ configuration: BackendConfiguration, discover: Bool = false, query: Bool = false,
+               inspect: Bool = false) async throws {
         let client = try ManagementClient()
         do {
             let hello = try await client.connect(configuration)
@@ -370,22 +404,20 @@ actor Checks {
                           && second.nextCursor != cursor,
                           "Actual scoped Store cursor advances without merging edition/product identities")
                 }
-                let emptyQuery = "XodusNoMatch9F4A12C7"
-                var emptyParams = params
-                emptyParams["query"] = .string(emptyQuery)
-                let empty = try await client.request(.query, params: emptyParams, timeout: .seconds(45))
-                    .decode(CatalogQuery.self)
-                try empty.validatePublicScope(query: emptyQuery, market: "US", language: "en-US", limit: 8)
-                check(empty.products.isEmpty && empty.failures.isEmpty && empty.nextCursor == nil,
-                      "Actual zero-source query returns genuine empty success, not metadata failure")
                 _ = try await client.request(.jobs).decode(JobsSnapshot.self)
-                check(true, "Actual connection survives a genuine zero-source Store query")
+                check(true, "Actual connection survives bounded Store network query pages")
             }
             if hello.supports(.installed) {
                 let registry = try await client.request(.installed).decode(InstalledSnapshot.self)
                 check(registry.scope == "managementRegistryOnly"
                       && Set(registry.installations.map(\.id)).count == registry.installations.count,
                       "Actual registry does not import legacy game folders")
+            }
+            if inspect {
+                guard hello.supports(.inspectInstallation) else {
+                    throw ManagementError.capabilityMissing("installed.inspect")
+                }
+                try await probeInspection(client, configuration: configuration)
             }
             if hello.supports(.diagnostics) {
                 let report = try await client.request(.diagnostics)
@@ -415,11 +447,80 @@ actor Checks {
                 check(searched.products.contains { $0.id == product.id },
                       "Actual checked-catalog title search resolves a source-backed discovered product")
             }
-            await client.close()
+            check(await client.close(), "Actual owned engine exits before its state directory can be reused")
         } catch {
-            await client.close()
+            check(await client.close(), "Actual failed probe still closes its owned engine")
             throw error
         }
+    }
+
+    func probeInspection(_ client: ManagementClient, configuration: BackendConfiguration) async throws {
+        let files = FileManager.default
+        let root = configuration.stateDirectory
+            .appendingPathComponent("inspection-check-\(UUID().uuidString)").resolvingSymlinksInPath()
+        try files.createDirectory(at: root, withIntermediateDirectories: false,
+                                  attributes: [.posixPermissions: 0o700])
+        defer {
+            do { try files.removeItem(at: root) }
+            catch { check(false, "Owned synthetic inspection fixture cleanup") }
+        }
+        let selected = root.appendingPathComponent("selected")
+        let missing = root.appendingPathComponent("missing")
+        for directory in [selected, missing] {
+            try files.createDirectory(at: directory, withIntermediateDirectories: false,
+                                      attributes: [.posixPermissions: 0o700])
+        }
+        // Original sanitized header, matching the pinned public producer's synthetic layout.
+        var marker = Data(repeating: 0, count: 4096)
+        marker.replaceSubrange(0x200..<0x208, with: Data("msft-xvd".utf8))
+        marker[0x20c] = 2
+        marker[0x22f] = 1
+        marker[0x284] = 1
+        marker[0x3ab] = 2
+        marker[0x3bb] = 3
+        for (offset, value) in [(0x3bc, 4), (0x3be, 3), (0x3c0, 2), (0x3c2, 1)] {
+            marker[offset] = UInt8(value)
+        }
+        let markerURL = selected.appendingPathComponent(".xodus-streaming.msixvc")
+        try marker.write(to: markerURL, options: .withoutOverwriting)
+        let registryURL = configuration.stateDirectory.appendingPathComponent("management.json")
+        let registryBefore = try Data(contentsOf: registryURL)
+        let observed = try await client.request(.inspectInstallation,
+            params: ["directory": .string(selected.path)]).decode(InstallationInspection.self)
+        try observed.validateSelection(directory: selected.path)
+        let metadata = Data(marker[0x200..<0x29c]) + Data(marker[0x39c..<0x3c4])
+        let digest = SHA256.hash(data: metadata).map { String(format: "%02x", $0) }.joined()
+        check(metadata.count == 196 && observed.marker.observedMetadataSHA256 == digest
+              && observed.marker.observedPackageVersion == "1.2.3.4",
+              "Actual selected synthetic marker reads exactly the declared metadata digest/version")
+        check(observed.marker.contentID == "00000000-0000-0000-0000-000000000001"
+              && !observed.assessment.registered && !observed.assessment.launchable
+              && observed.assessment.entitlement == "unknown",
+              "Actual observed container ID remains unknown access and unregistered, never a retail game")
+        check(try Data(contentsOf: markerURL) == marker && Data(contentsOf: registryURL) == registryBefore,
+              "Actual inspection leaves selected marker and management registry bytes unchanged")
+        let alias = root.appendingPathComponent("alias")
+        try files.createSymbolicLink(at: alias, withDestinationURL: selected)
+        for (directory, code) in [(missing, "NOT_FOUND"), (alias, "UNSUPPORTED_CONFIGURATION")] {
+            do {
+                _ = try await client.request(.inspectInstallation, params: ["directory": .string(directory.path)])
+                check(false, "Actual inspection rejects synthetic \(code) without an installed success")
+            } catch {
+                check(error as? ManagementError == .backendError(code, retryable: false),
+                      "Actual inspection rejects synthetic \(code) without an installed success")
+            }
+        }
+        marker[0x200] = 0
+        try marker.write(to: markerURL)
+        do {
+            _ = try await client.request(.inspectInstallation, params: ["directory": .string(selected.path)])
+            check(false, "Actual malformed synthetic marker returns explicit integrity failure")
+        } catch {
+            check(error as? ManagementError == .backendError("INTEGRITY_FAILED", retryable: false),
+                  "Actual malformed synthetic marker returns explicit integrity failure")
+        }
+        _ = try await client.request(.installed).decode(InstalledSnapshot.self)
+        check(true, "Actual connection remains usable after selected-folder inspection failures")
     }
 
     func activityChecks(_ positive: [JSONValue]) throws {
@@ -492,7 +593,11 @@ enum MockBackend {
             var hello = frames.first(where: { $0["data"]?["schema"] != nil })?["data"]?.object ?? [:]
             var supported: Set<ManagementCommand> = [.authStatus, .authLogout, .jobs]
             if ["discoveryfail", "discoveryrecover"].contains(scenario) { supported.insert(.discover) }
-            if ["queryfail", "badqueryfail", "queryempty", "queryslow"].contains(scenario) { supported.insert(.query) }
+            if ["queryfail", "badqueryfail", "queryempty", "queryslow", "querynodetails",
+                "querynulldetails", "querycoalesce"].contains(scenario) { supported.insert(.query) }
+            if ["inspection", "inspectionmissing", "inspectionmismatch"].contains(scenario) {
+                supported.insert(.inspectInstallation)
+            }
             if ["expired", "expiredpermission", "transientauth", "latecancel", "humanwait", "hangmutation", "beginfail"].contains(scenario) {
                 supported.formUnion([.authBegin, .authCancel])
             }
@@ -513,6 +618,64 @@ enum MockBackend {
                     if scenario == "mismatch" { result["protocol"] = .object(["major": .integer(2), "minor": .integer(0)]) }
                     try emit(.object(result))
                 } else {
+                    if scenario == "querynodetails", command == "catalog.query" {
+                        try emitFailure(request, code: "PACKAGE_UNAVAILABLE")
+                        continue
+                    }
+                    if scenario == "querynulldetails", command == "catalog.query" {
+                        var response = result(request, data: .null)
+                        response.removeValue(forKey: "data")
+                        response["ok"] = .bool(false)
+                        response["error"] = .object(["code": .string("PACKAGE_UNAVAILABLE"),
+                            "message": .string("Synthetic source failure."), "retryable": .bool(false), "details": .null])
+                        try emit(.object(response))
+                        continue
+                    }
+                    if scenario == "querycoalesce", command == "catalog.query" {
+                        guard queryCounters.started() else {
+                            queryCounters.finished()
+                            try emitFailure(request, code: "LIMIT_EXCEEDED")
+                            continue
+                        }
+                        guard var page = frames.first(where: {
+                            $0["data"]?["corpus"]?.string == "publicMicrosoftStoreSearch"
+                                && $0["data"]?["products"]?.array?.isEmpty == false
+                        })?["data"]?.object, var product = page["products"]?.array?.first?.object else { exit(3) }
+                        let params = request["params"] ?? .null
+                        product["source"] = .string("syntheticPublicSource")
+                        product["market"] = params["market"]
+                        product["language"] = params["language"]
+                        product["resolvedLanguage"] = params["language"]
+                        page["query"] = params["query"]
+                        page["failures"] = .array([])
+                        page["nextCursor"] = .null
+                        let basePage = page, baseProduct = product
+                        DispatchQueue.global().async {
+                            Thread.sleep(forTimeInterval: 2)
+                            queryCounters.finished()
+                            let counts = queryCounters.snapshot()
+                            var responsePage = basePage, responseProduct = baseProduct
+                            responseProduct["title"] = .string("\(params["query"]?.string ?? "") [requests=\(counts.issued),max=\(counts.maximum)]")
+                            responsePage["products"] = .array([.object(responseProduct)])
+                            do { try emit(.object(result(request, data: .object(responsePage)))) }
+                            catch { exit(3) }
+                        }
+                        continue
+                    }
+                    if ["inspection", "inspectionmissing", "inspectionmismatch"].contains(scenario),
+                       command == "installed.inspect" {
+                        if scenario == "inspectionmissing" {
+                            try emitFailure(request, code: "NOT_FOUND")
+                        } else {
+                            guard var inspection = frames.first(where: {
+                                $0["data"]?["scope"]?.string == "userSelectedDirectory"
+                            })?["data"]?.object else { exit(3) }
+                            inspection["directory"] = scenario == "inspectionmismatch"
+                                ? .string("/different/selected/folder") : request["params"]?["directory"]
+                            try emit(.object(result(request, data: .object(inspection))))
+                        }
+                        continue
+                    }
                     if scenario == "beginfail", command == "auth.begin" {
                         try emitFailure(request, code: "AUTH_INVALID")
                         continue
@@ -672,6 +835,7 @@ enum MockBackend {
     }
 
     private static let outputLock = NSLock()
+    private static let queryCounters = QueryCounters()
 
     static func emitFailure(_ request: JSONValue, code: String, category: String? = nil) throws {
         var error: [String: JSONValue] = [
@@ -682,5 +846,31 @@ enum MockBackend {
             "kind": .string("result"), "protocol": .object(["major": .integer(1), "minor": .integer(0)]),
             "requestID": request["requestID"] ?? .null, "ok": .bool(false), "error": .object(error)
         ]))
+    }
+
+    private final class QueryCounters: @unchecked Sendable {
+        private let lock = NSLock()
+        private var active = 0, issued = 0, maximum = 0
+
+        func started() -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            active += 1
+            issued += 1
+            maximum = max(maximum, active)
+            return active <= 4
+        }
+
+        func finished() {
+            lock.lock()
+            defer { lock.unlock() }
+            active -= 1
+        }
+
+        func snapshot() -> (issued: Int, maximum: Int) {
+            lock.lock()
+            defer { lock.unlock() }
+            return (issued, maximum)
+        }
     }
 }

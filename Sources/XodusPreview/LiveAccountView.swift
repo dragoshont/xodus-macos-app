@@ -170,7 +170,7 @@ struct LiveSettingsView: View {
             Section("Original design preview") {
                 Button("Open offline fixture preview") {
                     Task {
-                        await session.disconnect()
+                        guard await session.disconnect() else { return }
                         state.reset()
                         state.fixtureMode = true
                     }
