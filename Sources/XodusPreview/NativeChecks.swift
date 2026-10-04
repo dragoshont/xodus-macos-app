@@ -131,7 +131,46 @@ enum NativeChecks {
                           && !summary.contains("disconnect") && !summary.contains("delete"),
                           "Device-proof shape or missing-proof failure never invents a cryptographic cause or credential deletion")
                 }
+                let subsiteCopy: String?
+                switch diagnostic {
+                case .tokenKindInvalid:
+                    subsiteCopy = "The device sign-in token uses a format this launcher cannot accept."
+                case .tokenAudienceInvalid:
+                    subsiteCopy = "The device sign-in token did not match the required context."
+                case .tokenCipherInvalid:
+                    subsiteCopy = "The device sign-in token payload could not be processed."
+                case .tokenSecretInvalid:
+                    subsiteCopy = "The device sign-in proof was missing or invalid."
+                default:
+                    subsiteCopy = nil
+                }
+                if let subsiteCopy {
+                    check(summary.contains(subsiteCopy) && failed.accountFailureTitle == "Microsoft sign-in could not start."
+                          && !summary.contains("cryptograph") && !summary.contains("signature")
+                          && !summary.contains("Microsoft rejected") && !summary.contains("disconnect")
+                          && !summary.contains("delete") && !summary.contains("4096")
+                          && !summary.contains("version4") && !summary.contains("base64") && !summary.contains("STS"),
+                          "Static token subsite copy reports only the agreed guard category, not values or a guessed cause")
+                }
                 await failed.disconnect()
+            }
+            for diagnostic in [NativeConsentFailure.tokenKindInvalid, .tokenAudienceInvalid,
+                               .tokenCipherInvalid, .tokenSecretInvalid] {
+                for suffix in ["extra", "unknown", "mismatched", "cancelcode", "expirycode", "internalcode"] {
+                    let failed = session("failedstage-\(diagnostic.rawValue)-\(suffix)")
+                    await failed.connect()
+                    await failed.refreshAccount()
+                    await failed.beginSignIn()
+                    let summary = failed.accountFailureSummary ?? ""
+                    check(failed.isReady && failed.authentication?.flow?.error?.nativeConsentFailure == nil
+                          && failed.authentication?.entitlementAuthorized == false && !failed.signInPending
+                          && summary.contains("Stage: stageUnavailable") && !summary.contains("Reason:")
+                          && !summary.contains("Original extra-field sentinel")
+                          && !summary.contains("Original synthetic upstream wording")
+                          && failed.accountFailureTitle != "Microsoft sign-in could not start.",
+                          "Actual mock-child subsite rejects extra/unknown/stage/non-AUTH details without secret retention or guessed preparation")
+                    await failed.disconnect()
+                }
             }
             for suffix in ["extra", "unknown", "mismatched", "cancelcode", "expirycode"] {
                 let failed = session("failedstage-\(suffix)")

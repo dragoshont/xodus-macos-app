@@ -181,6 +181,22 @@ the unchanged failing engine is not repeatedly retried. Exact hashes,
 historical local failures and independently passing evidence are recorded in
 [verification](VERIFICATION.md).
 
+### Agreed static token subsites (source only)
+
+The coordinator and sole consumer explicitly agreed four additive
+`devicePreparation` reasons with the producer before implementation:
+`tokenKindInvalid`, `tokenAudienceInvalid`, `tokenCipherInvalid` and
+`tokenSecretInvalid`. The consumer retains all fourteen older pairs, including
+coarse `tokenStructureInvalid`, and accepts only the exact three string keys
+for `AUTH_INVALID` / `nativeConsentFailure`. Static local copy explains only
+unsupported format, unmatched context, unprocessable payload or missing/invalid
+proof; no values or assumed provider/cryptographic cause are shown.
+Decoder/round-trip/privacy and actual mock-child presentation regressions are
+part of this source-only batch. The currently deployed bace/da0 pair is untouched;
+same-reviewer closure, producer native gates and a new sealed engine must precede
+replacement or retry. This refinement does not retrospectively identify which
+structure guard failed in the observed attempt.
+
 ## Developer application
 
 On the isolated Mac:

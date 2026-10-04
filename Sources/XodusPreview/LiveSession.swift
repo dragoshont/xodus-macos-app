@@ -190,6 +190,14 @@ final class LiveSession: ObservableObject {
             "The device sign-in result lacked a valid token proof. Report this diagnostic before another attempt."
         case .tokenStructureInvalid:
             "The device sign-in proof did not have the required supported structure. Report this diagnostic before another attempt."
+        case .tokenKindInvalid:
+            "The device sign-in token uses a format this launcher cannot accept. Report this diagnostic before another attempt."
+        case .tokenAudienceInvalid:
+            "The device sign-in token did not match the required context. Report this diagnostic before another attempt."
+        case .tokenCipherInvalid:
+            "The device sign-in token payload could not be processed. Report this diagnostic before another attempt."
+        case .tokenSecretInvalid:
+            "The device sign-in proof was missing or invalid. Report this diagnostic before another attempt."
         case .proofUnavailable:
             "Device proof was unavailable. No validated sign-in or package access was established; report this diagnostic."
         case .pipelineFailed:

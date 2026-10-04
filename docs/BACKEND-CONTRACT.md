@@ -88,9 +88,12 @@ Every request ID has exactly one terminal result; jobs continue through events. 
 
 The reviewed original ten-pair delta is deployed in the `360e8bf` / `e60481fc`
 diagnostic pair, not retroactively applied to the first 57d attempt.
-The coordinator and sole consumer subsequently agreed four additive static
-device reasons below; that fourteen-pair source refinement awaits the same
-continuity review and is **not yet deployed**. C95/protocol 1.0 stay byte-identical: the existing
+The subsequent fourteen-pair refinement was reviewed and deployed in the
+`da0adc0` / `bace09c` pair. After its observed coarse `tokenStructureInvalid`
+failure, the coordinator and sole consumer explicitly agreed four further static
+subsites with the producer before implementation. This eighteen-pair source
+delta is **not yet deployed** and still requires the same continuity review,
+native producer gates and a new immutable pairing. C95/protocol 1.0 stay byte-identical: the existing
 optional `flow.error.details` object carries exactly three string keys,
 `category`, `stage`, `reason`. Category must be `nativeConsentFailure`; the
 consumer accepts only `AUTH_INVALID` with one of these exact closed pairs:
@@ -107,6 +110,10 @@ consumer accepts only `AUTH_INVALID` with one of these exact closed pairs:
 | `devicePreparation` | `tokenResponseInvalid` |
 | `devicePreparation` | `tokenProofInvalid` |
 | `devicePreparation` | `tokenStructureInvalid` |
+| `devicePreparation` | `tokenKindInvalid` |
+| `devicePreparation` | `tokenAudienceInvalid` |
+| `devicePreparation` | `tokenCipherInvalid` |
+| `devicePreparation` | `tokenSecretInvalid` |
 | `deviceProof` | `proofUnavailable` |
 | `nativeSignIn` | `pipelineFailed` |
 | `storeProof` | `proofInvalid` |
@@ -137,6 +144,20 @@ device response, rejected checked token proof and unsupported proof structure.
 It carries no HTTP/XML, identity, audience, token, key or decoded-body values.
 Invalid device setup visibly says Microsoft sign-in could not start, without
 promoting a guessed deeper cause or recommending credential deletion.
+
+The four additive subsites preserve the older coarse `tokenStructureInvalid`:
+`tokenKindInvalid` identifies a converted token that is not Legacy;
+`tokenAudienceInvalid` identifies an outer/parsed STS-key mismatch;
+`tokenCipherInvalid` identifies a serialized-XML bound/parse failure or
+missing/invalid encoded cipher; `tokenSecretInvalid` identifies a missing,
+bad-base64 or invalid required 4096-byte/version-4 secret. These descriptions
+define static source sites, not values observed from the live attempt.
+The consumer presents only format-not-accepted, context-not-matched,
+payload-not-processable or proof-missing/invalid wording. It never reports
+lengths, versions, keys, XML/HTTP, identity or a presumed cryptographic/provider
+rejection. No validation is weakened and no new provider request is authorized.
+Whether live data contains XML Schema base64 whitespace remains unproven;
+isolated producer fixtures or a parser correction cannot establish that cause.
 
 ## Durable registry and updates
 

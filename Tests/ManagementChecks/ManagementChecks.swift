@@ -82,6 +82,12 @@ actor Checks {
             check(status.flow != nil && !status.entitlementAuthorized,
                   "Typed native authentication flow never promotes PC entitlement")
         }
+        check(Set(NativeConsentFailure.allCases.map(\.rawValue)) == [
+            "bootstrapInvalid", "clientUnavailable", "credentialStorageUnavailable", "storedCredentialInvalid",
+            "providerRequestFailed", "providerProofInvalid", "proofUnavailable", "pipelineFailed", "proofInvalid",
+            "workerOutcomeUnavailable", "registrationProofInvalid", "tokenResponseInvalid", "tokenProofInvalid",
+            "tokenStructureInvalid", "tokenKindInvalid", "tokenAudienceInvalid", "tokenCipherInvalid", "tokenSecretInvalid"
+        ], "Static subsite allowlist contains exactly eighteen reasons and preserves all fourteen older reasons")
         for diagnostic in NativeConsentFailure.allCases {
             let frame: JSONValue = .object(["code": .string("AUTH_INVALID"), "retryable": .bool(false),
                 "message": .string("Original upstream diagnostic sentinel is not UI copy."), "details": diagnostic.details])
@@ -124,13 +130,24 @@ actor Checks {
                   "Cancellation/expiry/non-auth codes cannot borrow AUTH_INVALID diagnostic stage evidence")
         }
         for diagnostic in [NativeConsentFailure.registrationProofInvalid, .tokenResponseInvalid,
-                           .tokenProofInvalid, .tokenStructureInvalid] {
+                           .tokenProofInvalid, .tokenStructureInvalid, .tokenKindInvalid,
+                           .tokenAudienceInvalid, .tokenCipherInvalid, .tokenSecretInvalid] {
             var extra = diagnostic.details.object ?? [:]
             extra["secret"] = .string("Original refined-device private sentinel")
             var mismatched = diagnostic.details.object ?? [:]
             mismatched["stage"] = .string("storeProof")
+            var unknown = diagnostic.details.object ?? [:]
+            unknown["reason"] = .string("\(diagnostic.rawValue)Unsupported")
+            var category = diagnostic.details.object ?? [:]
+            category["category"] = .string("unrecognizedCategory")
+            var malformed = diagnostic.details.object ?? [:]
+            malformed["reason"] = .integer(1)
+            var incomplete = diagnostic.details.object ?? [:]
+            incomplete.removeValue(forKey: "stage")
             let rejected: [(String, JSONValue)] = [
                 ("AUTH_INVALID", .object(extra)), ("AUTH_INVALID", .object(mismatched)),
+                ("AUTH_INVALID", .object(unknown)), ("AUTH_INVALID", .object(category)),
+                ("AUTH_INVALID", .object(malformed)), ("AUTH_INVALID", .object(incomplete)),
                 ("AUTH_CANCELLED", diagnostic.details), ("AUTH_EXPIRED", diagnostic.details),
                 ("INTERNAL_ERROR", diagnostic.details)
             ]
@@ -713,13 +730,24 @@ enum MockBackend {
                             if let diagnostic = NativeConsentFailure(rawValue: suffix) {
                                 failureObject["details"] = diagnostic.details
                             } else {
-                                var details = NativeConsentFailure.pipelineFailed.details.object ?? [:]
-                                switch suffix {
+                                let parts = suffix.split(separator: "-", maxSplits: 1).map(String.init)
+                                let diagnostic: NativeConsentFailure
+                                let variant: String
+                                if parts.count == 2, let subsite = NativeConsentFailure(rawValue: parts[0]) {
+                                    diagnostic = subsite
+                                    variant = parts[1]
+                                } else {
+                                    diagnostic = .pipelineFailed
+                                    variant = suffix
+                                }
+                                var details = diagnostic.details.object ?? [:]
+                                switch variant {
                                 case "extra": details["secret"] = .string("Original extra-field sentinel")
                                 case "unknown": details["reason"] = .string("unrecognizedReason")
                                 case "mismatched": details["stage"] = .string("storeProof")
                                 case "cancelcode": failureObject["code"] = .string("AUTH_CANCELLED")
                                 case "expirycode": failureObject["code"] = .string("AUTH_EXPIRED")
+                                case "internalcode": failureObject["code"] = .string("INTERNAL_ERROR")
                                 default: exit(3)
                                 }
                                 failureObject["details"] = .object(details)

@@ -4,6 +4,36 @@ Foundation recorded 2026-10-03; subsequent native/read-only milestones are
 identified separately below. None establishes successful human authentication,
 game download, install or gameplay.
 
+## Agreed static token subsites: source-only checks
+
+The coordinator approved, and the sole app explicitly agreed directly with
+the producer before implementation, four additive `devicePreparation` reasons:
+`tokenKindInvalid`, `tokenAudienceInvalid`, `tokenCipherInvalid` and
+`tokenSecretInvalid`. All fourteen older pairs remain accepted, including
+`tokenStructureInvalid`; there are exactly eighteen reasons, still restricted
+to `AUTH_INVALID` and the exact three string keys. C95 source/resource hashes
+remain unchanged.
+
+An isolated one-job/index-disabled native build succeeded in 11.56 seconds.
+The complete executable suite passed **398 checks** (14 core + 246 management +
+27 presentation + 111 native), zero failures. Management checks cover the exact
+eighteen-reason set, every pair's schema/decode/round trip, and discarded
+unknown/extra-secret/mismatched-category/stage/type/missing/non-AUTH details.
+Native checks exercise the four honest local explanations and 24 additional
+actual mock-child cases: each new subsite with extra-secret, unknown-reason,
+wrong-stage, cancellation, expiry and non-AUTH error metadata. No malformed
+diagnostic survives as stage evidence, raw wording or entitlement authority.
+The visible device-preparation title remains unchanged.
+
+These are **source-only, mock-child regressions**, not new provider observations.
+No Keychain/Microsoft operation, live Account action, bundle replacement,
+navigation polish or authentication retry occurred. Build/check temporary logs
+were removed after their results were captured. The running reviewed da0/bace
+pair below remains the operational baseline. This additive source delta awaits
+the same continuity review, producer native gates and a new immutable artifact
+before pairing or another agent-mediated entry. It does not establish that the
+live proof contains whitespace or retrospectively choose a narrower cause.
+
 ## Reviewed native-toolbar pair and latest observed retry
 
 The same continuity review closed app
