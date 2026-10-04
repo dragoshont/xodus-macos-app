@@ -108,8 +108,10 @@ It includes the retained-review-closed R05/R06/R07 producer fixes; its inspectio
 adapter/primitives were approved by that same review. The source-only app
 R01-R04 fixes closed at `fb66a2d`, R08/R09 at `6750219`; the `db0bf21`
 picker/consumer delta had no significant issues. Subsequently confirmed R10
-shared-retirement fixes need review of their new immutable revision before
-human sign-in readiness. Historical producer
+shared-retirement fixes closed at `f967f5c` in retained report 13, with no
+significant diagnostics issue. Separate backend R11 source closure followed in
+report 14. The source/UI hold is cleared; human provider consent and the full
+game journey are not completed or inferred. Historical producer
 hashes, including superseded `58f5` and `35f0`, remain in
 [verification](VERIFICATION.md); they are not current readiness builds.
 **Provider consent remains separate from read-only/schema/build verification.**
@@ -197,7 +199,9 @@ observed gone before another instance opened.
 `tools/check_diagnostics_ui.applescript` passed actual native Settings,
 counts-only preview and save-panel cancellation. It does not log picker contents,
 choose a destination or write a file. Programmatic file regressions use only
-owned original synthetic roots and clean them up. R10 and this new source delta
-still require the same retained review; no human sign-in has been initiated.
+owned original synthetic roots and clean them up. The same retained review closed
+R10 at `f967f5c` and found no significant diagnostic-summary issue. The unchanged
+native Account entry has been prepared for human handoff; no sign-in or approval
+has been automated.
 
 Native provider-consent/cancellation integration, source-backed discovery/search and explicit installed import are ongoing, not waived. Full owned-PC inventory/audience, legacy package authorization, safe staged installation/hash/expanded-size semantics, signed exact gameplay runtime, save-preserving updates/rollback, full VoiceOver/localization/min-OS and distribution remain open. No install or play action is enabled merely because Xbox Live sign-in succeeds. The user-directed full journey and coordinator-owned adversarial review remain completion prerequisites; this persisted client milestone is not final completion.

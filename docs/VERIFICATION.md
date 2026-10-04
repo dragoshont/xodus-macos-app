@@ -32,8 +32,10 @@ against a mock that enforces the producer's four-operation limit. Latest scope
 results arrive without manual refresh; stop drops unsent queued work. These
 fixes were subsequently closed by the same retained review at `6750219`; the
 `db0bf21` picker/consumer follow-up had no significant issues. A later confirmed
-R10 retirement race is fixed below and still needs retained-review closure before
-human readiness.
+R10 retirement race is fixed below and was closed at `f967f5c` by the same
+retained review (report 13); diagnostics had no significant issues. The separate
+backend R11 source finding closed in report 14. This clears the source/UI hold,
+not human consent or any game-lifecycle gate.
 
 Canonical schema/fixtures at producer `e3129cee422305657b945d35daf2f780ffe98e2b`:
 SHA256 `c95c3fabdf114f89329d2361e76421e7b47be4c113f56c2381e64d437e44f749`,
@@ -111,7 +113,10 @@ noninteractive Account/status/Close and reviewed-summary save-panel cancellation
 All 22 signed producer read-only checks passed again. App 89107 / child 89111
 then exited normally before relaunch; current app 89731 / child 89734 passed
 Account/status/Close with the same signed engine hash. No auth consent occurred.
-R10 source closure remains pending, not inferred from these tests.
+The same retained review subsequently closed R10 at `f967f5c` in report 13,
+independently of these tests. No significant diagnostic-summary issue was found.
+The existing Account entry was opened for coordinator-routed human handoff with
+the unchanged app/child pair and engine hash; sign-in was not initiated.
 
 ### Reviewed counts-only diagnostic summary export
 
