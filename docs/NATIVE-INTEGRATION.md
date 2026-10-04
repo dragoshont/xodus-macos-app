@@ -134,6 +134,11 @@ Library/Discover/Downloads/Account controls passed bounded Accessibility
 interaction. The committed `tools/check_live_ui.applescript` requires the exact
 owned PID, bundle identity, non-fixture window and stable native control identifier;
 it refuses blind interaction and logs only allowlisted, locally authored labels.
+Its `InspectCancel` action was exercised against the normal native app: it opens
+only the explicitly labelled game-folder picker, cancels without selecting a
+directory and confirms the picker closed. The inspection button has explicit
+AX label/identifier/button/press semantics. Picker contents and directory names
+are not logged. Cancellation does not call `installed.inspect`.
 This is not a full VoiceOver or provider-consent test. Missing included engines do not silently select a remembered
 developer binary. User-mediated store authentication will use a backend-isolated
 launcher Keychain profile, not implicit CLI/private-worker credential import.

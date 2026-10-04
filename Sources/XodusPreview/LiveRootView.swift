@@ -220,6 +220,11 @@ struct LiveRootView: View {
                 if session.inspectionBusy { ProgressView().controlSize(.small) }
                 Button("Inspect a game folder") { session.chooseInstallationFolder() }
                     .disabled(!session.isReady || !session.supports(.inspectInstallation) || session.inspectionBusy)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Inspect a game folder")
+                    .accessibilityIdentifier("xodus.library.inspectFolder")
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { session.chooseInstallationFolder() }
             }
             Text(session.supports(.inspectInstallation)
                  ? "Read-only marker check in one selected folder. No scan, registration, download or launch."

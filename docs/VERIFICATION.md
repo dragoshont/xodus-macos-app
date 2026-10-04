@@ -61,6 +61,23 @@ child 67496 passed Account/Check status/Close and retained the same signed
 engine hash. This additionally exercises the new bounded shutdown through the
 actual application delegate, not only mock-child checks. No consent was started.
 
+### Native folder-picker cancellation follow-up
+
+An exact-owned UI check could see the inspection section but could not find an
+actionable inspection button with its plain SwiftUI label. It refused interaction;
+those attempts are not recorded as successful picker tests. Added explicit
+native button label, identifier, traits and press semantics, matching navigation.
+The release bundle then rebuilt and passed all **24 presentation checks**.
+Exact app PID 69353 / child 69356 exposed the inspection button, opened its
+native folder picker and cancelled it through its sole exact Cancel button.
+Account status/Close still worked afterward and the child remained alive.
+No directory was selected or inspected; this is cancellation evidence, not
+external-game inspection or adoption. The approved signed engine hash is
+unchanged. `InspectCancel` in the committed helper confines every interaction
+to the exact owned bundle/window, bounds traversal/waits and never logs picker
+directory names. A single bounded own-window scroll supports the below-fold
+Library action; ambiguous targets or existing modals are refused.
+
 Live upstream zero-source behavior is **not observed**: arbitrary nonsense can
 return suggested cards. The empty-source regression remains scoped to
 deterministic backend serve tests and actual LiveSession/mock-child checks;
