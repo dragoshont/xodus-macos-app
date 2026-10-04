@@ -794,7 +794,8 @@ enum MockBackend {
                         continue
                     }
                     if scenario == "beginfail", command == "auth.begin" {
-                        try emitFailure(request, code: "AUTH_INVALID")
+                        try emitFailure(request, code: "AUTH_INVALID",
+                                        message: "Original preparation upstream sentinel must not enter local UI.")
                         continue
                     }
                     if ["expired", "expiredpermission", "transientauth", "latecancel"].contains(scenario) {
@@ -966,9 +967,10 @@ enum MockBackend {
     private static let outputLock = NSLock()
     private static let queryCounters = QueryCounters()
 
-    static func emitFailure(_ request: JSONValue, code: String, category: String? = nil) throws {
+    static func emitFailure(_ request: JSONValue, code: String, category: String? = nil,
+                            message: String = "Synthetic fixture failure.") throws {
         var error: [String: JSONValue] = [
-            "code": .string(code), "message": .string("Synthetic fixture failure."), "retryable": .bool(false)
+            "code": .string(code), "message": .string(message), "retryable": .bool(false)
         ]
         if let category { error["details"] = .object(["category": .string(category)]) }
         try emit(.object([
