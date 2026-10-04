@@ -81,6 +81,12 @@ No provider or Keychain operation occurred in these regression tests.
 The held running app 79003 / child 79007 and signed7a6e engine were checked
 unchanged afterward; this source is not deployed and the previous real failure
 still has no observed diagnostic code/stage.
+Published diagnostic source `34e396a5a1036a8ed073ec45c0f5678424d4d603`
+independently [passed hosted CI](https://github.com/dragoshont/xodus-macos-app/actions/runs/37188370651),
+including the native suite and SVG regeneration. The earlier deployed AX entry
+source `f289eafc4352bede7e152916c68b902124739e44` separately
+[passed its hosted run](https://github.com/dragoshont/xodus-macos-app/actions/runs/37187823776).
+Neither hosted result is successful live authentication or retained-review closure.
 
 ## Store search and adversarial-review app fixes
 
