@@ -4,6 +4,43 @@ Foundation recorded 2026-10-03; subsequent native/read-only milestones are
 identified separately below. None establishes successful human authentication,
 game download, install or gameplay.
 
+## User-directed sign-in retry with reviewed nonce correction
+
+The backend explicitly confirmed reviewed producer
+`2a47eafc930603773583ce4c1d6be89a2f0ccd60` was required on the actual
+authentication decoder path before retrying. Immutable native unsigned input
+SHA256 `57d4500d6de922d644071ff6749b662c56d75f5f4646da2a884a363169373c0b`
+was checked before and after embedding; it remained unchanged, mode 0500,
+79,610,312 bytes. Inert management help matched the same protocol/state-dir
+entry. The separate signed embedded copy is
+`7a6edd58efa81f567ebf7ecc8c7cf089fb7fc155533e2db28ab797111ec2230d`;
+release compilation, plist/resources and deep strict signature checks passed.
+Entitlement inspection reported no entitlement payload. C95 schema is unchanged.
+
+Only five explicit accessibility modifiers were added to the existing
+`Sign in with Microsoft` Glass action: native label, identifier, button trait,
+children policy and press action. The same `beginSignIn`/`canSignIn` state gates
+remain; no duplicate provider or hidden-worker invocation was introduced.
+The new release passed **24 presentation checks** and the signed engine passed
+**22 actual read-only management checks**. The prior 278-check app milestone is
+separate, not relabelled as a new full-suite run.
+
+The old exact app/child pair was gracefully closed after Account closed and no
+modal flow was present. Fresh normal app 79003 / embedded child 79007 negotiated
+the same contract and prepared Account noninteractively. A bounded exact-owned
+check verified `xodus.account.signIn` was a unique enabled native AXButton with
+AXPress. Initial string-label probes refused before activation because this SDK
+uses attributed accessibility descriptions; those are not successful actions.
+The native control was then pressed **once** as directed by the user.
+
+The native Account subsequently displayed the fixed authored message
+"Sign-in did not complete. Try again when you are ready." Close, Check status and
+Sign in were enabled; no pending Cancel control was present. This is an
+unsuccessful attempt, not successful issuance, credential storage or ownership.
+Microsoft/Keychain prompts were not inspected, approved or automated, and no
+automatic retry occurred. The running pair was retained for diagnosis; no
+success-shaped fallback or invented account state is recorded.
+
 ## Store search and adversarial-review app fixes
 
 ### Current inspection pairing and additional client fixes

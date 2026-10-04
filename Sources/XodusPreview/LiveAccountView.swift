@@ -92,6 +92,11 @@ struct LiveAccountView: View {
                     } else {
                         GlassAction(title: "Sign in with Microsoft") { Task { await session.beginSignIn() } }
                             .disabled(!session.canSignIn)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("Sign in with Microsoft")
+                            .accessibilityIdentifier("xodus.account.signIn")
+                            .accessibilityAddTraits(.isButton)
+                            .accessibilityAction { Task { await session.beginSignIn() } }
                     }
                 }
             }

@@ -100,12 +100,20 @@ Committed LF bytes and all four sanitized fixture hashes were independently veri
 
 `docs/contracts/management-v1.schema.json` is the producer's canonical scoped schema. `tools/sync_contract.py` copies its exact bytes to the Swift resource. `Tests/ManagementChecks/Fixtures` contains its sanitized public positive/negative/evidence fixtures. No private backend source or real account payload was imported. `foundation-v1.schema.json` preserves the original proposal.
 
-Current enabled-inspection engine input SHA256:
-`da548dd5abe4c32dc17035817d1a809a31c8eb19e615f26dad079a245cf72178`.
-Its ad-hoc-signed embedded copy has SHA256
-`2180d02dca9300d08c91384207fed6acebdeaaa9d0c309bc0fd28a7fcf7b2296`.
-It includes the retained-review-closed R05/R06/R07 producer fixes; its inspection
-adapter/primitives were approved by that same review. The source-only app
+Current engine source is reviewed public
+`2a47eafc930603773583ce4c1d6be89a2f0ccd60`. Its preserved unsigned input is
+`xodus-cli-soap-nonces-v1-57d4500d6de922d6`, SHA256
+`57d4500d6de922d644071ff6749b662c56d75f5f4646da2a884a363169373c0b`;
+the separate ad-hoc-signed embedded copy has SHA256
+`7a6edd58efa81f567ebf7ecc8c7cf089fb7fc155533e2db28ab797111ec2230d`.
+C95 schema/operations are unchanged. This is a necessary correction on the real
+Store authentication decoder path: duplicate or empty derived-key nonce IDs
+are rejected rather than silently overwritten/accepted. The producer pin was
+confirmed by the backend before the user-directed retry; no unsigned sealed
+artifact was changed. Historical e3129/da548 and signed2180 pairing is superseded,
+not reused as current authentication readiness proof.
+
+It retains the reviewed public search/inspection behavior. The source-only app
 R01-R04 fixes closed at `fb66a2d`, R08/R09 at `6750219`; the `db0bf21`
 picker/consumer delta had no significant issues. Subsequently confirmed R10
 shared-retirement fixes closed at `f967f5c` in retained report 13, with no
@@ -116,6 +124,11 @@ hashes, including superseded `58f5` and `35f0`, remain in
 [verification](VERIFICATION.md); they are not current readiness builds.
 **Provider consent remains separate from read-only/schema/build verification.**
 No successful account login is claimed merely because the native UI compiles.
+The user-directed retry activated the exact enabled native Account sign-in
+button once through AXPress, using `auth.begin`. The app subsequently displayed
+its fixed failed-flow message, not saved credentials or successful sign-in.
+No Microsoft credentials, code, consent or Keychain decision was automated or
+read; there was no automatic retry. The flow's failure needs further diagnosis.
 
 ## Developer application
 
