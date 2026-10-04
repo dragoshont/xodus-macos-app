@@ -100,7 +100,36 @@ Committed LF bytes and all four sanitized fixture hashes were independently veri
 
 `docs/contracts/management-v1.schema.json` is the producer's canonical scoped schema. `tools/sync_contract.py` copies its exact bytes to the Swift resource. `Tests/ManagementChecks/Fixtures` contains its sanitized public positive/negative/evidence fixtures. No private backend source or real account payload was imported. `foundation-v1.schema.json` preserves the original proposal.
 
-Current deployed diagnostic engine source is reviewed public
+The current deployed development engine source is reviewed public
+`e7e61fa820b771099fd90516ccaca056f265966d`, paired with app
+`e5a573aaca94f4cee46f591f9f927fcd0df0f782`. Its immutable unsigned input
+SHA256 is `304c249ae24fc187533865ebb3d61cd40cec812629c537692e009f54bec22349`;
+the separate signed copy is
+`4d04fd6c98478574f8b0413de3a2422cebf66dce9c72357629c38cf02e2dbf32`.
+The app executable is
+`97e423985d1e5193db2cd80b6f2aa9ce546cc167d91ec2337a4653f3dc0bfabe`.
+The Swift executable came from a verified native **release** stage; the Rust
+engine is an offline/locked **default-dev** build, not a Rust release.
+
+This producer corrects an unsupported local decoding predicate: original
+Passport request builders forward the issuer's opaque ticket representation,
+while the distinct proof key and SOAP cryptography still require strict
+validation. Bounded/reparsed/nonblank ticket, kind/context/expiry, isolation,
+cancellation and atomic-commit checks remain. Two native regressions failed
+before the correction and passed afterward; 59 selected native checks passed
+in one bounded run. These are not captured provider-format or authentication
+success evidence. Same continuity review closed the exact combined source.
+
+One owned native authentication window was subsequently observed. The flow
+was already active before an agent Sign in guard, which refused before AXPress;
+activation source is unknown and no duplicate entry was sent. Human completion
+and credential commit are **not verified**. Sign-in and deployment are now user-paused; current window/worker presence is
+not re-inspected or inferred. No agent navigation, approval, credential entry,
+polling or restart is authorized.
+The subsequent bounded native UI source correction is separately staged only;
+it does not mutate that deployed app, engine or authentication flow.
+
+The preceding reviewed eighteen-pair diagnostic engine source was
 `2acb452a7ee66b2c9d3ad75ecf85e2be2f94fbc3`, paired with app
 `5ae30fd4bd4e17cb235857e5c41fba1627c317f7`.
 Preserved immutable input is `xodus-cli-xml-proof-v1-8a4b8d56aad18841`,
@@ -210,10 +239,66 @@ Exact keys, AUTH_INVALID-only gating, C95 and lifecycle behavior remain unchange
 Local copy reports only a supported processing limit, unreadable required format
 or unprocessable encoding; no numeric limit, data or assumed crypto/provider
 cause is shown. This twenty-one-pair source batch does not relax token acceptance.
-The currently deployed 8a4b/125a pair is untouched; same-reviewer closure,
-producer native gates and a new sealed engine must precede another pairing or
-entry. Authentication remains first priority; the user-directed modern native
-UI audit/correction is deferred until a genuine owned login window/human gate.
+The historical source-only phase left 8a4b/125a untouched. Later same-reviewer
+closure and native gates authorized the baf/e5 diagnostic pairing, followed by
+the e7/e5 admission correction recorded above. The twenty-one diagnostic mappings
+and all authentication lifecycle behavior remain unchanged in the current UI
+source correction. Live visual verification and authentication/deployment are
+paused. Source work does not imply approval to act on an existing window.
+
+## Bounded native UI source correction
+
+Live and fixture views share the existing native search editor/bindings with
+standard `NSSearchField` appearance and clear control, without a custom capsule
+or forced dark/white search styling. Following the latest user-directed header
+revision, compact search now shares the principal toolbar group with navigation
+instead of appearing inside the hero. Command-F continues to request its editor.
+Real macOS 27 `.tabs` uses a segmented 14-26 fallback; source requires SDK 27+.
+Original artwork extends behind system chrome, notices move into content, and
+the visible title is hidden without discarding window/menu/Dock identity.
+Account separates scrolling status/explanation content from one adaptive action
+footer; a bounded sheet shrinks decoration before controls. Existing auth
+predicates, identifiers, cancel/dismiss safeguards and Account refresh remain.
+The Scene owns the hidden-title-bar/unified toolbar; redundant post-creation window
+overrides and unconditional legacy activation have been removed.
+
+Headless presentation checks allocate only detached native controls and
+synthetic layout views. They do not instantiate the Account flow's refresh task,
+show a window or contact an engine/Keychain/provider. An additive isolated
+native release stage is not a signed/packaged/deployed app. Both-appearance,
+compositor, preference, resize and assistive-technology confirmation remain
+pending; source/framework/AX-role evidence is not visual conformance.
+
+## Dedicated Swift native authentication host: source only
+
+`XodusAuthHost` is a dependency-free AppKit/WebKit/Foundation SwiftPM executable,
+not a second management transport. The private contract and neutral corpus are
+pinned to public producer `bb6397033fc38497a73684a9ecdb2929caba1f63`;
+schema SHA256 is
+`c7ca7de8ee8a610b71e9e458f13469554467dd2632f88d35317a1ce2646af430`,
+fixture SHA256
+`d864e96079dc5292f6c078fb2be37c870f1cf4be114edc6e68e0984a555d0d24`.
+It uses an anonymous inherited socket, strict bounded correlated frames,
+the original remaining monotonic budget, a fresh nonpersistent WebKit store,
+trusted main-frame/origin/document-generation checks and one-shot exact
+seven-string legacy handoff. Native callback, navigation, renderer, checked-JS,
+popup denial, close, EOF and deadline failures are explicit static outcomes.
+Rust retains SOAP/proof processing, helper reaping and atomic credential commit.
+
+Configuration binds a fixed owned bundle executable, protocol version and
+SHA256 through nonsecret flags; incomplete or invalid bundle metadata fails
+cleanly, without PATH selection. The packaging script now includes the helper,
+resources and post-sign metadata from clean source, but has not been executed.
+The deployed e7 producer lacks the new concurrent engine-EOF guardian; the
+paired producer must implement it through issuance, cleanup and publication,
+then pass the agreed engine-only death/write-half/race tests and combined review.
+Matching C95 alone is not this pairing gate.
+
+Detached synthetic WebKit/channel checks are not a provider trial, OS passkey
+association, biometric-prompt diagnosis or authenticated/committed account.
+Production stdio is discarded and core dumps are disabled where possible;
+OS crash-report suppression is not promised. GUI focus/input/capture/inspection
+and deployment remain paused while the user's game work owns the desktop.
 
 ## Developer application
 
@@ -225,7 +310,14 @@ sh tools/build_app.sh
 open dist/Xodus.app
 ```
 
-The `.app` includes a release executable, required SwiftPM resources, original native icon and a development bundle identifier. An optional explicit management-engine argument embeds a matching local development build. Its native auth worker re-executes the same binary and returns its session through a backend-private inherited socket; the app receives status only. It is ad-hoc signed and locally verified, **not notarized or released**. No Wine/runtime payload, real library or credential cache is bundled.
+The existing deployed `.app` includes a release executable, SwiftPM resources,
+original native icon and development bundle identifier. Its Rust native worker
+re-executes the same engine and returns a session through a backend-private
+socket; the main app receives status only. It is ad-hoc signed and locally
+verified, **not notarized or released**. The unexecuted packaging revision adds
+the Swift host and requires a matching new producer; it does not replace this
+preserved pairing. No Wine/runtime payload, real library or credential cache is
+bundled.
 
 Settings provides a native engine picker, account controls, explicit catalog market/language, advanced public-product lookup and a bounded redacted diagnostic preview. After preview, a native save panel can save exactly the displayed counts-only summary atomically off the main actor. Unreviewed/stale preview and nonlocal destinations are rejected; filesystem errors are visible, not success. No account data, raw logs, URLs or personal paths enter this summary. Backend discovery in a developer bundle does not establish signed runtime certification.
 

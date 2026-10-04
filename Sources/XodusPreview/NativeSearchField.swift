@@ -2,7 +2,37 @@
 import AppKit
 import SwiftUI
 
-/// Keep the native field editor and an explicit readable placeholder over immersive artwork.
+struct ScopedSearchField: View {
+    @Binding var text: String
+    @Binding var focused: Bool
+    let placeholder: String
+    var enabled = true
+
+    var body: some View {
+        NativeSearchField(text: $text, focused: $focused, placeholder: placeholder, enabled: enabled)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: 640)
+            .frame(maxWidth: .infinity)
+    }
+}
+
+struct NativeToolbarSearch: View {
+    @Binding var text: String
+    @Binding var focused: Bool
+    let placeholder: String
+    var enabled = true
+
+    static func width(text: String, focused: Bool) -> CGFloat {
+        focused || !text.isEmpty ? 220 : 32
+    }
+
+    var body: some View {
+        ScopedSearchField(text: $text, focused: $focused, placeholder: placeholder, enabled: enabled)
+            .frame(width: Self.width(text: text, focused: focused))
+            .help(placeholder)
+    }
+}
+
 struct NativeSearchField: NSViewRepresentable {
     @Binding var text: String
     @Binding var focused: Bool
@@ -12,35 +42,37 @@ struct NativeSearchField: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeNSView(context: Context) -> FocusedSearchField {
+        makeField(coordinator: context.coordinator)
+    }
+
+    func makeField(coordinator: Coordinator) -> FocusedSearchField {
         let view = FocusedSearchField()
-        view.delegate = context.coordinator
-        view.isBezeled = false
-        view.isBordered = false
-        view.drawsBackground = false
+        view.delegate = coordinator
+        view.target = coordinator
+        view.action = #selector(Coordinator.searchChanged(_:))
         view.focusRingType = .exterior
         view.font = .systemFont(ofSize: NSFont.systemFontSize)
-        view.textColor = .white
+        view.textColor = .controlTextColor
         view.setAccessibilityIdentifier("xodus.catalog.search")
-        if let cell = view.cell as? NSSearchFieldCell {
-            cell.searchButtonCell = nil
-            cell.cancelButtonCell = nil
-        }
         view.setContentHuggingPriority(.defaultLow, for: .horizontal)
         view.sendsSearchStringImmediately = true
         view.sendsWholeSearchString = false
+        updateField(view, coordinator: coordinator)
         return view
     }
 
     func updateNSView(_ view: FocusedSearchField, context: Context) {
-        context.coordinator.parent = self
-        view.wantsFocus = focused
+        updateField(view, coordinator: context.coordinator)
+    }
+
+    func updateField(_ view: FocusedSearchField, coordinator: Coordinator) {
+        coordinator.parent = self
+        view.wantsFocus = focused && enabled
         view.isEnabled = enabled
         if view.stringValue != text { view.stringValue = text }
-        view.placeholderAttributedString = NSAttributedString(string: placeholder,
-            attributes: [.foregroundColor: NSColor.white.withAlphaComponent(enabled ? 0.88 : 0.68),
-                         .font: NSFont.systemFont(ofSize: NSFont.systemFontSize)])
+        view.placeholderString = placeholder
         view.setAccessibilityLabel(placeholder)
-        if focused, enabled, view.currentEditor() == nil {
+        if view.wantsFocus, view.window != nil, view.currentEditor() == nil {
             DispatchQueue.main.async { [weak view] in
                 guard let view, view.wantsFocus, view.isEnabled else { return }
                 view.window?.makeFirstResponder(view)
@@ -54,6 +86,10 @@ struct NativeSearchField: NSViewRepresentable {
         init(_ parent: NativeSearchField) { self.parent = parent }
         func controlTextDidChange(_ notification: Notification) {
             guard let field = notification.object as? NSSearchField else { return }
+            searchChanged(field)
+        }
+        @objc func searchChanged(_ field: NSSearchField) {
+            guard field.isEnabled, parent.text != field.stringValue else { return }
             parent.text = field.stringValue
         }
         func controlTextDidBeginEditing(_ notification: Notification) { parent.focused = true }

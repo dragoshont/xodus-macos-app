@@ -28,14 +28,15 @@ Design collaboration: [nine editable v0.2 Figma mockups](https://www.figma.com/d
 
 ## Run the native development app
 
-On an Apple Silicon Mac with Swift 6 and Apple Command Line Tools:
+On an Apple Silicon Mac with the **Xcode/SDK 27 or newer** toolchain
+(tested with Apple Command Line Tools, Swift 6.4 and SDK 27.0):
 
 ```sh
 swift run XodusFixtureChecks
 swift run XodusPreview
 ```
 
-The historical SwiftPM executable name remains `XodusPreview`; its default is now the live development shell, **not simulated gameplay**. Source-only development can select a trusted engine in Advanced Settings or explicitly use `XODUS_BACKEND_PATH`. A packaged build uses its included engine automatically; a missing/nonexecutable included engine shows an actionable error rather than silently using a saved external build or convincing fixtures. There is no interactive-CLI scraping, arbitrary Wine picker or credential handling in the Swift app.
+The historical SwiftPM executable name remains `XodusPreview`; its default is now the live development shell, **not simulated gameplay**. Source-only development can select a trusted engine in Advanced Settings or explicitly use `XODUS_BACKEND_PATH`. A packaged build uses its included engine automatically; a missing/nonexecutable included engine shows an actionable error rather than silently using a saved external build or convincing fixtures. There is no interactive-CLI scraping or arbitrary Wine picker. The main launcher never receives credentials; the isolated Swift authentication host handles only its private memory-only handoff, not credential storage or cryptography.
 
 Build a double-clickable local `.app` with original icon and resource bundles:
 
@@ -44,9 +45,16 @@ sh tools/build_app.sh
 open dist/Xodus.app
 ```
 
-The optional positional argument to `build_app.sh` is an explicit matching management-engine executable. The current backend re-executes that same binary for its private native-auth worker; no separate helper is invented. This produces an **ad-hoc-signed development app**, not a notarized/distributed installer or signed gameplay runtime. Runtime licensing and public distribution remain separate gates.
+The optional positional argument to `build_app.sh` is an explicit matching management-engine executable. The script now requires clean committed source and includes the dependency-free Swift `XodusAuthHost`, its resources and fixed-path/version/post-sign-hash metadata. This packaging revision has **not been executed or deployed**. Its private worker integration requires a separately reviewed matching producer; unchanged management-schema bytes alone do not establish compatibility. The current deployed producer still owns its older worker. A future package is an **ad-hoc-signed development app**, not a notarized/distributed installer or signed gameplay runtime. Runtime licensing and public distribution remain separate gates.
 
-The proposed deployment baseline is **macOS 14**, not a user-approved support commitment. On macOS 26+, the preview uses **real SwiftUI Liquid Glass** (`glassEffect`, `GlassEffectContainer`, glass buttons): a centered floating capsule menu and separate circular account control over original immersive imagery, with a transparent native titlebar. Older systems use explicitly availability-gated standard materials; reduced transparency uses opaque surfaces. SwiftUI/AppKit provides the modern Mac framework behavior without a UIKit rewrite or full Xcode.
+The proposed deployment baseline is **macOS 14**, not a user-approved support commitment. The shared native toolbar groups Library / Discover / Downloads with compact stock `NSSearchField` search: real `.tabs` on macOS 27+, segmented fallback on 14-26. Search expands for editing, Command-F or a retained query; Account stays separate at the trailing edge. The Scene hides the visible title while retaining native traffic lights and app identity. Original hero artwork extends behind system chrome without a sampled tint or fabricated glass overlay. Account content scrolls independently of its adaptive action footer, and normal activation remains AppKit-owned. These source corrections are built and headlessly checked, **not deployed or visually confirmed**; artwork-dependent toolbar tint is still a live compositor gate.
+
+`XodusAuthHost` implements AppKit/WebKit window ownership and a strict private,
+anonymous-channel protocol. Its exact seven-string legacy handoff remains
+memory-only; Rust retains proof/SOAP processing and credential commit. Neutral
+WebKit and channel checks do not contact Microsoft. This is not verified
+passkey support, a demonstrated fix for the reported prompt, or successful
+authentication. Sign-in and deployment are paused.
 
 **Visual revision v0.2 supersedes the unapproved flat v0.1 concepts.** SVGs describe editable layout and intended glass placement, not live compositor refraction. Native own-view exports also cannot establish backdrop/refraction fidelity; the native implementation, not an SVG blur, owns system Glass.
 
@@ -62,7 +70,7 @@ In that separate mode, choose **Library / Discover / Downloads**, search within 
 swift run XodusPreview --self-check
 ```
 
-Core, presentation and `swift run XodusManagementChecks` are dependency-free executables. Management checks use the producer's sanitized fixtures plus real mock child processes to exercise negotiation, framing, EOF/timeouts/exit failures, request correlation and activity reconciliation. They do not sign in or approve Keychain access. Command Line Tools do not include XCTest/Swift Testing on the tested Mac. [Verification](docs/VERIFICATION.md) records actual evidence separately from future release criteria.
+Core, presentation and `swift run XodusManagementChecks` are dependency-free executables. Presentation checks also allocate native search controls and lay out synthetic Account content in detached `NSHostingView` instances: no window is shown, no provider is loaded and no backend connects. They do not render or capture an existing app. Management checks use the producer's sanitized fixtures plus real mock child processes to exercise negotiation, framing, EOF/timeouts/exit failures, request correlation and activity reconciliation. They do not sign in or approve Keychain access. Command Line Tools do not include XCTest/Swift Testing on the tested Mac. [Verification](docs/VERIFICATION.md) records actual evidence separately from future release criteria.
 
 `swift run XodusPreview --live-check` exercises the actual native session coordinator against synthetic subprocesses: expired-profile recovery, permission failures, transient/late-cancel reconciliation and failed-page continuation. It exits before creating a window and performs no Microsoft or Keychain operation.
 
@@ -73,7 +81,7 @@ off the main actor; failures remain explicit. Overlapping disconnect/reconnect
 operations share bounded shutdown ownership rather than starting another engine
 before the old child exits.
 
-`sh tools/check.sh` runs the complete native/management/fixture check sequence. GitHub Actions repeats it on a hosted Mac and checks SVG regeneration; a workflow definition is not itself a claim that a particular revision passed hosted CI.
+`sh tools/check.sh` runs the complete native/management/fixture/private-host check sequence. The existing GitHub Actions job uses the preview `xcode-27` runner and checks actual Xcode/SDK/runtime versions before the suite and SVG regeneration. Runner availability/queueing is a risk; a workflow definition is not itself a claim that a particular revision passed hosted CI.
 
 Own-view exports use `--export-preview <directory>` for fixtures or `--export-live <directory>` for a **disconnected**, non-account live shell. They export this app's Library, Discover and Downloads view hierarchy and exit; they do not capture the desktop/other apps or establish Glass-compositor fidelity.
 

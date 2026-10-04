@@ -58,12 +58,95 @@ actor Checks {
     }
 
     func run() async throws {
+        try hostBindingChecks()
         let validator = try ContractValidator()
         let positive = try fixture("positive").array ?? []
         check(positive.count == 79, "Pinned producer corpus contains 79 positive frames")
         for (index, frame) in positive.enumerated() {
             do { try validator.validate(frame); check(true, "Producer positive frame \(index + 1)") }
             catch { check(false, "Producer positive frame \(index + 1)") }
+        }
+
+        func hostBindingChecks() throws {
+            let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+                .appendingPathComponent("XodusHostBindingChecks-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false,
+                                                    attributes: [.posixPermissions: 0o700])
+            defer {
+                do { try FileManager.default.removeItem(at: root) }
+                catch { check(false, "Synthetic helper binding files are cleaned") }
+            }
+            let executable = root.appendingPathComponent("synthetic-helper")
+            let bytes = Data("synthetic helper bytes, never executed".utf8)
+            try bytes.write(to: executable)
+            try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: executable.path)
+            let hash = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+            let binding = NativeAuthHostBinding(executable: executable, sha256: hash)
+            check(try binding.validatedArguments() == [
+                "--native-auth-host", executable.path, "--native-auth-host-sha256", hash,
+                "--native-auth-host-version", "1"
+            ], "Reviewed nonsecret helper binding forwards all three explicit paired flags")
+            for invalid in [
+                NativeAuthHostBinding(executable: executable, sha256: String(repeating: "0", count: 64)),
+                NativeAuthHostBinding(executable: executable, sha256: hash, version: 2),
+                NativeAuthHostBinding(executable: root.appendingPathComponent("missing"), sha256: hash)
+            ] {
+                do { _ = try invalid.validatedArguments(); check(false, "Wrong helper hash/version/path fails cleanly") }
+                catch { check(error as? ManagementError == .backendUnavailable,
+                              "Wrong helper hash/version/path fails cleanly") }
+            }
+            let alias = root.appendingPathComponent("alias")
+            try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: executable)
+            do {
+                _ = try NativeAuthHostBinding(executable: alias, sha256: hash).validatedArguments()
+                check(false, "A helper symlink cannot substitute for the reviewed owned regular executable")
+            } catch {
+                check(error as? ManagementError == .backendUnavailable,
+                      "A helper symlink cannot substitute for the reviewed owned regular executable")
+            }
+            let hardlink = root.appendingPathComponent("hardlink")
+            try FileManager.default.linkItem(at: executable, to: hardlink)
+            do { _ = try binding.validatedArguments(); check(false, "Hard-linked helper is rejected") }
+            catch { check(error as? ManagementError == .backendUnavailable, "Hard-linked helper is rejected") }
+            try FileManager.default.removeItem(at: hardlink)
+            try FileManager.default.setAttributes([.posixPermissions: 0o522], ofItemAtPath: executable.path)
+            do { _ = try binding.validatedArguments(); check(false, "Group/world-writable helper is rejected") }
+            catch { check(error as? ManagementError == .backendUnavailable, "Group/world-writable helper is rejected") }
+            try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: executable.path)
+            let app = root.appendingPathComponent("Synthetic.app")
+            let macOS = app.appendingPathComponent("Contents/MacOS")
+            let resources = app.appendingPathComponent("Contents/Resources")
+            try FileManager.default.createDirectory(at: macOS, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: resources, withIntermediateDirectories: true)
+            try PropertyListSerialization.data(fromPropertyList: [
+                "CFBundleIdentifier": "invalid.example.synthetic", "CFBundlePackageType": "APPL",
+                "CFBundleExecutable": "XodusAuthHost"
+            ], format: .xml, options: 0).write(to: app.appendingPathComponent("Contents/Info.plist"))
+            let helper = macOS.appendingPathComponent("XodusAuthHost")
+            try FileManager.default.copyItem(at: executable, to: helper)
+            guard let bundle = Bundle(url: app) else { throw ManagementError.backendUnavailable }
+            let metadata = resources.appendingPathComponent("XodusAuthHost.json")
+            let source = String(repeating: "0", count: 40)
+            let canonical = Data("{\"sha256\": \"\(hash)\", \"sourceCommit\": \"\(source)\", \"version\": 1}\n".utf8)
+            try canonical.write(to: metadata)
+            check(try NativeAuthHostBinding.bundled(in: bundle)?.validatedArguments().first == "--native-auth-host",
+                  "Bundled helper metadata creates only the fixed owned executable binding")
+            for malformed in [
+                Data("{\"sha256\":\"\(hash)\",\"sha256\":\"\(hash)\",\"sourceCommit\":\"\(source)\",\"version\":1}".utf8),
+                Data("{\"sha256\":\"\(hash)\",\"sourceCommit\":\"\(source)\",\"version\":1,\"unknown\":true}".utf8)
+            ] {
+                try malformed.write(to: metadata)
+                do { _ = try NativeAuthHostBinding.bundled(in: bundle); check(false, "Noncanonical duplicate/extra binding metadata is rejected") }
+                catch { check(error as? ManagementError == .backendUnavailable,
+                              "Noncanonical duplicate/extra binding metadata is rejected") }
+            }
+            try FileManager.default.removeItem(at: metadata)
+            do { _ = try NativeAuthHostBinding.bundled(in: bundle); check(false, "Incomplete bundle pairing cannot fall back") }
+            catch { check(error as? ManagementError == .backendUnavailable, "Incomplete bundle pairing cannot fall back") }
+            guard mkfifo(metadata.path, 0o600) == 0 else { throw ManagementError.backendUnavailable }
+            do { _ = try NativeAuthHostBinding.bundled(in: bundle); check(false, "FIFO metadata is rejected without blocking") }
+            catch { check(error as? ManagementError == .backendUnavailable, "FIFO metadata is rejected without blocking") }
+            try FileManager.default.removeItem(at: metadata)
         }
         let negative = try fixture("negative").array ?? []
         check(negative.count == 20, "Pinned producer corpus contains twenty negative frames")

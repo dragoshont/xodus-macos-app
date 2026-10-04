@@ -11,17 +11,18 @@ struct LiveAccountView: View {
     @EnvironmentObject private var session: LiveSession
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.layoutDirection) private var layoutDirection
     @StateObject private var interaction = AccountInteraction()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
+        AccountSheetLayout {
             ZStack(alignment: .bottomLeading) {
                 GameArtwork(kind: "orbit")
                 LinearGradient(colors: [.clear, .black.opacity(0.7)], startPoint: .top, endPoint: .bottom)
                 Text("Your account.\nSafely on your Mac.")
                     .font(.system(size: 32, weight: .bold)).foregroundStyle(.white).padding(24)
             }
-            .frame(height: 210).clipped()
+        } content: {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(spacing: 12) {
                     Image(systemName: "person.crop.circle").font(.largeTitle).foregroundStyle(.secondary)
@@ -66,48 +67,46 @@ struct LiveAccountView: View {
                     Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Divider()
-                HStack {
-                    Button(session.signInPending ? "Cancel sign-in" : "Close") {
-                        Task {
-                            let cancelling = session.signInPending
-                            if cancelling { await session.cancelSignIn() }
-                            if !session.signInPending,
-                               !cancelling || session.authentication?.flow?.state != .completed { dismiss() }
-                        }
-                    }
-                    .keyboardShortcut(.cancelAction).disabled(session.accountBusy)
-                    .accessibilityLabel(session.signInPending ? "Cancel sign-in" : "Close account")
-                    .accessibilityIdentifier(session.signInPending ? "xodus.account.cancelSignIn" : "xodus.account.close")
-                    if session.isReady {
-                        Button("Check status") { Task { await session.refreshAccount() } }
-                            .disabled(session.accountBusy)
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityLabel("Check account status")
-                            .accessibilityIdentifier("xodus.account.checkStatus")
-                            .accessibilityAddTraits(.isButton)
-                            .accessibilityAction { Task { await session.refreshAccount() } }
-                    } else { Button("Settings", action: openSettings.callAsFunction) }
-                    Spacer()
-                    if session.needsAccountDisconnect {
-                        Button(session.authentication?.state == .expired ? "Disconnect expired sign-in" : "Sign out") {
-                            interaction.confirmingSignOut = true
-                        }
-                            .disabled(!session.canDisconnectAccount)
-                    } else {
-                        GlassAction(title: "Sign in with Microsoft") { Task { await session.beginSignIn() } }
-                            .disabled(!session.canSignIn)
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityLabel("Sign in with Microsoft")
-                            .accessibilityIdentifier("xodus.account.signIn")
-                            .accessibilityAddTraits(.isButton)
-                            .accessibilityAction { Task { await session.beginSignIn() } }
+            }
+        } actions: {
+            AccountActionsLayout(layoutDirection: layoutDirection) {
+                Button(session.signInPending ? "Cancel sign-in" : "Close") {
+                    Task {
+                        let cancelling = session.signInPending
+                        if cancelling { await session.cancelSignIn() }
+                        if !session.signInPending,
+                           !cancelling || session.authentication?.flow?.state != .completed { dismiss() }
                     }
                 }
+                .keyboardShortcut(.cancelAction).disabled(session.accountBusy)
+                .accessibilityLabel(session.signInPending ? "Cancel sign-in" : "Close account")
+                .accessibilityIdentifier(session.signInPending ? "xodus.account.cancelSignIn" : "xodus.account.close")
+                if session.isReady {
+                    Button("Check status") { Task { await session.refreshAccount() } }
+                        .disabled(session.accountBusy)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Check account status")
+                        .accessibilityIdentifier("xodus.account.checkStatus")
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityAction { Task { await session.refreshAccount() } }
+                } else { Button("Settings", action: openSettings.callAsFunction) }
+                if session.needsAccountDisconnect {
+                    Button(session.authentication?.state == .expired ? "Disconnect expired sign-in" : "Sign out") {
+                        interaction.confirmingSignOut = true
+                    }
+                        .disabled(!session.canDisconnectAccount)
+                } else {
+                    GlassAction(title: "Sign in with Microsoft") { Task { await session.beginSignIn() } }
+                        .disabled(!session.canSignIn)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Sign in with Microsoft")
+                        .accessibilityIdentifier("xodus.account.signIn")
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityAction { Task { await session.beginSignIn() } }
+                }
             }
-            .padding(.horizontal, 28).padding(.bottom, 28)
+            .controlSize(.regular)
         }
-        .frame(width: 650)
         .task { await session.refreshAccount() }
         .interactiveDismissDisabled(session.accountBusy || session.signInPending)
         .confirmationDialog("Sign out of Xodus on this Mac?", isPresented: $interaction.confirmingSignOut) {

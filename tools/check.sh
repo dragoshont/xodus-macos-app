@@ -8,3 +8,4 @@ swift run XodusFixtureChecks
 swift run XodusManagementChecks
 swift run XodusPreview --self-check
 swift run XodusPreview --live-check
+swift run XodusAuthHost --self-check

@@ -9,6 +9,7 @@ let package = Package(
         .library(name: "XodusCore", targets: ["XodusCore"]),
         .library(name: "XodusManagement", targets: ["XodusManagement"]),
         .executable(name: "XodusPreview", targets: ["XodusPreview"]),
+        .executable(name: "XodusAuthHost", targets: ["XodusAuthHost"]),
         .executable(name: "XodusFixtureChecks", targets: ["XodusFixtureChecks"]),
         .executable(name: "XodusManagementChecks", targets: ["XodusManagementChecks"])
     ],
@@ -18,6 +19,7 @@ let package = Package(
                 resources: [.copy("Resources/management-v1.schema.json")]),
         .executableTarget(name: "XodusPreview", dependencies: ["XodusCore", "XodusManagement"],
                           resources: [.copy("Resources/Artwork")]),
+        .executableTarget(name: "XodusAuthHost", resources: [.copy("Resources")]),
         .executableTarget(name: "XodusFixtureChecks", dependencies: ["XodusCore"],
                           path: "Tests/FixtureChecks"),
         .executableTarget(name: "XodusManagementChecks", dependencies: ["XodusManagement"],

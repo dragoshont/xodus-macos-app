@@ -6,34 +6,85 @@
 flowchart LR
   UI[SwiftUI views + AppKit window lifecycle] --> State[MainActor application state]
   State --> Models[Typed evidence and action policy]
-  State --> Adapter[Future management adapter]
+  State --> Adapter[Bounded management client]
   Adapter --> CLI[Versioned Rust CLI JSON / JSONL]
   CLI --> Registry[Durable jobs + installed registry]
   CLI --> Runtime[Signed exactly paired Xbox-capable runtime]
-  Adapter --> Keychain[Keychain auth broker]
+  CLI --> Keychain[Isolated launcher Keychain profile]
+  CLI --> Worker[Owned Rust auth worker / private EOF guardian]
+  Worker --> Host[Separate Swift AppKit/WebKit auth host]
+  Host --> Browser[Fresh nonpersistent native WKWebView]
 ```
 
-**Implemented:** SwiftPM `XodusCore` typed fixture models/policy, `XodusPreview` SwiftUI/AppKit executable, dependency-free checks, true macOS 26+ system Glass and image-backed original scene resources. There is no management adapter, network transport, Keychain use or runtime invocation in the preview. Optional explicit image exports write only the app's own fixture view artifacts.
+**Implemented:** SwiftPM `XodusCore` typed evidence/fixture policy, a supervised
+`XodusManagement` JSONL client, the live `XodusPreview` SwiftUI/AppKit shell,
+dependency-free native checks and original scene resources. Explicit fixture
+mode never connects an engine. The separately staged `XodusAuthHost` executable
+has no management-module dependency; it owns native browser callbacks and the
+strict private seven-string handoff, not credentials in the main application.
+Its source/headless checks are not a deployed producer pairing or successful
+human authentication. Optional explicit exports write only this app's own views.
 
-**Future:** existing Rust Xodus behind a deliberately new management surface. Existing `xodus-service` runtime IPC must not be treated as account/catalog/install/queue management. No private Rust source is imported into this public app.
+**Future/gated:** authoritative inventory, authorized installation and a signed,
+exactly paired gameplay runtime. Existing `xodus-service` runtime IPC is not
+account/catalog/install/queue management. No private Rust source is imported.
 
 ## Model and ownership
 
 `ProductID` identifies a catalog product; edition identity, package identity/version, market, language and architecture remain separate. Entitlement is purchase/subscription/none/unknown, with provenance/time and expiry where supplied. Installability is downloadable/blocked/unknown with a reason and pinned package. Compatibility is verified/experimental/unsupported/unknown with OS/architecture/runtime fingerprint. Local installation has its own version/runtime/state; no boolean `supported` or title-string lookup.
 
-The Rust management layer owns authoritative package plans, durable jobs, installed registry, managed-path validation, integrity, staging, atomic promotion and process supervision. Swift owns presentation, user consent, connection/session lifecycle, secure credential broker and event reconciliation. Neither UI cache nor a previous purchase-looking label authorizes a new install.
+The Rust management layer owns credential proof/SOAP, the isolated Keychain
+profile, final atomic credential commit, registry and process supervision.
+Future package plans/install promotion remain backend responsibilities. Swift
+owns presentation, user intent, connection/session lifecycle and reconciliation.
+The private Swift helper alone projects exactly seven issuer strings in memory;
+it does not decode issuer tickets, implement proof crypto or write credentials.
+Neither UI cache nor a purchase-looking label authorizes an install.
 
 ## Concurrency and persistence
 
-Views observe MainActor state. Future adapters perform process IO and parsing off the main actor with bounded frame sizes and backpressure, then publish validated state updates. A session serializes snapshot/event application; sequence/request/job identifiers reject duplicates and terminal-state regressions. App restart requests durable backend snapshots, not local reconstruction from percentages.
+Views observe MainActor state. Process I/O is bounded and performed off that actor;
+validated updates enter the session coordinator. Sequence/request/job identifiers
+reject duplicates and terminal regressions. Restart requests backend snapshots,
+not reconstructed percentages. Private helper I/O uses an actor-owned anonymous
+duplex descriptor with bounded asynchronous reads/writes, while AppKit/WebKit
+delegates stay on MainActor.
 
-Registry writes use a journal/transaction plus atomic rename and fsync strategy proven on the target filesystem. Entries reference manifest-owned paths and exact package/runtime fingerprints. Saves are external to versioned install roots. Crash-recovery reconciliation quarantines unregistered staged content; it never infers an installed game from a directory name.
+The helper inherits the worker's remaining monotonic 600-second budget, never
+resets it for a continuation, and closes its owned browser/window on EOF,
+cancellation or expiry. The paired Rust change must add an independent
+engine-parent EOF guardian throughout async issuance and handoff publication;
+the deployed e7 worker does **not** already have that guardian. A shared terminal
+fence, matching closed acknowledgement, helper EOF and matching clean exit are
+required before Store completion. Engine-only death, write-half retention,
+half-close, worker death and completion/publication races remain paired Rust
+validation gates, not claims made by Swift-only fixtures.
+
+Registry writes must use a journal/transaction plus atomic rename and fsync strategy proven on the target filesystem. Entries reference manifest-owned paths and exact package/runtime fingerprints. Saves are external to versioned install roots. Crash-recovery reconciliation quarantines unregistered staged content; it never infers an installed game from a directory name.
 
 ## Security and privacy
 
-Consumer inventory consent and token audience are still unresolved, so no speculative live login code exists. Supplied verified backend prior art already has a Keychain token abstraction: `crates/xodus/src/tokens/backend/keychain.rs`, with macOS selection in `crates/xodus/src/secrets.rs` using `apple_native_keyring_store::keychain`. Reuse that abstraction with one credential owner; do not introduce a second incompatible token store. The optional `key-chain-file` feature persists `.xodus-keyring.ron` and must be forbidden in shipping app builds. The diagram's Keychain broker is an interface to this ownership, not a separate vault.
+Consumer inventory consent/audience remain unresolved. Native sign-in reuses the
+backend's Keychain abstraction, with one credential owner and an isolated
+launcher profile; Swift has no second vault. The optional `key-chain-file`
+feature must remain forbidden in shipping builds. Existing sign-in does not
+establish inventory access.
 
 Tokens belong in Keychain and private authenticated channels, never argv, stdout events, stderr or export logs. Request credentials are passed through an authenticated local broker/anonymous pipe or equivalent narrowly scoped channel. Account switch isolates caches/jobs; entitlement revocation follows backend policy. Existing Xbox Live session scopes and configurable XSTS relying party are useful machinery, not proof of inventory audience. Negotiate/document approved auth audience separately per capability; never reuse one XSTS token everywhere.
+
+The dedicated host receives only an inherited anonymous FD0 socketpair and the
+agreed bounded private frames. Provider strings do not enter management frames,
+argv, named sockets, files or application logs. Its standard streams are null,
+the channel is close-on-exec, and core dumps are disabled process-locally where
+supported; this does not promise that OS crash reports are suppressed. The
+nonsecret helper path/version/hash binding is explicit, reviewed and bundle
+relative before producing an absolute launch path, with no PATH fallback.
+Fresh nonpersistent WebKit data, exact trusted HTTPS origins/main frame,
+navigation generations/document nonce and one-shot result gates fence callbacks.
+Popup denial, renderer/navigation/checked-JavaScript failures are typed terminal
+outcomes. Known superseded navigation cancellation is distinct from real failure.
+Swift ownership alone proves neither Microsoft passkey eligibility nor a fix
+for the user's unclassified authenticator obstacle.
 
 Runtime downloads must come from an approved manifest with publisher signature, hash, exact engine pairing, capability version and rollback metadata. Validate archives against path traversal/symlink escape, use bounded managed roots, and fail closed on signature/hash mismatch. No auto-downloading arbitrary Wine. Gatekeeper/notarization, hardened runtime/entitlements and component redistribution need a signed release design, not assumptions.
 
@@ -45,4 +96,13 @@ Fixture state deliberately remains in memory and uses no filesystem mutations. T
 
 ## Build and distribution
 
-SwiftPM executable builds using Apple Command Line Tools, targeting a proposed macOS 14 baseline. Available macOS 26+ Glass APIs are used explicitly; older systems have normal-material fallback and reduced transparency has opaque surfaces. Original images are bundled SwiftPM resources, with committed source/provenance. A future `.app` target, icons, signing, notarization, updater, installer and deployment support matrix need decisions and end-to-end validation. Do not ship the unbundled fixture executable as a consumer launcher.
+Source builds require Xcode 27 or its matching Command Line Tools/macOS SDK 27;
+runtime deployment remains proposed macOS 14. Real macOS 27 tabs and macOS 26+
+Glass APIs have availability-gated older-runtime fallbacks, not a compiler
+version proxy. The existing CI job selects `xcode-27` and asserts its actual
+SDK/runtime; that preview runner may queue or change and is not an unstated proof
+of a hosted pass. Original images/resources and a local `.app` packaging script
+exist. The script now packages a separately signed helper copy with nonsecret
+source/version/hash metadata only from frozen clean source; it has not been
+executed for this revision. Consumer signing/notarization, updater, distribution
+and the deployment support matrix still require end-to-end release validation.

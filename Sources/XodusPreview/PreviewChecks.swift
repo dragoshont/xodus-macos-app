@@ -5,8 +5,9 @@ import XodusCore
 @MainActor
 enum PreviewChecks {
     static func run() -> Bool {
-        var failures = 0
+        var count = 0, failures = 0
         func check(_ condition: Bool, _ name: String) {
+            count += 1
             if condition { print("PASS: \(name)") }
             else {
                 failures += 1
@@ -77,7 +78,8 @@ enum PreviewChecks {
         check(!live.signInPending && !live.accountBusy, "No unattended native sign-in begins")
         check(live.diagnosticPreview == nil, "No diagnostics or raw engine text are captured at startup")
         check(live.phase == .disconnected, "Presentation checks do not contact Xodus or Keychain")
-        print("27 preview checks, \(failures) failures. No backend connected.")
+        NativeUIChecks.run(check: check)
+        print("\(count) preview checks, \(failures) failures. No backend connected.")
         return failures == 0
     }
 }

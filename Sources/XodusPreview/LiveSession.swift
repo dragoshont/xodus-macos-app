@@ -252,13 +252,14 @@ final class LiveSession: ObservableObject {
         }
         let state = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
             .appendingPathComponent("Library/Application Support/Xodus/Management", isDirectory: true)
-        let target = configuration ?? BackendConfiguration(
-            executable: URL(fileURLWithPath: backendPath), stateDirectory: state)
         guard await retireClient(), revision == lifecycleRevision else { return }
         phase = .connecting
         errorMessage = nil
         let token = generation
         do {
+            let target = try configuration ?? BackendConfiguration(
+                executable: URL(fileURLWithPath: backendPath), stateDirectory: state,
+                nativeAuthHost: NativeAuthHostBinding.bundled(in: .main))
             let connection = try ManagementClient()
             client = connection
             let negotiated = try await connection.connect(target)

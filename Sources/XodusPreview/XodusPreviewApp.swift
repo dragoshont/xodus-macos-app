@@ -8,8 +8,6 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
     var liveSession: LiveSession?
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        DispatchQueue.main.async { PreviewWindow.configure() }
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -47,6 +45,7 @@ struct XodusPreviewApp: App {
                 .onAppear { delegate.liveSession = session }
         }
         .defaultSize(width: 1200, height: 860)
+        .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified)
         .commands {
             CommandMenu("Navigate") {

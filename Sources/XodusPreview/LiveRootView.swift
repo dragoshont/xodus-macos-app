@@ -13,33 +13,39 @@ struct LiveRootView: View {
         session.isReady && (session.supports(.search)
             || (scopedQuery.isEmpty ? session.supports(.discover) : session.supports(.query)))
     }
+    private var searchEnabled: Bool {
+        state.destination == .discover || (state.destination == .library
+            && session.installedSnapshot?.installations.isEmpty == false)
+    }
+    private var searchPlaceholder: String {
+        state.destination == .library ? "Search your Library"
+            : state.destination == .downloads ? "Search Library or Discover"
+            : session.supports(.query) ? "Search Microsoft Store games" : "Search checked catalog"
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Label(session.isReady ? "Live Xodus connection - development build" : "Xodus for Mac - development build",
-                  systemImage: session.isReady ? "cable.connector" : "hammer")
-                .font(.caption).foregroundStyle(.secondary)
-                .padding(.vertical, 6)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    hero
-                    VStack(alignment: .leading, spacing: 28) {
-                        if state.destination == .library { library }
-                        else if state.destination == .discover { catalog }
-                        else { LiveActivityView() }
-                    }
-                    .padding(30)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                hero
+                VStack(alignment: .leading, spacing: 28) {
+                    if state.destination == .library { library }
+                    else if state.destination == .discover { catalog }
+                    else { LiveActivityView() }
                 }
+                .padding(30)
             }
         }
+        .ignoresSafeArea(.container, edges: .top)
         .background(Color(nsColor: .windowBackgroundColor))
         .toolbar {
-            XodusToolbar(selection: state.navigationSelection, accountLabel: session.accountLabel,
+            XodusToolbar(selection: state.navigationSelection, searchText: $state.query,
+                         searchFocused: Binding(get: { searchFocused }, set: { searchFocused = $0 }),
+                         searchPlaceholder: searchPlaceholder, searchEnabled: searchEnabled,
+                         accountLabel: session.accountLabel,
                          accountSymbol: session.authentication?.state == .credentialPresent
                              ? "person.crop.circle.fill" : "person.crop.circle") { state.showingAccount = true }
         }
         .onAppear {
-            PreviewWindow.configure()
             PreviewExporter.startIfRequested(state: state)
         }
         .task {
@@ -81,24 +87,9 @@ struct LiveRootView: View {
                     GlassAction(title: session.accountLabel) { state.showingAccount = true }
                         .controlSize(.large)
                 }
-                if state.destination != .downloads {
-                    HStack(spacing: 12) {
-                        Image(systemName: "magnifyingglass").accessibilityHidden(true)
-                        NativeSearchField(text: $state.query,
-                            focused: Binding(get: { searchFocused }, set: { searchFocused = $0 }),
-                            placeholder: state.destination == .library ? "Search your Library"
-                                : session.supports(.query) ? "Search Microsoft Store games" : "Search checked catalog",
-                            enabled: state.destination == .discover || session.installedSnapshot?.installations.isEmpty == false)
-                        if !state.query.isEmpty {
-                            Button { state.query = "" } label: { Image(systemName: "xmark.circle.fill") }
-                                .buttonStyle(.plain).accessibilityLabel("Clear catalog search")
-                        }
-                    }
-                    .padding(.horizontal, 18).padding(.vertical, 13)
-                    .frame(maxWidth: 640)
-                    .modifier(NativeGlass()).environment(\.colorScheme, .dark)
-                    .frame(maxWidth: .infinity)
-                }
+                Label(session.isReady ? "Connected development engine" : "Development build - engine not connected",
+                      systemImage: session.isReady ? "cable.connector" : "hammer")
+                    .font(.caption)
                 Text("Original landscape illustration - not a game screenshot.")
                     .font(.caption).foregroundStyle(.white.opacity(0.9))
             }

@@ -6,10 +6,12 @@ import OSLog
 public struct BackendConfiguration: Sendable {
     public let executable: URL
     public let stateDirectory: URL
+    public let nativeAuthHost: NativeAuthHostBinding?
 
-    public init(executable: URL, stateDirectory: URL) {
+    public init(executable: URL, stateDirectory: URL, nativeAuthHost: NativeAuthHostBinding? = nil) {
         self.executable = executable
         self.stateDirectory = stateDirectory
+        self.nativeAuthHost = nativeAuthHost
     }
 }
 
@@ -56,6 +58,7 @@ public actor ManagementClient {
         let child = Process()
         child.executableURL = configuration.executable
         child.arguments = ["manage", "--protocol", "1", "--state-dir", configuration.stateDirectory.path]
+            + (try configuration.nativeAuthHost?.validatedArguments() ?? [])
         // Inherit operational context, not unrelated application tokens or debug/proxy settings.
         child.environment = ProcessInfo.processInfo.environment.filter {
             ["HOME", "PATH", "TMPDIR", "LANG", "LC_ALL", "SSL_CERT_FILE", "SSL_CERT_DIR"].contains($0.key)

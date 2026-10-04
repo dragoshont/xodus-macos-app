@@ -10,6 +10,38 @@ Current scoped entry: `xodus-cli manage --protocol 1 --state-dir <absolute-priva
 
 Authentication reuses the backend's existing macOS Keychain token abstraction as a single credential owner. Shipping manifests must disable `key-chain-file`/`.xodus-keyring.ron`. Hello must also expose non-secret **per-capability audience requirements**; the broker obtains scoped proofs for inventory/catalog/package/launch as required. Existing Xbox Live scopes and configurable XSTS relying party do not authorize arbitrary inventory APIs.
 
+### Separate private Swift authentication host
+
+This is not a public management-protocol extension. The immutable private-host
+contract is producer
+[`bb6397033fc38497a73684a9ecdb2929caba1f63`](https://github.com/dragoshont/xodus-macos/blob/bb6397033fc38497a73684a9ecdb2929caba1f63/docs/NATIVE-AUTH-HOST.md);
+its exact schema LF SHA256 is
+`c7ca7de8ee8a610b71e9e458f13469554467dd2632f88d35317a1ce2646af430`.
+Public sanitized schema/fixtures are copied into `XodusAuthHost/Resources`,
+not private source or a credential cache.
+
+The Rust worker launches the reviewed bundled Swift executable on an inherited
+anonymous duplex FD0. A four-byte big-endian length precedes each UTF8 JSON frame,
+with **1..262144 bytes including the entire JSON envelope**. Version1,
+canonical flow UUID/session1, exact directional sequences/correlation and
+closed field sets are mandatory. Commands are open, at most four navigate
+continuations and close; results are ready, exact-seven-string DA, closed,
+cancelled or a closed static failure reason. Ready means an accepted native view,
+not authentication. The existing inline URL, user agent, nine headers,
+getContext callback and issuer strings are retained, not replaced by OAuth
+or guessed platform flags.
+
+Only nonsecret all-or-none launch flags cross the main app/engine boundary:
+`--native-auth-host <absolute-owned-path> --native-auth-host-sha256 <sha256>
+--native-auth-host-version 1`. Wrong/missing required pairing fails closed;
+there is no PATH/Wry fallback in the new paired path. Main app frames stay C95.
+Swift owns the window and WebKit callbacks; Rust retains proof/SOAP and atomic
+Keychain commit. Parent EOF cancellation must fence issuance through helper
+close/ack/EOF/exit and final handoff write. Normal engine write-half retention
+until worker EOF avoids misclassifying complete publication as premature death.
+Those paired backend changes, retained review and deployment require separate
+gates; local Swift synthetic tests do not establish that they have shipped.
+
 First request:
 
 ```json
@@ -95,9 +127,14 @@ subsites with the producer before implementation. That eighteen-pair delta was
 reviewed and deployed in the `5ae30fd` / `2acb452` pair. Its actual retry returned
 coarse `tokenCipherInvalid`, not a successful authentication window.
 The coordinator and sole app then explicitly agreed only three additional
-cipher subsites before producer implementation. This twenty-one-pair source
-delta is **not yet deployed** and requires the same continuity review, native
-producer gates and a new immutable pairing. C95/protocol 1.0 stay byte-identical: the existing
+cipher subsites before producer implementation. The twenty-one-pair delta was
+reviewed and deployed with consumer `e5a573a` / producer `baf92bc`; its observed
+failure was `devicePreparation/tokenCipherEncodingInvalid`. The subsequent
+reviewed producer `e7e61fa` removes an unsupported local base64-decoding
+predicate on the opaque issuer ticket, retaining strict separate proof-key and
+SOAP cryptography. Consumer diagnostics remain compatible and unchanged;
+the historical encoding reason is not emitted merely to decode that ticket.
+See [paired deployment evidence](VERIFICATION.md). C95/protocol 1.0 stay byte-identical: the existing
 optional `flow.error.details` object carries exactly three string keys,
 `category`, `stage`, `reason`. Category must be `nativeConsentFailure`; the
 consumer accepts only `AUTH_INVALID` with one of these exact closed pairs:

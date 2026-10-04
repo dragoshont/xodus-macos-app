@@ -2,16 +2,18 @@
 
 ## User-directed visual contract
 
-Apple Games for macOS is the **actual composition/layout authority**, not loose inspiration. The user rejected the flat v0.1 interpretation and requested newer Liquid Glass with rounded transparent floating navigation and immersive game imagery. The framework remains native SwiftUI/AppKit: it supports the same modern Mac system Glass without a UIKit rewrite.
+Apple Games for macOS is the **actual composition/layout authority**, not loose inspiration. The user rejected the flat v0.1 interpretation and later the bespoke floating-menu interpretation. The current direction is immersive artwork under a translucent native bar, grouped native navigation/search, a separate trailing account control and no visible app title. The framework remains SwiftUI/AppKit, not a UIKit rewrite.
 
 The subsequent user critique rejected the hand-rolled rounded menu as non-native.
 The navigation correction uses the real macOS window toolbar: a centered native
-segmented Library / Discover / Downloads picker and a standard trailing account
+Library / Discover / Downloads picker, compact stock search and a trailing account
 button. System chrome owns geometry, selected/focus state, appearance and
 background; no custom capsule selection or forced white/dark toolbar treatment.
 Keep the original artwork-led content, traffic lights and routes, without a web
-sidebar, Xbox-green brand or copied Apple logo/art/source. This source-only
-correction is not yet deployed to the held diagnostic app.
+sidebar, Xbox-green brand or copied Apple logo/art/source. The system toolbar
+is deployed in an older source pairing; the grouped search, artwork-under-chrome,
+Account and Scene corrections below remain separately staged, not deployed or
+visually confirmed.
 
 ## Surfaces
 
@@ -23,11 +25,15 @@ correction is not yet deployed to the held diagnostic app.
 
 ## Actual native implementation
 
-`XodusToolbar` uses SwiftUI `ToolbarItem`, a `.segmented` `Picker` and an ordinary
-toolbar `Button`; these are platform controls, not a third-party kit or a custom
-navigation shape. The picker writes through `AppState.navigate`, preserving
-scope resets and Command-1/2/3 routes. A normal unified window toolbar keeps
-content below native chrome. The fixture-only path shares this navigation but
+`XodusToolbar` uses a principal `ToolbarItemGroup`, a real `.tabs` `Picker` on
+macOS 27+ with a `.segmented` fallback on 14-26, stock `NSSearchField` and an
+ordinary trailing toolbar `Button`. These are platform controls, not a
+third-party kit or custom navigation shape. SDK 27+ is a build requirement,
+independent of the proposed runtime baseline. The picker writes through
+`AppState.navigate`, preserving scope resets and Command-1/2/3 routes. The
+Scene's hidden-title-bar style and unified toolbar retain traffic lights and
+window/menu/Dock identity while content extends only under the top container
+safe area. The fixture-only path shares this navigation but
 its Account button still opens only invented onboarding.
 
 The toolbar and development/fixture status use semantic system appearance.
@@ -37,7 +43,26 @@ content surfaces, not for repainting toolbar controls. Reduced transparency and
 body light/dark treatment remain native. There is no fake CSS glass or private
 SDK import.
 
-The live development shell inherits this world without copying fixture game names or covers. It uses a labelled original landscape, a separate native account sheet, centered scoped search and centered unavailable/empty states. A native `NSSearchField` supplies the field editor, readable attributed placeholder and keyboard focus over immersive art. Checked real public products use honest native icon placeholders until rights-cleared title artwork exists. Four-facet detail does not turn catalog presence or saved sign-in into ownership. The original orbital-doorway app icon is reproducible with `tools/RenderAppIcon.swift`.
+The live development shell inherits this world without copying fixture game names or covers. It uses a labelled original landscape, a separate native account sheet and centered unavailable/empty states. The same scoped `NSSearchField` supplies toolbar search in live and fixture views: system bezel, search/cancel controls, semantic appearance and the existing field editor/focus binding. Empty unfocused search occupies 32 pt; editing, Command-F or nonempty text expands it to 220 pt. Downloads retains disabled search, and live Library eligibility rules remain unchanged. There is no duplicate hero search, wrapper icon, forced dark scheme or custom capsule. Fixture/development notices remain inside content rather than an opaque strip above the hero. Checked real public products use honest native icon placeholders until rights-cleared title artwork exists. Four-facet detail does not turn catalog presence or saved sign-in into ownership. The original orbital-doorway app icon is reproducible with `tools/RenderAppIcon.swift`.
+
+Account uses a bounded width/height range, a scrollable explanation/status body
+and a separate adaptive native-action footer. Decoration contracts first at
+short heights; longer action labels stack through one layout, not duplicated
+button trees. Authentication predicates, stable identifiers, keyboard
+cancellation, dismissal protection and explicit Account refresh are unchanged.
+The main Scene declares a hidden-title-bar window and unified toolbar. No post-creation
+bridge forces titlebar background, opacity or full-size content geometry, and
+normal app activation is left to LaunchServices/AppKit. Removing those
+overrides is not evidence that they previously disabled Liquid Glass.
+
+Apple's [Liquid Glass adoption guidance](https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass)
+supports current-SDK standard SwiftUI/AppKit controls, fewer custom chrome
+backgrounds, safe areas and preference/resize testing. This is macOS guidance,
+not an iOS touch-target or Dynamic Type score. The deployed app's Mach-O metadata
+records SDK 27 and minimum macOS 14; a lower deployment target is not an old-SDK
+appearance opt-out. No sampled toolbar tint or additional decorative Glass is
+used: the system compositor owns the backdrop. Actual artwork-dependent tint,
+modern rendering and constrained-window toolbar placement remain live gates.
 
 | Role | Rule |
 | --- | --- |
@@ -65,6 +90,12 @@ composition and the now-superseded custom navigation concept. They are not proof
 of the newer system toolbar or live system refraction. In-process AppKit exports
 render only the fixture's own NSView hierarchy; compositor/backdrop effects may
 be absent. They prove native layout/resource rendering, not live Glass fidelity.
+
+The latest header source follows an explicitly authorized historical private
+Apple Games reference that was actually inspected. A fresh single-window capture
+attempt failed; an alternative stopped at a false existing-permission preflight,
+without requesting permission or capturing. No fresh reference was obtained or
+published. The historical image and its account/game content remain private.
 
 [v0.1 SVG archive](design/archive/v0.1/README.md) is explicitly superseded and not user-approved. Its earlier Figma vector import/inspection must not be presented as approval of the revised design. Repo sources/generators remain authoritative. [v0.2 Figma](https://www.figma.com/design/5iQu716UFImHjRxJkf0t8V?node-id=3-115) has nine successful editable imports with Library/Discover render inspection; import flattens some gradients/rounded-image fidelity and does not prove system Glass. [FigJam](https://www.figma.com/board/3MejlFaXHkogmJ3J5k79Gw) is proposed UX; detailed status is in the [mockup index](design/README.md).
 

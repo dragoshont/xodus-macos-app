@@ -32,23 +32,22 @@ struct GlassAction: View {
 
 struct XodusToolbar: ToolbarContent {
     let selection: Binding<Destination>
+    let searchText: Binding<String>
+    let searchFocused: Binding<Bool>
+    let searchPlaceholder: String
+    let searchEnabled: Bool
     let accountLabel: String
     let accountSymbol: String
     let openAccount: () -> Void
 
     var body: some ToolbarContent {
-        ToolbarItem(placement: .principal) {
-            Picker("Navigate Xodus", selection: selection) {
-                ForEach(Destination.allCases) { destination in
-                    Text(destination.rawValue).tag(destination)
-                        .accessibilityIdentifier("xodus.navigation.\(destination.rawValue.lowercased())")
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+        ToolbarItemGroup(placement: .principal) {
+            navigation
             .fixedSize()
             .accessibilityLabel("Navigate Xodus")
             .accessibilityIdentifier("xodus.navigation")
+            NativeToolbarSearch(text: searchText, focused: searchFocused,
+                                placeholder: searchPlaceholder, enabled: searchEnabled)
         }
         if #available(macOS 26, *) {
             ToolbarSpacer(.flexible, placement: .primaryAction)
@@ -58,6 +57,24 @@ struct XodusToolbar: ToolbarContent {
                 .labelStyle(.iconOnly)
                 .help(accountLabel)
                 .accessibilityIdentifier("xodus.account")
+        }
+    }
+
+    private var picker: some View {
+        Picker("Navigate Xodus", selection: selection) {
+            ForEach(Destination.allCases) { destination in
+                Text(destination.rawValue).tag(destination)
+                    .accessibilityIdentifier("xodus.navigation.\(destination.rawValue.lowercased())")
+            }
+        }
+        .labelsHidden()
+    }
+
+    @ViewBuilder private var navigation: some View {
+        if #available(macOS 27, *) {
+            picker.pickerStyle(.tabs)
+        } else {
+            picker.pickerStyle(.segmented)
         }
     }
 }

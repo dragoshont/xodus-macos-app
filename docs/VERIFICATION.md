@@ -4,7 +4,135 @@ Foundation recorded 2026-10-03; subsequent native/read-only milestones are
 identified separately below. None establishes successful human authentication,
 game download, install or gameplay.
 
-## Agreed minimal cipher subsites: source-only checks
+## Reviewed opaque-ticket correction and protected human handoff
+
+The twenty-one-pair diagnostics-only pairing used producer
+`baf92bc204755a12d956dca657b7e45989ec6991` and consumer
+`e5a573aaca94f4cee46f591f9f927fcd0df0f782`. Its unsigned input SHA256 was
+`542e855cd2e2131b391f772590a16dfc8f22704243c9c0b4bcea419510599846`.
+One authorized native entry returned
+`AUTH_INVALID/devicePreparation/tokenCipherEncodingInvalid`; no owned native
+authentication window was observed. Those diagnostics did not repair admission.
+
+Source tracing then established that the original Passport request builders
+forward the issuer's opaque ticket rather than locally decode its CipherValue;
+the separate BinarySecret proof key supplies cryptographic proof. Reviewed
+producer `e7e61fa820b771099fd90516ccaca056f265966d` removes only the unsupported
+opaque-ticket decoding predicate. Two actual native regressions failed on the
+preceding source and passed through the corrected managed-memory/request-builder
+paths; 59 selected native checks passed in one bounded run. The exact combined
+source review closed with unchanged consumer e5a. This is an admission correction,
+not an inferred provider format or a change to separate proof/SOAP cryptography.
+
+The immutable unsigned arm64 engine is 79,399,000 bytes, SHA256
+`304c249ae24fc187533865ebb3d61cd40cec812629c537692e009f54bec22349`;
+adjacent provenance SHA256 is
+`647094684c9f90d50d30a6cf911baa5d3c4d9bdeb50b056f67f8a4a79e272bb5`.
+Separate signed engine SHA256 is
+`4d04fd6c98478574f8b0413de3a2422cebf66dce9c72357629c38cf02e2dbf32`;
+app executable SHA256 is
+`97e423985d1e5193db2cd80b6f2aa9ce546cc167d91ec2337a4653f3dc0bfabe`.
+The Swift app reused the native release stage SHA256
+`ac497495e1b300cae750ffb89f9470ecd29727c80982366e2a93fa4ffad8f280`.
+The engine is offline/locked default-dev, not a Rust release. Original artifacts
+and old bundles were preserved. C95 resources, arm64/plist/deep signature and
+nine bounded anonymous-only readiness assertions passed; those assertions did
+not call account status or prove a new full contract-corpus run.
+
+After a fresh owned idle transition, one owned native authentication window
+was observed on this new pair. The flow was active before the agent's next
+Sign in guard; that guard refused before AXPress. Activation source is unknown,
+agent Sign in presses for this engine were zero, and no duplicate entry was sent.
+Window presence gets past the earlier pre-window blocker but is **not successful
+authentication or credential commit**. Human completion remains unverified.
+No provider page, credentials, code or OS approval was inspected or automated.
+The observed flow was preserved without agent polling, focus, restart or retry.
+Authentication is now user-paused; current window/worker presence is not
+re-inspected or inferred.
+
+## Consolidated native header and Swift authentication host: source-only evidence
+
+A bounded source audit confirmed actual AppKit/SwiftUI framework links and
+deployed Mach-O SDK 27 / minimum macOS 14. It did not inspect window pixels or
+claim that the old window overrides disabled Liquid Glass. The following source
+correction groups stock scoped search and native navigation in the toolbar,
+extends original artwork under chrome, hides the visible title, makes Account
+body/footer adaptive, removes unconditional legacy activation and leaves
+window setup to the Scene.
+Routing, artwork, authentication predicates/IDs/lifecycle, C95 and the exact
+twenty-one diagnostic mappings are unchanged.
+
+Validation uses detached native controls and synthetic offscreen Account
+layout, never the running application or Account refresh task. The release
+build goes to a new owned scratch directory, not `dist` or the preserved ac497
+stage. No signing, packaging, deployment, production app launch or live visual
+confirmation is included in this consolidated validation.
+
+An earlier pre-header source snapshot built with SDK 27.0 / Swift 6.4 and passed
+**537 checks** (14 core + 262 management + 45 presentation + 144 native session +
+72 private host). It is not proof for the subsequent header delta.
+
+The consolidated source passes **548 checks** (14 core + 267 management +
+50 presentation + 144 native session + 73 private host), zero failures, in an
+isolated native release stage. Search checks cover stock bezel/search/cancel,
+edit/clear binding, duplicate-notification fencing, disabled/focus semantics and
+actual detached 32/220 pt native field geometry. Synthetic long/pending/error
+Account layouts keep a single stable footer inside constrained bounds and
+outside the scroll view. Native session checks use mock children only.
+
+The arm64 Swift release executable SHA256 values are
+`9ec534f589f529414de7583d458c77b40bb46b43c1556d9c4f9d5155e42e40e9`
+for the launcher and
+`9fe1eed545c296982d56db2b767df737b5d998748cc154d27eeb7f9b45268f68`
+for the host. The final incremental host build took 3.18 seconds; the preceding
+header rebuild took 14.30 seconds. The native SwiftPM builder emits its documented
+deprecation warning. These are build-stage executables, not signed/deployed
+application-pair evidence.
+
+Helper tests cover strict JSON/framing/ordering/correlation, original-budget
+expiry, unchanged legacy constants and verbatim seven strings, anonymous
+socket framing/EOF, oversized output rejection without state promotion,
+validated continuations/close dispositions, and detached neutral WebKit
+callbacks, stale/duplicate messages, checked JS, popups, renderer/navigation and
+close cancellation. Tests set their own activation policy to prohibited and
+show no window; WebKit may allocate a hidden system window. They neither
+capture/inspect a running application nor contact Microsoft/Keychain.
+The production close path additionally waits for an in-flight DA write before
+acknowledgement and cannot hide its failure behind a clean exit; production
+helper/worker completion races still require the paired neutral Rust gates.
+
+A neutral bundle fixture exposed Foundation resource URLs retaining a base URL
+that differed in URL-object equality despite the same canonical filesystem path.
+The metadata gate now compares canonical/resolved paths while retaining
+no-follow regular-file, ownership, link, mode, bounded-size and stable-read
+checks. Valid fixed-path metadata and duplicate/extra/incomplete/FIFO failures
+are covered. Shell syntax passes without executing packaging.
+
+All 24 curated public protected artifact/resource hashes match before/after,
+and the already-running anonymous preview executable retains SHA256
+`1a1eedf983c2d1349e8e3e05ccd923ba426365815c755e6fbce64404491ca9a0`.
+No current bundle, signed engine, unsigned producer or preserved release stage
+was modified. Private host schema/fixture pins are recorded in
+[native integration](NATIVE-INTEGRATION.md); C95 bytes are unchanged.
+
+The header follows an actually inspected, explicitly authorized historical
+private Apple Games reference. A fresh single-window capture failed; a single
+alternative stopped before enumeration/capture at false existing-permission
+preflight, without requesting permission. There is **no fresh captured
+reference**. Natural artwork-dependent toolbar tint, actual compositor geometry,
+VoiceOver/focus/resize and minimum-runtime behavior remain live gates.
+The existing hosted job now selects the preview `xcode-27` runner and asserts
+actual SDK/runtime; hosted results must be established for the frozen commit,
+not inferred from local proof or workflow configuration.
+
+The user's game work has exclusive desktop priority. Further launcher/reference
+focus, input, capture, window inspection, activation and preview cleanup are
+paused. Existing preview closure is not inferred. Authentication and deployment
+are also paused. The helper still requires paired Rust lifecycle tests and
+combined source review; this is neither passkey support nor authenticated/
+committed account evidence.
+
+## Historical agreed minimal cipher subsites: source-only checks
 
 The coordinator approved and the sole app explicitly agreed with the producer
 before implementation to only `tokenXmlBoundInvalid`, `tokenXmlParseInvalid`

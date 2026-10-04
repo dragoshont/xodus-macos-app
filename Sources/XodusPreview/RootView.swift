@@ -7,33 +7,33 @@ struct RootView: View {
     @FocusState private var searchFocused: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            Label("Fixture preview - invented content. No real sign-in, downloads or gameplay.",
-                  systemImage: "testtube.2")
-                .font(.caption).foregroundStyle(.secondary)
-                .padding(.vertical, 6)
+        Group {
             if state.destination == .downloads {
                 VStack(spacing: 0) {
                     GameArtwork(kind: "orbit").frame(height: 160).clipped()
+                    FixtureNotice().padding(.horizontal, 30).padding(.top, 12)
                     DownloadsView()
                 }
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        ImmersiveHero(game: state.destination == .library ? Fixtures.games[0] : Fixtures.games[1],
-                                      searchFocused: $searchFocused)
+                        ImmersiveHero(game: state.destination == .library ? Fixtures.games[0] : Fixtures.games[1])
                         libraryContent
                     }
                 }
             }
         }
+        .ignoresSafeArea(.container, edges: .top)
         .background(Color(nsColor: .windowBackgroundColor))
         .toolbar {
-            XodusToolbar(selection: state.navigationSelection, accountLabel: "Fixture account",
+            XodusToolbar(selection: state.navigationSelection, searchText: $state.query,
+                         searchFocused: Binding(get: { searchFocused }, set: { searchFocused = $0 }),
+                         searchPlaceholder: state.destination == .downloads ? "Search Library or Discover"
+                            : "Search \(state.destination.rawValue)",
+                         searchEnabled: state.destination != .downloads, accountLabel: "Fixture account",
                          accountSymbol: "person.crop.circle") { state.showingWelcome = true }
         }
         .onAppear {
-            PreviewWindow.configure()
             PreviewExporter.startIfRequested(state: state)
         }
         .sheet(item: $state.selectedGame) { game in GameDetailView(game: game) }
@@ -155,7 +155,6 @@ struct RootView: View {
 struct ImmersiveHero: View {
     @EnvironmentObject private var state: AppState
     let game: Game
-    let searchFocused: FocusState<Bool>.Binding
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -168,26 +167,8 @@ struct ImmersiveHero: View {
                     GlassAction(title: "Explore fixture") { state.selectedGame = game }
                         .controlSize(.large)
                 }
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                    TextField("Search \(state.destination.rawValue)", text: $state.query,
-                              prompt: Text("Search \(state.destination.rawValue)")
-                                .foregroundStyle(Color.white.opacity(0.88)))
-                        .foregroundStyle(Color.white)
-                        .textFieldStyle(.plain)
-                        .focused(searchFocused)
-                        .accessibilityLabel("Search \(state.destination.rawValue)")
-                    if !state.query.isEmpty {
-                        Button { state.query = "" } label: { Image(systemName: "xmark.circle.fill") }
-                            .buttonStyle(.plain).accessibilityLabel("Clear search")
-                    }
-                }
-                .foregroundStyle(Color.primary)
-                .padding(.horizontal, 18).padding(.vertical, 13)
-                .frame(maxWidth: 640)
-                .modifier(NativeGlass())
-                .environment(\.colorScheme, .dark)
-                .frame(maxWidth: .infinity)
+                Label("Fixture preview - invented content. No real sign-in, downloads or gameplay.",
+                      systemImage: "testtube.2").font(.caption)
             }
             .foregroundStyle(.white)
             .padding(30)

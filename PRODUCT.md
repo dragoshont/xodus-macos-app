@@ -16,7 +16,7 @@ Make four independent questions understandable: **Do I have access? Can I downlo
 
 ## Positioning
 
-An original Apple-native, standalone experience over a future Xodus management adapter. The mechanism is explicit entitlement, package and runtime evidence, not a broad promise that all Xbox PC games work on Mac. Heroic integration was considered; no shipping new-store plugin API has been established.
+An original Apple-native, standalone experience over the scoped Xodus management adapter. The mechanism is explicit entitlement, package and runtime evidence, not a broad promise that all Xbox PC games work on Mac. Heroic integration was considered; no shipping new-store plugin API has been established.
 
 ## Operating context
 
@@ -28,7 +28,7 @@ Develop and verify native code on the user's Mac over trusted SSH, using isolate
 
 **Not promised in v1:** social features, achievements, cloud saves, checkout, cloud gaming, DLC management, all-PC-title support or a arbitrary runtime selector. Discover does not claim purchasability or ownership.
 
-**Today:** native development app with a real management-process client, capability-gated account UI, partial public catalog and durable catalog-activity integration. Real provider interoperability is recorded separately in [native integration](docs/NATIVE-INTEGRATION.md), never inferred from mock checks. Owned-PC inventory, game installation and gameplay remain unavailable. An explicit offline `--fixture` mode retains the original demonstration; its non-durable jobs and invented titles never become live evidence.
+**Today:** native development app with a real management-process client, capability-gated account UI, partial public catalog and durable catalog-activity integration. A separate Swift native authentication host is source-implemented and checked with neutral fixtures, but not paired/deployed or proven against the provider. Sign-in and deployment are paused. Real provider interoperability is recorded separately in [native integration](docs/NATIVE-INTEGRATION.md), never inferred from mock checks. Owned-PC inventory, game installation and gameplay remain unavailable. An explicit offline `--fixture` mode retains the original demonstration; its non-durable jobs and invented titles never become live evidence.
 
 **User-decided:** original app code/docs/art use GPL-3.0-only, matching the user's stated Xodus licensing intent without assuming an "or later" grant.
 
@@ -39,13 +39,18 @@ Develop and verify native code on the user's Mac over trusted SSH, using isolate
 Apple Games for macOS is the actual composition authority, not Xbox. The user
 initially requested immersive artwork, floating transparent navigation and
 edge-to-edge detail images, then rejected the bespoke rounded menu as non-native.
-The narrow source correction uses a real macOS unified toolbar, centered native
-segmented navigation and a standard account button, preserving artwork and
-information architecture. System controls, type, focus and semantic appearance
-take precedence over hand-rolled pill geometry. Actual macOS 26+ Glass is used
-where available, not ordinary material relabelled as glass. SwiftUI/AppKit remains
-the native framework; UIKit was not a chosen rewrite. The newer navigation is
-source-only until separately reviewed and deployed.
+The latest user direction groups native navigation and compact scoped search
+in the system bar, with a separate trailing Account control, no visible app
+title and original artwork behind chrome. Real macOS 27 tabs have a segmented
+14-26 runtime fallback; SDK 27+ is required to build. System controls, type,
+focus and semantic appearance take precedence over hand-rolled pill geometry.
+Actual macOS 26+ Glass is used where available, not ordinary material relabelled
+as glass. SwiftUI/AppKit remains the native framework; UIKit was not a chosen
+rewrite. An older native toolbar is deployed in the pairing recorded in
+verification. This subsequent source correction includes shared stock search
+and adaptive Account layout without changing routes or authentication behavior.
+It is built/headlessly checked, not deployed or visually confirmed. Natural
+artwork-dependent toolbar tint remains a compositor acceptance gate.
 
 Directly observed Library compact three-column horizontal entries remain useful alongside the user-directed artwork-led featured/Continue Playing area. Each entry keeps access and compatibility separate. Discover has immersive features/browse/shelves, scoped Search, and no checkout promise. Navigation is Library / Discover / Downloads; Library remains the proposed default. No Apple logos/proprietary images/source, invented Friends/Arcade or Xbox-green identity. v0.1 was not approved and is explicitly superseded.
 
