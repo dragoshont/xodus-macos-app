@@ -82,6 +82,47 @@ actor Checks {
             check(status.flow != nil && !status.entitlementAuthorized,
                   "Typed native authentication flow never promotes PC entitlement")
         }
+        for diagnostic in NativeConsentFailure.allCases {
+            let frame: JSONValue = .object(["code": .string("AUTH_INVALID"), "retryable": .bool(false),
+                "message": .string("Original upstream diagnostic sentinel is not UI copy."), "details": diagnostic.details])
+            try validator.validate(frame, definition: "error")
+            let typed = try frame.decode(WireFailure.self)
+            check(typed.nativeConsentFailure == diagnostic,
+                  "Closed native-consent stage/reason pair decodes without arbitrary details")
+            check(try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(typed)) == frame,
+                  "Typed native-consent diagnostics round-trip without altering their allowlist")
+        }
+        let invalidDetails: [JSONValue] = [
+            .object(["category": .string("nativeConsentFailure"), "stage": .string("devicePreparation"),
+                     "reason": .string("providerRequestFailed"), "secret": .string("Original extra-field sentinel")]),
+            .object(["category": .string("nativeConsentFailure"), "stage": .string("unknownStage"),
+                     "reason": .string("providerRequestFailed")]),
+            .object(["category": .string("nativeConsentFailure"), "stage": .string("devicePreparation"),
+                     "reason": .string("unknownReason")]),
+            .object(["category": .string("nativeConsentFailure"), "stage": .string("storeProof"),
+                     "reason": .string("providerRequestFailed")]),
+            .object(["category": .string("anotherCategory"), "stage": .string("devicePreparation"),
+                     "reason": .string("providerRequestFailed")]),
+            .object(["category": .string("nativeConsentFailure"), "stage": .integer(1),
+                     "reason": .string("providerRequestFailed")]),
+            .object(["category": .string("nativeConsentFailure"), "stage": .string("devicePreparation")]),
+            .array([]), .null
+        ]
+        for details in invalidDetails {
+            let frame: JSONValue = .object(["code": .string("AUTH_INVALID"), "retryable": .bool(false),
+                "message": .string("Original upstream diagnostic sentinel is not UI copy."), "details": details])
+            let typed = try frame.decode(WireFailure.self)
+            let encoded = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(typed))
+            check(typed.nativeConsentFailure == nil && encoded["details"] == nil,
+                  "Unknown/malformed/extra diagnostic fields are discarded, never retained as safe stage evidence")
+        }
+        for code in ["AUTH_CANCELLED", "AUTH_EXPIRED", "INTERNAL_ERROR"] {
+            let frame: JSONValue = .object(["code": .string(code), "retryable": .bool(false),
+                "message": .string("Original upstream diagnostic sentinel is not UI copy."),
+                "details": NativeConsentFailure.pipelineFailed.details])
+            check(try frame.decode(WireFailure.self).nativeConsentFailure == nil,
+                  "Cancellation/expiry/non-auth codes cannot borrow AUTH_INVALID diagnostic stage evidence")
+        }
         let registryResults = positive.filter { $0["data"]?["installations"]?.array != nil }
         check(!registryResults.isEmpty, "Producer corpus includes installed-registry evidence")
         for frame in registryResults {
@@ -591,7 +632,7 @@ enum MockBackend {
         let scenario = URL(fileURLWithPath: CommandLine.arguments[index + 1]).lastPathComponent
         do {
             let lifecycleDirectory = URL(fileURLWithPath: CommandLine.arguments[index + 1])
-            let lifecycleScenario = ["retireslow", "retirefailed", "retirehello", "retiresnapshot"].contains(scenario)
+            let lifecycleScenario = ["retireslow", "retirefailed", "retirehello", "retiresnapshot", "authgate"].contains(scenario)
             func trace(_ entry: String) throws {
                 guard lifecycleScenario else { return }
                 try FileManager.default.createDirectory(at: lifecycleDirectory, withIntermediateDirectories: true,
@@ -616,7 +657,7 @@ enum MockBackend {
                 supported.insert(.inspectInstallation)
             }
             if ["expired", "expiredpermission", "transientauth", "latecancel", "humanwait", "hangmutation", "beginfail",
-                "failedflow", "failedflownocode"].contains(scenario) {
+                "failedflow", "failedflownocode", "authgate"].contains(scenario) || scenario.hasPrefix("failedstage-") {
                 supported.formUnion([.authBegin, .authCancel])
             }
             var loggedOut = false, flowStarted = false, cancelledLate = false
@@ -640,17 +681,58 @@ enum MockBackend {
                     if scenario == "mismatch" { result["protocol"] = .object(["major": .integer(2), "minor": .integer(0)]) }
                     try emit(.object(result))
                 } else {
-                    if ["failedflow", "failedflownocode"].contains(scenario), command == "auth.begin" {
-                        let failure: JSONValue = scenario == "failedflownocode" ? .null : .object([
+                    if (["failedflow", "failedflownocode"].contains(scenario) || scenario.hasPrefix("failedstage-")),
+                       command == "auth.begin" {
+                        var failureObject: [String: JSONValue] = [
                             "code": .string("AUTH_INVALID"), "retryable": .bool(false),
                             "message": .string("Original synthetic upstream wording must not enter the app summary.")
-                        ])
+                        ]
+                        if scenario.hasPrefix("failedstage-") {
+                            let suffix = String(scenario.dropFirst("failedstage-".count))
+                            if let diagnostic = NativeConsentFailure(rawValue: suffix) {
+                                failureObject["details"] = diagnostic.details
+                            } else {
+                                var details = NativeConsentFailure.pipelineFailed.details.object ?? [:]
+                                switch suffix {
+                                case "extra": details["secret"] = .string("Original extra-field sentinel")
+                                case "unknown": details["reason"] = .string("unrecognizedReason")
+                                case "mismatched": details["stage"] = .string("storeProof")
+                                case "cancelcode": failureObject["code"] = .string("AUTH_CANCELLED")
+                                case "expirycode": failureObject["code"] = .string("AUTH_EXPIRED")
+                                default: exit(3)
+                                }
+                                failureObject["details"] = .object(details)
+                            }
+                        }
+                        let failure: JSONValue = scenario == "failedflownocode" ? .null : .object(failureObject)
                         try emit(.object(result(request, data: .object([
                             "state": .string("signedOut"), "credentialStore": .string("macOSKeychain"),
                             "audience": .null, "expiresAt": .null, "entitlementAuthorized": .bool(false),
                             "flow": .object(["flowID": .string("fixture-failed-flow"),
                                              "state": .string("failed"), "error": failure])
                         ]))))
+                        continue
+                    }
+                    if scenario == "authgate", command.hasPrefix("auth.") {
+                        var flowState = "pending"
+                        if command == "auth.begin" { flowStarted = true; try trace("auth.begin") }
+                        if command == "auth.cancel" { flowStarted = false; flowState = "cancelled"; try trace("auth.cancel") }
+                        var status: [String: JSONValue] = [
+                            "state": .string("signedOut"), "credentialStore": .string("macOSKeychain"),
+                            "audience": .null, "expiresAt": .null, "entitlementAuthorized": .bool(false)
+                        ]
+                        if flowStarted || command == "auth.cancel" {
+                            status["flow"] = .object(["flowID": .string("fixture-gated-flow"),
+                                "state": .string(flowState), "error": .null])
+                        }
+                        let response = result(request, data: .object(status))
+                        if ["auth.begin", "auth.cancel"].contains(command) {
+                            DispatchQueue.global().async {
+                                Thread.sleep(forTimeInterval: 0.4)
+                                do { try emit(.object(response)) }
+                                catch { exit(3) }
+                            }
+                        } else { try emit(.object(response)) }
                         continue
                     }
                     if scenario == "querynodetails", command == "catalog.query" {

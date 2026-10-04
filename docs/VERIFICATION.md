@@ -61,6 +61,27 @@ signed hash above; this correction is not yet deployed and cannot retrospectivel
 recover the first attempt. Any finer static stage diagnostic requires a
 coordinated, reviewed producer/consumer delta before another human attempt.
 
+### Closed stage/reason source agreement and checks
+
+The coordinator approved a diagnostic-only producer/consumer correction, with
+no deployment or retry until the same retained review closes it. The exact
+optional object/pairs are documented in [the contract](BACKEND-CONTRACT.md).
+The consumer decodes only AUTH_INVALID plus the ten closed category/stage/reason
+pairs; arbitrary details are not retained as safe evidence. Known pairs map to
+static local text. Coarse native-sign-in pipeline failure never proves a browser
+appeared or consent completed; absent/unknown evidence says stageUnavailable.
+Cancellation, expiry, pending-flow and double-mutation gates remain intact.
+
+One complete isolated Mac `sh tools/check.sh` run passed **14 core + 221
+management + 24 presentation + 73 native session = 332 checks**, zero failures.
+This includes all ten diagnostic pairs/round trips, unknown/malformed/mismatched
+and extra-field secret sentinels, incompatible cancellation/expiry codes,
+safe UI mappings, and duplicate begin/cancel guards against actual mock children.
+No provider or Keychain operation occurred in these regression tests.
+The held running app 79003 / child 79007 and signed7a6e engine were checked
+unchanged afterward; this source is not deployed and the previous real failure
+still has no observed diagnostic code/stage.
+
 ## Store search and adversarial-review app fixes
 
 ### Current inspection pairing and additional client fixes

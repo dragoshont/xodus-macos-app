@@ -84,6 +84,45 @@ Required codes include `PROTOCOL_MISMATCH`, `CAPABILITY_MISSING`, `AUTH_CANCELLE
 
 Every request ID has exactly one terminal result; jobs continue through events. A transport EOF before terminal result is failure even with exit 0. Nonzero exit overrides apparent success until reconciled. Success must include the correct required result shape and durable state. Test interactive-output contamination, malformed/truncated frames, empty token proof, missing job completion, duplicate sequences, snapshot races and success-after-inner-error.
 
+### Optional native-consent failure diagnostics (source agreement)
+
+Agreed producer/consumer diagnostic-only delta, **not deployed to the held
+57d sign-in attempt**. C95/protocol 1.0 stay byte-identical: the existing
+optional `flow.error.details` object carries exactly three string keys,
+`category`, `stage`, `reason`. Category must be `nativeConsentFailure`; the
+consumer accepts only `AUTH_INVALID` with one of these exact closed pairs:
+
+| Stage | Reason |
+| --- | --- |
+| `privateBootstrap` | `bootstrapInvalid` |
+| `clientInitialization` | `clientUnavailable` |
+| `devicePreparation` | `credentialStorageUnavailable` |
+| `devicePreparation` | `storedCredentialInvalid` |
+| `devicePreparation` | `providerRequestFailed` |
+| `devicePreparation` | `providerProofInvalid` |
+| `deviceProof` | `proofUnavailable` |
+| `nativeSignIn` | `pipelineFailed` |
+| `storeProof` | `proofInvalid` |
+| `stageUnavailable` | `workerOutcomeUnavailable` |
+
+Missing/unknown/mismatched/extra-key diagnostic objects are not stage evidence.
+Their unrecognized data is discarded; local UI says `stageUnavailable`.
+Existing strict envelope/schema rules are not relaxed. `AUTH_CANCELLED` and
+`AUTH_EXPIRED` retain their existing semantics and never borrow this diagnostic.
+Parent/profile/proof/commit errors lacking details keep an unavailable stage,
+not a guessed worker stage. No raw upstream message, exception, HTTP/XML,
+provider page or credential value is rendered or exported.
+
+`nativeSignIn/pipelineFailed` intentionally covers native UI **or** token exchange;
+it does not prove a browser appeared or consent completed. UI maps known pairs
+to locally authored descriptions and human-controlled guidance, never automatic
+retry, deletion, logout or consent. The producer must preserve a validated
+failure handoff when the worker later exits nonzero, but must not accept a success
+handoff from an observed failed exit. Missing/invalid/crashed outcomes use honest
+unavailable-stage diagnostics. Source review and a new approved artifact/pairing
+must precede deployment or another human attempt; this agreement does not
+retrospectively diagnose the earlier failed flow.
+
 ## Durable registry and updates
 
 Registry schema has its own major/minor version and migration backups. Installation ID is stable; active and rollback versions store package digest, exact runtime pairing, managed manifests and separate save root. Journal records prepare/verify/commit phases; only verified atomic promotion changes active version. Fault-inject at each write/fsync/rename and reconcile on restart. Preserve previous active entry until the new one commits. Cleanup validates every path and refuses traversal, external symlinks or unexpected ownership.

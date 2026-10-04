@@ -136,6 +136,13 @@ messages, and explicitly preserves unknown stage when evidence is absent.
 It is not deployed to the held retry app; no debugger/status call/retry was used
 to recover the old tuple. Static stage diagnostics need an agreed reviewed
 producer delta before further human entry.
+The subsequent diagnostic-only source agreement closes the optional details to
+ten exact AUTH_INVALID stage/reason pairs, mapped to local guidance; unknown,
+extra or incompatible values remain unavailable stage and are not retained or
+rendered as diagnostics. See [the exact object](BACKEND-CONTRACT.md).
+The full source suite passed 332 checks; this newer source is not deployed to
+the held retry app. The same retained source review and approved new producer
+artifact are still required before deployment or another human entry.
 
 ## Developer application
 

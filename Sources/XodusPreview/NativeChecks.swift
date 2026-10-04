@@ -102,6 +102,58 @@ enum NativeChecks {
                 await failed.disconnect()
             }
 
+            for diagnostic in NativeConsentFailure.allCases {
+                let failed = session("failedstage-\(diagnostic.rawValue)")
+                await failed.connect()
+                await failed.refreshAccount()
+                await failed.beginSignIn()
+                let summary = failed.accountFailureSummary ?? ""
+                check(failed.authentication?.flow?.error?.nativeConsentFailure == diagnostic
+                      && summary.contains("Stage: \(diagnostic.stage)") && summary.contains("Reason: \(diagnostic.rawValue)")
+                      && !summary.contains("Original synthetic upstream wording") && failed.isReady
+                      && failed.authentication?.entitlementAuthorized == false && !failed.signInPending,
+                      "Known closed auth stage/reason is locally mapped without upstream text or entitlement promotion")
+                if diagnostic == .pipelineFailed {
+                    check(summary.contains("does not establish that a browser appeared or consent completed"),
+                          "Native pipeline diagnostic never invents observed Microsoft UI or successful consent")
+                }
+                await failed.disconnect()
+            }
+            for suffix in ["extra", "unknown", "mismatched", "cancelcode", "expirycode"] {
+                let failed = session("failedstage-\(suffix)")
+                await failed.connect()
+                await failed.refreshAccount()
+                await failed.beginSignIn()
+                let summary = failed.accountFailureSummary ?? ""
+                check(failed.isReady && failed.authentication?.flow?.error?.nativeConsentFailure == nil
+                      && summary.contains("Stage: stageUnavailable") && !summary.contains("Reason:")
+                      && !summary.contains("Original extra-field sentinel") && !summary.contains("Original synthetic upstream wording"),
+                      "Malformed/extra/unknown/incompatible diagnostics yield honest unavailable stage without secret sentinel")
+                await failed.disconnect()
+            }
+            let gateConfiguration = configuration("authgate")
+            let gated = LiveSession(configuration: gateConfiguration)
+            await gated.connect()
+            await gated.refreshAccount()
+            let beginning = Task { await gated.beginSignIn() }
+            try await wait { gated.accountBusy }
+            await gated.beginSignIn()
+            await beginning.value
+            await gated.beginSignIn()
+            check(try gated.signInPending && !gated.canSignIn && gated.accountFailureSummary == nil
+                  && trace(gateConfiguration).filter { $0 == "auth.begin" }.count == 1,
+                  "Busy and pending state reject duplicate native sign-in activation before any second mutation")
+            let cancelling = Task { await gated.cancelSignIn() }
+            try await wait { gated.accountBusy }
+            await gated.cancelSignIn()
+            await cancelling.value
+            check(try gated.authentication?.flow?.state == .cancelled && !gated.signInPending
+                  && gated.accountFailureSummary == nil
+                  && trace(gateConfiguration).filter { $0 == "auth.cancel" }.count == 1,
+                  "Busy cancellation gate sends one request and does not invent failure-stage diagnostics")
+            await gated.disconnect()
+            try cleanLifecycle(gateConfiguration)
+
             let unavailable = session("transientauth")
             await unavailable.connect()
             await unavailable.refreshAccount()

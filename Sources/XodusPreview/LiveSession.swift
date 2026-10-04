@@ -137,6 +137,10 @@ final class LiveSession: ObservableObject {
         guard let failure = flow.error else {
             return "Failure stage is unavailable. No successful sign-in or credential commit was assumed."
         }
+        if let diagnostic = failure.nativeConsentFailure {
+            return "Sign-in failure code: \(failure.code). Stage: \(diagnostic.stage). Reason: \(diagnostic.rawValue). "
+                + Self.describeConsentFailure(diagnostic)
+        }
         let reason: String
         switch failure.code {
         case "AUTH_CANCELLED":
@@ -150,7 +154,32 @@ final class LiveSession: ObservableObject {
         default:
             reason = "No successful sign-in or credential commit was assumed."
         }
-        return "Sign-in failure code: \(failure.code). \(reason)"
+        return "Sign-in failure code: \(failure.code). Stage: stageUnavailable. \(reason)"
+    }
+
+    private static func describeConsentFailure(_ failure: NativeConsentFailure) -> String {
+        switch failure {
+        case .bootstrapInvalid:
+            "The authentication worker could not initialize safely. Keep the current app and report this diagnostic before another attempt."
+        case .clientUnavailable:
+            "The native sign-in client could not initialize. Keep the current app and report this diagnostic before another attempt."
+        case .credentialStorageUnavailable:
+            "Device credentials could not be prepared in Keychain. Personally review its native permission or unlock state before any later attempt."
+        case .storedCredentialInvalid:
+            "Stored launcher device material could not be validated. No credential deletion or replacement is advised; report this diagnostic."
+        case .providerRequestFailed:
+            "A provider request during device preparation failed. Its network or service cause is not established; report this diagnostic."
+        case .providerProofInvalid:
+            "The device-preparation response could not be cryptographically validated. Do not bypass validation; report this diagnostic."
+        case .proofUnavailable:
+            "Device proof was unavailable. No validated sign-in or package access was established; report this diagnostic."
+        case .pipelineFailed:
+            "Native sign-in or token exchange failed. This does not establish that a browser appeared or consent completed; report this diagnostic."
+        case .proofInvalid:
+            "The returned Store proof did not pass validation. No credential commit or package access was established; report this diagnostic."
+        case .workerOutcomeUnavailable:
+            "Failure stage is unavailable. The worker supplied no usable stage evidence; keep the current app and report the failure code."
+        }
     }
 
     func supports(_ command: ManagementCommand) -> Bool { hello?.supports(command) == true }

@@ -276,6 +276,59 @@ public struct WireFailure: Codable, Equatable, Sendable {
     public let code: String
     public let message: String
     public let retryable: Bool
+    public let nativeConsentFailure: NativeConsentFailure?
+
+    private enum CodingKeys: String, CodingKey { case code, message, retryable, details }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        code = try container.decode(String.self, forKey: .code)
+        message = try container.decode(String.self, forKey: .message)
+        retryable = try container.decode(Bool.self, forKey: .retryable)
+        let details = try container.decodeIfPresent(JSONValue.self, forKey: .details)
+        nativeConsentFailure = code == "AUTH_INVALID" ? NativeConsentFailure(details: details) : nil
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(code, forKey: .code)
+        try container.encode(message, forKey: .message)
+        try container.encode(retryable, forKey: .retryable)
+        if let nativeConsentFailure {
+            try container.encode(nativeConsentFailure.details, forKey: .details)
+        }
+    }
+}
+
+public enum NativeConsentFailure: String, CaseIterable, Equatable, Sendable {
+    case bootstrapInvalid, clientUnavailable, credentialStorageUnavailable, storedCredentialInvalid
+    case providerRequestFailed, providerProofInvalid, proofUnavailable, pipelineFailed, proofInvalid
+    case workerOutcomeUnavailable
+
+    public var stage: String {
+        switch self {
+        case .bootstrapInvalid: "privateBootstrap"
+        case .clientUnavailable: "clientInitialization"
+        case .credentialStorageUnavailable, .storedCredentialInvalid, .providerRequestFailed, .providerProofInvalid:
+            "devicePreparation"
+        case .proofUnavailable: "deviceProof"
+        case .pipelineFailed: "nativeSignIn"
+        case .proofInvalid: "storeProof"
+        case .workerOutcomeUnavailable: "stageUnavailable"
+        }
+    }
+
+    public init?(details: JSONValue?) {
+        guard let object = details?.object, Set(object.keys) == ["category", "stage", "reason"],
+              object["category"]?.string == "nativeConsentFailure",
+              let reason = object["reason"]?.string, let value = Self(rawValue: reason),
+              object["stage"]?.string == value.stage else { return nil }
+        self = value
+    }
+
+    public var details: JSONValue {
+        .object(["category": .string("nativeConsentFailure"), "stage": .string(stage), "reason": .string(rawValue)])
+    }
 }
 public enum CatalogJobState: String, Codable, Sendable {
     case queued, running, completed, failed, cancelled
