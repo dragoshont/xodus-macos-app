@@ -101,14 +101,16 @@ Committed LF bytes and all four sanitized fixture hashes were independently veri
 `docs/contracts/management-v1.schema.json` is the producer's canonical scoped schema. `tools/sync_contract.py` copies its exact bytes to the Swift resource. `Tests/ManagementChecks/Fixtures` contains its sanitized public positive/negative/evidence fixtures. No private backend source or real account payload was imported. `foundation-v1.schema.json` preserves the original proposal.
 
 Current deployed diagnostic engine source is reviewed public
-`e60481fc918b4cc2cc599a5db2aba17a04738872`, paired with app `360e8bf`.
-Preserved immutable input is `xodus-cli-native-consent-v1-47fab28009f9c6c5`,
-SHA256 `47fab28009f9c6c52294095e5684bfce3f86f45e50ddc98655d2b22150f02c8d`;
+`bace09c1be95ff35864b8c8593b974b2aeee934f`, paired with app
+`da0adc00d337ba27c914f5e47ce3c2b11b8000de`.
+Preserved immutable input is `xodus-cli-device-proof-v1-34214ee29b3582a6`,
+SHA256 `34214ee29b3582a6d146ccd029991a70949514c58bcaa99f834db930d41e96ca`;
 the separate signed embedded copy is
-`c50a98b3e0afe4ba6a9b883e6f09ef194b481817eea94f5db190fb2123aceaa8`.
+`5d6bb07936559ea44a0fd81ad96ed7e118bf6346d8d09a83f8212a543ee1329a`.
 Deep signature, exact C95 resource/provenance, fresh parent/child ownership and
 nine actual read-only checks passed. This is a local development pairing, not a
-certified runtime or successful sign-in.
+certified runtime or successful sign-in. The previous reviewed e604/360e8bf
+47f/c50a pairing and all older immutable inputs remain preserved.
 
 The historical first human-entry engine source was
 `2a47eafc930603773583ce4c1d6be89a2f0ccd60`. Its preserved unsigned input is
@@ -160,12 +162,24 @@ That legacy classification does **not** establish a cryptographic failure:
 it covers an unsupported device response or absent/invalid proof. No successful
 credential commit, Microsoft UI observation or owned-library proof was inferred.
 
-The next source-only batch replaces bespoke navigation with a system toolbar,
+The subsequent source batch replaces bespoke navigation with a system toolbar,
 corrects that local proof wording and adds four agreed static device reasons
-(fourteen closed pairs total). It requires the coordinator's same continuity
-review with the backend response-wrapper refinement before another deployment.
-The held `360e8bf`/signed-c50a app remains unchanged. Native build/test evidence
-and the host file-table blocker are recorded in [verification](VERIFICATION.md).
+(fourteen closed pairs total). The coordinator's same continuity review closed
+that app delta and the backend response-wrapper refinement with no significant
+issues. Exact app source passed 353 hosted checks; the producer passed its 45
+native checks and qualified gates before sealing. The reviewed pair was then
+deployed after fresh idle-flow guards and graceful exact-owned quit.
+
+One user-authorized native entry on the new pair returned
+`AUTH_INVALID/devicePreparation/tokenStructureInvalid`, with the visible
+"Microsoft sign-in could not start." explanation. No pending Cancel control
+or auth child remained at observation; an owned native authentication window
+was not observed. The particular structure guard is still unknown. No raw
+provider data, credentials or OS decisions were inspected or automated.
+The next concrete backend fix remains separate from source-review closure;
+the unchanged failing engine is not repeatedly retried. Exact hashes,
+historical local failures and independently passing evidence are recorded in
+[verification](VERIFICATION.md).
 
 ## Developer application
 

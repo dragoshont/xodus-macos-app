@@ -4,6 +4,56 @@ Foundation recorded 2026-10-03; subsequent native/read-only milestones are
 identified separately below. None establishes successful human authentication,
 game download, install or gameplay.
 
+## Reviewed native-toolbar pair and latest observed retry
+
+The same continuity review closed app
+`da0adc00d337ba27c914f5e47ce3c2b11b8000de` against `360e8bf` and producer
+`bace09c1be95ff35864b8c8593b974b2aeee934f` against `e60481f`, with no significant
+issues. Exact app source independently passed
+[hosted run 37191128180](https://github.com/dragoshont/xodus-macos-app/actions/runs/37191128180):
+**14 core + 233 management + 27 presentation + 79 native = 353 checks**,
+zero failures, plus SVG verification. This clears the source-validation hold
+described below; it does not erase the earlier incomplete local run.
+The producer separately passed 45 actual native checks and its qualified
+lint/check/format/contract gates before its immutable build.
+
+The preserved unsigned CLI is `xodus-cli-device-proof-v1-34214ee29b3582a6`,
+79,387,096 bytes, mode 0500, SHA256
+`34214ee29b3582a6d146ccd029991a70949514c58bcaa99f834db930d41e96ca`.
+Its adjacent mode-0400 provenance SHA256 is
+`4367686f926c205e5c51df1720d0e66a1ca6eee4e4e018f4b0247993ac3510c2`;
+the mode-0400 native-validation record SHA256 is
+`8b4c362d245daa3dda48c08ceff6a19231b95f6aa5b89ba8ffc2f24000d4f71d`.
+These originals remained unchanged. The separately signed embedded engine is
+`5d6bb07936559ea44a0fd81ad96ed7e118bf6346d8d09a83f8212a543ee1329a`;
+the app executable is
+`fa0cd48221b260f00eb3603f432ebbf07b114e48b57bde394c9076b92853b9da`.
+The previous 47f/c50a bundle and older artifacts were preserved.
+
+Before transition, fresh exact-owned path/hash/parent and local Account checks
+found no pending Cancel control or auth child and enabled Close/Sign in controls.
+The old app 92655 / engine 92660 then exited through graceful owned-app quit,
+without signals or action on another window. The new release built successfully
+in 9.85 seconds, passed 27 presentation checks and **nine actual signed read-only
+checks**, and matched public source inputs, C95 resource, plist and deep signature.
+Fresh ownership was app 18444 / embedded engine 18448 with exact parent 18444.
+Native AX observed three system navigation radio buttons and the Account button.
+These PIDs are observations at deployment, not reusable future ownership proof.
+
+One newly user-authorized native Sign in AXPress returned
+**`AUTH_INVALID/devicePreparation/tokenStructureInvalid`**. Account visibly
+reported **"Microsoft sign-in could not start."** Pending Cancel controls and
+owned auth children were both zero at observation; presence of an owned native
+authentication window was **not observed**. This is an unsuccessful attempt,
+not saved Store-user credentials, consent, ownership or a completed journey.
+The static reason groups unsupported token/proof structure checks; the particular
+legacy-token, STS-key, cipher-encoding or secret-shape guard is not established
+by this observation. No raw token/XML/HTTP/message, credentials, provider page
+or OS approval was read or automated. The precise tuple was routed to the sole
+backend for public-source diagnosis; the unchanged failing pair is not blindly
+retried. A further fix requires coordinated source review and verified pairing
+before another agent-mediated entry.
+
 ## Reviewed diagnostic pair and observed retry
 
 Source review closed app `f680410` -> `360e8bf3a2eb7efc087ccce2ed4d2bf93fc16369`
@@ -40,7 +90,7 @@ observation. The legacy reason is **not necessarily a cryptographic failure**.
 Deeper live cause remains unproven. No provider page, credentials, code, raw
 message, approval or OS decision was read or automated.
 
-## Source-only system toolbar and device-proof refinement
+## System toolbar and device-proof refinement source evidence
 
 The user rejected the bespoke rounded menu. The source correction uses real
 macOS `ToolbarItem`/segmented `Picker`, a native Account button and macOS 26+
@@ -60,16 +110,18 @@ The same source batch corrects coarse device-proof copy, visibly explains that
 device setup prevented Microsoft sign-in from starting, and extends only the
 agreed exact three-key diagnostics from ten to fourteen closed pairs.
 Unknown/extra/mismatched/non-AUTH diagnostics still do not survive parsing.
-The running 360e8bf/c50a bundle was not replaced.
+During this source-only phase, the running 360e8bf/c50a bundle was not replaced.
+The later reviewed deployment is recorded above.
 
-**Local final-suite hold:** the default builder hit host-wide ENFILE 23.
+**Historical local final-suite hold:** the default builder hit host-wide ENFILE 23.
 The supported native builder with one job/indexing disabled compiled the final
 source successfully, then passed **14 core + 233 management + 27 presentation**
 checks. The native run stopped at 61 checks with six reconnect/inspection/timeout
 failures during the same host-pressure incident; this is **not a passing final
-native run**. Both build systems' resource failures are retained as a blocker,
-not relabelled as source success. The existing hosted Mac CI must establish the
-complete final run before review/deployment. No global limits, other processes
+native run**. Both build systems' resource failures remain recorded, not
+relabelled as a passing local suite. The independent hosted 353-check run above
+subsequently established the complete final run before review/deployment.
+No global limits, other processes
 or private file paths were changed/inspected. Exact owned app/engine descriptor
 counts were eight/ten, not evidence of an owned descriptor leak.
 
