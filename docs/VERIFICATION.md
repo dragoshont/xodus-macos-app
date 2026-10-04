@@ -12,7 +12,9 @@ One full Mac `sh tools/check.sh` invocation passed **14 core + 189 management +
 24 presentation + 32 native session = 259 checks**, zero failures. The preceding
 212-check `fb66a2d` app revision separately
 [passed hosted CI](https://github.com/dragoshont/xodus-macos-app/actions/runs/37162534769);
-that success is not attributed to the newer delta.
+that success is not attributed to the newer delta. Current native source
+`6750219cf547b693d29ee162d796b9b39c37ca70` independently
+[passed hosted CI](https://github.com/dragoshont/xodus-macos-app/actions/runs/37165029761).
 
 The same retained reviewer closed app R01-R04 at `fb66a2d` and backend R05-R07.
 Two subsequently confirmed app findings are fixed with new regressions:
@@ -52,6 +54,12 @@ native field, and native continuation. The helper refuses to replace a preexisti
 query or type with a sheet open, and logs only authored allowlisted labels.
 No consent/sign-in was initiated. Native picker compilation is separate from an
 actual user-selected external-folder test, which has not occurred.
+
+The same signed bundle subsequently passed graceful normal-app quit: both
+owned PIDs exited before another app was opened. Relaunched app PID 67493 /
+child 67496 passed Account/Check status/Close and retained the same signed
+engine hash. This additionally exercises the new bounded shutdown through the
+actual application delegate, not only mock-child checks. No consent was started.
 
 Live upstream zero-source behavior is **not observed**: arbitrary nonsense can
 return suggested cards. The empty-source regression remains scoped to
