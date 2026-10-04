@@ -141,8 +141,12 @@ final class LiveSession: ObservableObject {
             return "Sign-in failure code: \(failure.code). Stage: \(diagnostic.stage). Reason: \(diagnostic.rawValue). "
                 + Self.describeConsentFailure(diagnostic)
         }
+        return Self.describeSignInFailure(code: failure.code)
+    }
+
+    private static func describeSignInFailure(code: String) -> String {
         let reason: String
-        switch failure.code {
+        switch code {
         case "AUTH_CANCELLED":
             reason = "The sign-in flow was cancelled. No new connection was assumed."
         case "AUTH_EXPIRED":
@@ -154,7 +158,7 @@ final class LiveSession: ObservableObject {
         default:
             reason = "No successful sign-in or credential commit was assumed."
         }
-        return "Sign-in failure code: \(failure.code). Stage: stageUnavailable. \(reason)"
+        return "Sign-in failure code: \(code). Stage: stageUnavailable. \(reason)"
     }
 
     private static func describeConsentFailure(_ failure: NativeConsentFailure) -> String {
@@ -471,7 +475,9 @@ final class LiveSession: ObservableObject {
             guard token == generation else { return }
             accountBusy = false
             accountStatusCurrent = false
-            errorMessage = Self.describe(error)
+            if case let ManagementError.backendError(code, _) = error {
+                errorMessage = Self.describeSignInFailure(code: code)
+            } else { errorMessage = Self.describe(error) }
         }
     }
 

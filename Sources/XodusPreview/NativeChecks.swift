@@ -81,6 +81,10 @@ enum NativeChecks {
             await uncertain.beginSignIn()
             check(!uncertain.accountStatusCurrent && !uncertain.canSignIn,
                   "Failed sign-in preparation invalidates pre-mutation status before another attempt")
+            let preparationSummary = uncertain.errorMessage ?? ""
+            check(preparationSummary.contains("AUTH_INVALID") && preparationSummary.contains("Stage: stageUnavailable")
+                  && !preparationSummary.contains("disconnect") && !preparationSummary.contains("saved sign-in"),
+                  "Request-level sign-in failure never implies invalid saved credentials or deletion advice")
             await uncertain.refreshAccount()
             check(uncertain.accountStatusCurrent && uncertain.canSignIn,
                   "A fresh status read is required to recover from failed sign-in preparation")

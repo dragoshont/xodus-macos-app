@@ -87,6 +87,13 @@ including the native suite and SVG regeneration. The earlier deployed AX entry
 source `f289eafc4352bede7e152916c68b902124739e44` separately
 [passed its hosted run](https://github.com/dragoshont/xodus-macos-app/actions/runs/37187823776).
 Neither hosted result is successful live authentication or retained-review closure.
+A tightly coupled follow-up also routes request-level `auth.begin` backend errors
+through the same sign-in-specific local code/unavailable-stage mapping. The older
+general AUTH_INVALID copy could otherwise wrongly imply invalid saved credentials
+and suggest disconnecting them during an unproven preparation failure. The
+fresh-status gate stays intact; no automatic mutation or retry is added.
+The updated **74 native session checks** passed against mock children only,
+including this regression. The running retry pair remained unchanged.
 
 ## Store search and adversarial-review app fixes
 
