@@ -36,6 +36,24 @@ same-document fragment checks exercise this delegate path and subsequent exact
 DA handoff without a provider or external page request. That follow-up requires
 its own fresh CI, not promotion of the initial run.
 
+The popup follow-up `c232e7409fa416fb8165d41773a81933487b2da4`, tree
+`d0885c2da92fd40a749d4e13a067bb1e37f79fd4`, passed exact normal-push
+[run37354611053](https://github.com/dragoshont/xodus-macos-app/actions/runs/37354611053):
+the same suites with 119 private-host checks, zero failures, all steps and SVG.
+Actual neutral blank/fragment popup routing and subsequent seven-string DA handoff
+passed. This is functional source evidence, not a successful provider login.
+
+The next pairing-only candidate pins producer
+`72d3000c82258c6aadbb4f72b90c75da861da802`, tree
+`7597f4534f9ad909facba96bb6af2852a896668e`, in the existing packager and
+compiled admission gate, with matching neutral shipping-test identities.
+The predecessor `7543744` encountered a native test-only compiler error and
+is not qualified. No unsigned artifact hash is invented or borrowed from `9ef`.
+Packaging remains gated on focused native producer tests, its actual freshly
+sealed Release CLI/provenance, independent external approval and this candidate's
+own normal native CI. The private and management schemas and generated-pin recipe
+remain unchanged.
+
 ## Shipping hardening candidate
 
 Hardening ancestor `00ba51fd5e48f6298d27a56e75f491f6f697696f` passed its
