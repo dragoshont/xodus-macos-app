@@ -39,6 +39,22 @@ Approved official publisher baseline and real engine pure-plan/public query
 observations are separate operator evidence, not synthetic test certification of
 a deployed app, license, successful human sign-in or playable game.
 
+CrossOver source `95af7c0e07d84ef85672d3d1ea184955f97536bf`, tree
+`a407e75dc6b9ad7cb411d6ece87f3095518b1e1c`, passed exact normal-push
+[run37318275541](https://github.com/dragoshont/xodus-macos-app/actions/runs/37318275541):
+15 core/358 management/61 presentation/215 native session/87 private host,
+27 shipping and22 portable packaging checks, zero failures, shipping release
+compilation/argument/resource checks and SVG reproduction. Hosted Compute Agent,
+Xcode27.0/build27A266a, SDK27.0; no shared-Mac hooks.
+
+Its first isolated Mac package attempt built the release helper and separately
+signed helper/engine, but stopped before launcher compilation: the Mac Python
+does not support `Path.write_text(newline=...)`. The additive tooling correction
+writes exact UTF-8/LF bytes and exercises the actual generator in portable checks,
+rather than manually manufacturing its output. The failed stage is retained;
+protected old26 files remain unchanged. A new candidate/package needs its own
+qualification; no completed95af package, replacement or human sign-in is claimed.
+
 ## Shipping hardening scope
 
 The adversarial841 review required compile-time shipping/demo separation,

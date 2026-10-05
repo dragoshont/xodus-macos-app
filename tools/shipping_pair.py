@@ -156,7 +156,7 @@ def main():
         output = Path(args.output)
         require(output.name == "ShippingPairPins.swift" and output.is_file() and not output.is_symlink(),
                 "Only the isolated-stage pin template can be replaced")
-        output.write_text(swift_pins(args.source, args.tree, engine, helper), encoding="utf-8", newline="\n")
+        output.write_bytes(swift_pins(args.source, args.tree, engine, helper).encode("utf-8"))
         approval.update({"approvedAppSourceCommit": hex_value(args.source, 40),
                          "approvedAppSourceTree": hex_value(args.tree, 40),
                          "signedBundledCLI": engine, "signedHelper": helper, "helperVersion": 1,

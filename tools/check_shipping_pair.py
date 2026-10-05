@@ -11,7 +11,7 @@ import struct
 import sys
 import tarfile
 import tempfile
-from shipping_pair import COMMAND, FEATURES, PROFILE, PRODUCER, PRODUCER_TREE, swift_pins, verify_input
+from shipping_pair import COMMAND, FEATURES, PROFILE, PRODUCER, PRODUCER_TREE, main as generate_pair, swift_pins, verify_input
 from verify_shipping_package import main as verify_package
 
 count = 0
@@ -109,7 +109,23 @@ with tempfile.TemporaryDirectory(prefix="xodus-pair-portable-") as temporary:
     with tarfile.open(stage / "source.tar", "w") as archive:
         archive.add(source / "Package.swift", arcname="Package.swift")
         archive.add(pin_source, arcname="Sources/XodusPreview/ShippingPairPins.swift")
-    pin_source.write_bytes(generated)
+    approval = stage / "neutral-approval.json"
+    approval.write_text(json.dumps(record), encoding="utf-8")
+    original_arguments, original_platform = sys.argv, sys.platform
+    try:
+        # Exercise the CLI generator with owned neutral bytes; never execute an engine.
+        sys.platform = "darwin"
+        sys.argv = ["neutral-generate", "generate", "--source", "a" * 40, "--tree", "b" * 40,
+                    "--engine", str(pair), "--helper", str(helper), "--approval", str(approval),
+                    "--output", str(pin_source), "--receipt", str(stage / "paired-inputs.json")]
+        generate_pair()
+    finally:
+        sys.argv, sys.platform = original_arguments, original_platform
+    assert pin_source.read_bytes() == generated and b"\r" not in pin_source.read_bytes()
+    paired = json.loads((stage / "paired-inputs.json").read_bytes())
+    assert paired["signedBundledCLI"] == signed and paired["signedHelper"] == signed
+    assert paired["generatedPinsSHA256"] == hashlib.sha256(generated).hexdigest()
+    count += 1
     receipt = resources / "XodusAuthHost.json"
     receipt.write_bytes((json.dumps({"version": 1, "sha256": signed["sha256"], "sourceCommit": "a" * 40},
                                    sort_keys=True) + "\n").encode())
@@ -117,12 +133,6 @@ with tempfile.TemporaryDirectory(prefix="xodus-pair-portable-") as temporary:
     management.mkdir()
     for name in ("management-v1.schema.json", "runtime-providers-v1.schema.json"):
         shutil.copyfile(project / "Sources/XodusManagement/Resources" / name, management / name)
-    (stage / "paired-inputs.json").write_text(json.dumps({
-        "approvedAppSourceCommit": "a" * 40, "approvedAppSourceTree": "b" * 40,
-        "signedBundledCLI": signed, "signedHelper": signed,
-        "generatedPinsSHA256": hashlib.sha256(generated).hexdigest()
-    }), encoding="utf-8")
-
     def package_check():
         original = sys.argv
         try:
