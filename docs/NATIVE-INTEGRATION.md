@@ -322,6 +322,15 @@ does not replace the current document. This fixes identified brittle handling,
 not a diagnosis of the previous brief-window failure.
 Rust retains SOAP/proof processing, helper reaping and atomic credential commit.
 
+The source-verified notification compatibility correction mirrors the original
+handler's tolerance. Known `getContext` invokes may include unused `args` or other
+keys; unrelated notifications and non-JSON strings are ignored. Flat or wrapped
+provider DA objects may contain extra keys, but only the seven required strings
+enter the unchanged strict `LegacyDA` and private result. A claimed malformed DA
+still fails. Untrusted frames/origins receive no callback or DA delivery and do
+not terminate the flow. Private wrapper shape, control generation, document nonce,
+one-shot delivery, frame limits and writer/commit gates remain unchanged.
+
 The compatible producer observation uses the existing failure message only:
 `Native sign-in failed: helper.REASON.` with the closed reasons `invalidFrame`,
 `invalidNavigation`, `navigationFailed`, `popupUnsupported`, `contentTerminated`,

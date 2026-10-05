@@ -112,10 +112,22 @@ enum AuthHostChecks {
             missingField.removeValue(forKey: "K")
             var extraField = da.fields.mapValues(PrivateValue.string)
             extraField["extra"] = .string("synthetic-forbidden")
-            for malformed in [missingField, wrongType, extraField] {
-                rejects("Malformed, nonstring or extra-field flat notification is rejected") {
-                    _ = try LegacyNotification(.object(malformed))
+            check(try LegacyNotification(.object(missingField)) == .ignored,
+                  "An incomplete flat notification authorizes no data and does not claim a DA handoff")
+            check(try LegacyNotification(.object(extraField)) == .da(da)
+                  && LegacyNotification(.object(["DAProperty": .object(extraField),
+                                                 "extra": .bool(true)])) == .da(da),
+                  "Provider flat/wrapped DA extras are discarded before exact seven-string private projection")
+            rejects("Private DA still rejects extra fields even when all seven strings are present") {
+                _ = try LegacyDA(.object(extraField))
+            }
+            for malformed in [missingField, wrongType] {
+                rejects("A claimed wrapped DA handoff rejects missing or nonstring issuer fields") {
+                    _ = try LegacyNotification(.object(["DAProperty": .object(malformed)]))
                 }
+            }
+            rejects("A complete flat DA handoff rejects nonstring issuer fields") {
+                _ = try LegacyNotification(.object(wrongType))
             }
             let context = "opaque \"provider\" context\\\nnot-a-uuid"
             let callback = try PrivateJSON.parse(Data(LegacyBridge.callback(context: context).utf8))
@@ -129,10 +141,31 @@ enum AuthHostChecks {
             check(try LegacyNotification(.object(["type": .string("invoke"),
                                                  "value": .object(["name": .string("CloudExperienceHost.getContext"),
                                                                     "context": .string(context)])])) == .context(context),
-                  "Only the existing fixed context request is supported")
-            rejects("Unknown bridge method cannot manufacture native capability") {
-                _ = try LegacyNotification(.object(["type": .string("invoke"), "value": .object([
-                    "name": .string("WindowsHello"), "context": .string(context)])]))
+                  "The existing fixed context request remains supported")
+            check(try LegacyNotification(.object([
+                "type": .string("invoke"), "extra": .bool(true),
+                "value": .object(["name": .string("CloudExperienceHost.getContext"),
+                                  "context": .string(context), "args": .array([]),
+                                  "extra": .string("synthetic")])
+            ])) == .context(context),
+                  "Known getContext accepts provider extra keys and args without changing callback authority")
+            for value in [
+                PrivateValue.object(["type": .string("invoke"), "value": .object([
+                    "name": .string("WindowsHello"), "context": .string(context)])]),
+                .object(["type": .string("telemetry"), "value": .string("synthetic")]),
+                .object(["type": .string("invoke"), "value": .object([
+                    "name": .string("CloudExperienceHost.getContext"), "context": .number("1")])]),
+                .array([.string("synthetic")]), .null
+            ] {
+                check(try LegacyNotification(value) == .ignored,
+                      "Unknown/telemetry/non-context notification produces no capability or issuer data")
+            }
+            for raw in ["synthetic non-JSON notification", "", #"{"duplicate":1,"duplicate":2}"#] {
+                check(try LegacyNotification(raw: raw) == .ignored,
+                      "Non-JSON or ambiguous notification text is ignored without authorization")
+            }
+            rejects("Provider notification parsing retains the bounded maximum") {
+                _ = try LegacyNotification(raw: String(repeating: "x", count: PrivateJSON.maximumBytes + 1))
             }
             for raw in ["http://login.live.com/", "https://foreign.invalid/", "https://login.live.com:444/",
                         "https://user@login.live.com/", "https://login.live.com.foreign.invalid/"] {
@@ -209,7 +242,9 @@ enum AuthHostChecks {
             try await outputFenceChecks(check: check)
             try await browserChecks(check: check)
         } catch {
-            check(false, "Bounded private host check setup or execution failed")
+            let failure = (error as? HostFailure)?.rawValue
+                ?? "\((error as NSError).domain):\((error as NSError).code)"
+            check(false, "Bounded private host check setup or execution failed (\(failure))")
         }
         print("\(count) private native-host checks, \(failures) failures. Detached synthetic WebKit only; no provider request.")
         return failures == 0
@@ -261,11 +296,16 @@ enum AuthHostChecks {
             Darwin.close(descriptors[1])
         }
 
+        var executablePath = [CChar](repeating: 0, count: 4096)
+        guard proc_pidpath(getpid(), &executablePath, UInt32(executablePath.count)) > 0 else {
+            throw HostFailure.protocolInvalid
+        }
+        let executable = URL(fileURLWithPath: String(cString: executablePath))
         for end in ["completed", "cancelled", "failed", "eof", "halfClosed"] {
             let descriptors = try pair()
             let parent = try PrivateChannel(descriptor: descriptors[0])
             let process = Process()
-            process.executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
+            process.executableURL = executable
             process.arguments = ["--self-check-peer"]
             process.environment = ["HOME": NSHomeDirectory(), "PATH": "/usr/bin:/bin"]
             process.standardInput = FileHandle(fileDescriptor: descriptors[1], closeOnDealloc: false)
@@ -498,6 +538,65 @@ enum AuthHostChecks {
         check(popupResult?.value == synthetic && popupFailure == nil,
               "Same-document popup retains the accepted control generation and exact DA handoff")
         popupBrowser.close()
+
+        var noiseResult: LegacyDA?
+        var noiseFailure: HostFailure?
+        let noiseBrowser = NativeAuthBrowser(trust: trust,
+            received: { noiseResult = $0 }, failed: { noiseFailure = $0 })
+        defer { noiseBrowser.close() }
+        try noiseBrowser.loadSyntheticDocument(
+            "<!doctype html><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'unsafe-inline'\"><p>Neutral provider-style callback.</p>",
+            baseURL: notificationBase)
+        let noiseDeadline = ContinuousClock.now.advanced(by: .seconds(8))
+        while noiseBrowser.view.isLoading && noiseFailure == nil && ContinuousClock.now < noiseDeadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let providerContext = "synthetic opaque callback context"
+        let contextRequest = String(decoding: try PrivateValue.object([
+            "type": .string("invoke"), "extra": .bool(true),
+            "value": .object(["name": .string("CloudExperienceHost.getContext"),
+                              "context": .string(providerContext), "args": .array([]),
+                              "extra": .string("synthetic")])
+        ]).encoded(), as: UTF8.self)
+        let contextHandled = try await noiseBrowser.view.callAsyncJavaScript("""
+            let callbacks = 0;
+            const handled = await new Promise(resolve => {
+              const timeout = setTimeout(() => resolve(false), 2000);
+              window["CloudExperienceHost.Bridge.dispatchMessage"] = raw => {
+                callbacks++;
+                const value = JSON.parse(raw);
+                clearTimeout(timeout);
+                resolve(value.type === "callback"
+                  && value.value.name === "CloudExperienceHost.getContext"
+                  && value.value.context === context
+                  && JSON.stringify(value.value.args) === JSON.stringify(args));
+              };
+              for (const raw of noise) window.external.notify(raw);
+              window.external.notify(request);
+            });
+            return handled && callbacks === 1;
+            """, arguments: [
+                "context": providerContext,
+                "args": ["CloudExperienceHost", "TokenBroker", "TokenBroker", LegacyBridge.capabilities],
+                "request": contextRequest,
+                "noise": [
+                    #"{"type":"invoke","value":{"name":"synthetic.unsupported","context":"synthetic"}}"#,
+                    #"{"type":"telemetry","value":"synthetic"}"#,
+                    "synthetic non-JSON notification", "null", "[]"
+                ]
+            ], in: nil, contentWorld: .page)
+        check(contextHandled as? Bool == true && noiseResult == nil && noiseFailure == nil,
+              "Actual provider-style getContext with extra args follows ignored invoke/telemetry/non-JSON noise and returns only the original callback")
+        _ = try await noiseBrowser.view.callAsyncJavaScript(
+            "window.external.notify(raw); return true;",
+            arguments: ["raw": data], in: nil, contentWorld: .page)
+        while noiseResult == nil && noiseFailure == nil && ContinuousClock.now < noiseDeadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        check(noiseResult?.value == synthetic && noiseFailure == nil,
+              "Ignored notification noise leaves the same native flow alive for a strict seven-string DA")
+        noiseBrowser.close()
+
         var subframeFailure: HostFailure?
         var subframeResult: LegacyDA?
         let subframeBrowser = NativeAuthBrowser(trust: trust,
@@ -510,17 +609,28 @@ enum AuthHostChecks {
         while subframeBrowser.view.isLoading && subframeFailure == nil && ContinuousClock.now < subframeDeadline {
             try await Task.sleep(for: .milliseconds(10))
         }
-        _ = try await subframeBrowser.view.callAsyncJavaScript("""
-            const frame = document.createElement('iframe');
-            frame.srcdoc = "<script>window.webkit.messageHandlers.xodusPrivateAuth.postMessage('synthetic');<\\/script>";
-            document.body.appendChild(frame);
-            return true;
-            """, arguments: [:], in: nil, contentWorld: .page)
-        while subframeFailure == nil && ContinuousClock.now < subframeDeadline {
+        let subframeLoaded = try await subframeBrowser.view.callAsyncJavaScript("""
+            return await new Promise(resolve => {
+              const frame = document.createElement('iframe');
+              const wrapper = JSON.stringify({
+                navigation: 1, document: window.__xodusAuthDocument, message: raw
+              });
+              frame.onload = () => resolve(true);
+              frame.srcdoc = "<script>window.webkit.messageHandlers.xodusPrivateAuth.postMessage("
+                + JSON.stringify(wrapper) + ");<\\/script>";
+              document.body.appendChild(frame);
+            });
+            """, arguments: ["raw": data], in: nil, contentWorld: .page)
+        check(subframeLoaded as? Bool == true && subframeResult == nil && subframeFailure == nil,
+              "Actual untrusted subframe with valid-looking DA and document wrapper authorizes no data and leaves the flow alive")
+        _ = try await subframeBrowser.view.callAsyncJavaScript(
+            "window.external.notify(raw); return true;",
+            arguments: ["raw": data], in: nil, contentWorld: .page)
+        while subframeResult == nil && subframeFailure == nil && ContinuousClock.now < subframeDeadline {
             try await Task.sleep(for: .milliseconds(10))
         }
-        check(subframeResult == nil && subframeFailure == .bridgeInvalid,
-              "Allowed same-origin subframe still cannot invoke the private main-frame bridge")
+        check(subframeResult?.value == synthetic && subframeFailure == nil,
+              "Ignoring subframe noise does not prevent the following trusted main-frame handoff")
         subframeBrowser.close()
         var missing = try LegacyDA(synthetic).fields.mapValues(PrivateValue.string)
         missing.removeValue(forKey: "K")
@@ -528,8 +638,11 @@ enum AuthHostChecks {
         mistyped["K"] = .number("1")
         var extra = try LegacyDA(synthetic).fields.mapValues(PrivateValue.string)
         extra["extra"] = .string("synthetic-forbidden")
-        for (property, valid) in [(synthetic, true), (.object(missing), false),
-                                  (.object(mistyped), false), (.object(extra), false)] {
+        for (property, valid) in [
+            (synthetic, true), (.object(extra), true),
+            (.object(["DAProperty": .object(extra), "extra": .bool(true)]), true),
+            (.object(["DAProperty": .object(missing)]), false), (.object(mistyped), false)
+        ] {
             var notified: LegacyDA?
             var rejected: HostFailure?
             let notificationBrowser = NativeAuthBrowser(trust: trust,
@@ -552,8 +665,39 @@ enum AuthHostChecks {
             check(valid ? notified?.value == synthetic && rejected == nil
                         : notified == nil && rejected == .bridgeInvalid,
                   valid ? "Detached WK flat notification forwards exactly seven unchanged strings without finish extraction"
-                        : "Detached WK malformed/type/extra flat notification terminates without issuer promotion")
+                        : "Detached WK claimed malformed DA terminates without issuer promotion")
             notificationBrowser.close()
+        }
+
+        for staleControl in [true, false] {
+            var invalidResult: LegacyDA?
+            var invalidFailure: HostFailure?
+            let invalidBrowser = NativeAuthBrowser(trust: trust,
+                received: { invalidResult = $0 }, failed: { invalidFailure = $0 })
+            defer { invalidBrowser.close() }
+            try invalidBrowser.loadSyntheticDocument(
+                "<!doctype html><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'unsafe-inline'\"><p>Neutral strict wrapper check.</p>",
+                baseURL: notificationBase)
+            let until = ContinuousClock.now.advanced(by: .seconds(8))
+            while invalidBrowser.view.isLoading && invalidFailure == nil && ContinuousClock.now < until {
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            _ = try await invalidBrowser.view.callAsyncJavaScript("""
+                window.webkit.messageHandlers.xodusPrivateAuth.postMessage(JSON.stringify({
+                  navigation: staleControl ? 0 : 1,
+                  document: staleControl ? window.__xodusAuthDocument
+                    : "00000000-0000-0000-0000-000000000001",
+                  message: raw
+                }));
+                return true;
+                """, arguments: ["raw": data, "staleControl": staleControl],
+                in: nil, contentWorld: .page)
+            while invalidFailure == nil && ContinuousClock.now < until {
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            check(invalidResult == nil && invalidFailure == .bridgeInvalid,
+                  "Trusted main-frame malformed control generation or stale document still fails without DA delivery")
+            invalidBrowser.close()
         }
 
         var staticFailure: HostFailure?

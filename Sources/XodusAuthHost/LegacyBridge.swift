@@ -22,25 +22,38 @@ struct LegacyDA: Equatable, Sendable {
 enum LegacyNotification: Equatable {
     case context(String)
     case da(LegacyDA)
+    case ignored
 
     init(_ value: PrivateValue) throws {
-        guard case .object(let object) = value else { throw HostFailure.bridgeInvalid }
-        if Set(object.keys) == LegacyDA.keys {
-            self = .da(try LegacyDA(value))
+        guard case .object(let object) = value else { self = .ignored; return }
+        if LegacyDA.keys.isSubset(of: Set(object.keys)) {
+            self = .da(try Self.property(value))
             return
         }
         if let property = object["DAProperty"] {
-            self = .da(try LegacyDA(property))
+            self = .da(try Self.property(property))
             return
         }
-        let invoke = try value.object(keys: ["type", "value"])
-        guard invoke["type"]?.string == "invoke", let body = invoke["value"] else {
+        guard object["type"]?.string == "invoke", case .object(let fields) = object["value"],
+              fields["name"]?.string == "CloudExperienceHost.getContext",
+              let context = fields["context"]?.string else { self = .ignored; return }
+        self = .context(context)
+    }
+
+    init(raw: String) throws {
+        let data = Data(raw.utf8)
+        guard data.count <= PrivateJSON.maximumBytes else { throw HostFailure.bridgeInvalid }
+        let value: PrivateValue
+        do { value = try PrivateJSON.parse(data) }
+        catch HostFailure.protocolInvalid { self = .ignored; return }
+        try self.init(value)
+    }
+
+    private static func property(_ value: PrivateValue) throws -> LegacyDA {
+        guard case .object(let object) = value, LegacyDA.keys.isSubset(of: Set(object.keys)) else {
             throw HostFailure.bridgeInvalid
         }
-        let fields = try body.object(keys: ["name", "context"])
-        guard fields["name"]?.string == "CloudExperienceHost.getContext",
-              let context = fields["context"]?.string else { throw HostFailure.bridgeInvalid }
-        self = .context(context)
+        return try LegacyDA(.object(object.filter { LegacyDA.keys.contains($0.key) }))
     }
 }
 

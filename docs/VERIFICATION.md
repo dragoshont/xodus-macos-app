@@ -4,6 +4,37 @@ Foundation recorded 2026-10-03; subsequent native/read-only milestones are
 identified separately below. None establishes successful human authentication,
 game download, install or gameplay.
 
+## Native bridge notification compatibility: candidate
+
+The qualified `5f7e408d297d4b9e1e09cb1dfaef603e9af0cb31` app paired with
+producer `72d3000c82258c6aadbb4f72b90c75da861da802` was installed and opened.
+One actual sign-in attempt produced the exact safe observation
+`Native sign-in failed: helper.bridgeInvalid.` An owned helper window was briefly
+observed, but stable visibility and successful login were not established.
+
+Source comparison with the pinned original handler identified stricter Swift
+notification handling: extra keys on the recognized context invoke and unrelated
+notifications terminated the flow, whereas the original handler tolerates them.
+The app-only correction projects provider DA extras to the unchanged seven-string
+private value, accepts only the known context method, and ignores unrelated
+notifications or untrusted-frame noise without authorizing data. Claimed malformed
+DA and private wrapper/generation/document/one-shot gates remain fail-closed.
+Focused neutral provider-style callback and noise checks precede fresh exact native
+CI and a new source-matching signed pair with the same qualified producer inputs.
+This source difference is not proof of the exact previous rejecting guard or of
+successful real authentication. No UI redesign, Rust change or schema change is
+part of this candidate.
+
+Focused Mac validation passed 137 private native-host checks with zero failures,
+including actual detached WebKit context callbacks, notification noise, subframe
+noise, provider DA projection and stale control/document negatives. No provider
+request or visible/active test window occurred. The nonshipping child check now
+resolves its own executable through `proc_pidpath`, not SwiftPM's logical `argv[0]`;
+the latter produced `NSCocoaErrorDomain:4` before browser checks on the local
+SDK27 Swift run wrapper. Direct execution passed, and the exact normal Swift run
+path passed after this test-only correction. Child budgets and production
+ownership/termination behavior are unchanged.
+
 ## Native sign-in navigation correction: candidate
 
 The user's reported briefly opened Microsoft window and the captured

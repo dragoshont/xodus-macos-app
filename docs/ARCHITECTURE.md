@@ -112,6 +112,14 @@ genuine navigation, renderer and checked-JavaScript errors remain typed failures
 Bridge/DA delivery still requires the original trusted main-frame origin,
 generation/document nonce and seven-string shape; wider navigation does not widen
 bridge authorization.
+Provider notification envelopes may contain extra keys: recognized DA data is
+projected to the unchanged exact seven-string private handoff, and the original
+fixed `CloudExperienceHost.getContext` request retains its opaque context and
+four-argument callback. Other notifications, non-JSON notification strings and
+untrusted-frame messages authorize no data and leave the flow alive. Claimed
+malformed DA, invalid private wrappers/control generations, document validation
+and duplicate handoffs remain failures. This is message tolerance, not broader
+origin, method, token or private-channel authority.
 Swift ownership alone proves neither Microsoft passkey eligibility nor a fix
 for the user's unclassified authenticator obstacle.
 

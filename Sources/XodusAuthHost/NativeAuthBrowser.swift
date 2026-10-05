@@ -116,16 +116,17 @@ final class NativeAuthBrowser: NSObject, WKNavigationDelegate, WKUIDelegate, WKS
     func userContentController(_ userContentController: WKUserContentController,
                                didReceive message: WKScriptMessage) {
         guard !terminal, acceptsMessages else { return }
-        guard trustedMessage(message) else { fail(.bridgeInvalid); return }
+        guard trustedMessage(message) else { return }
         do {
             guard let text = message.body as? String else { throw HostFailure.bridgeInvalid }
             let wrapper = try PrivateJSON.parse(Data(text.utf8)).object(keys: ["navigation", "document", "message"])
             guard let document = wrapper["document"]?.string, UUID(uuidString: document) != nil,
                   wrapper["navigation"]?.unsigned == controlGeneration,
                   let raw = wrapper["message"]?.string else { throw HostFailure.bridgeInvalid }
-            let notification = try LegacyNotification(PrivateJSON.parse(Data(raw.utf8)))
+            let notification = try LegacyNotification(raw: raw)
             let expectedGeneration = generation
             switch notification {
+            case .ignored: return
             case .context(let context):
                 let callback = try LegacyBridge.callback(context: context)
                 Task { @MainActor [weak self] in
