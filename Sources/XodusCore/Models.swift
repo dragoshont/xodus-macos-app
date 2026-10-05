@@ -97,6 +97,7 @@ public enum InventoryState: String, CaseIterable, Sendable {
 
     public var label: String { rawValue.capitalized }
 
+#if !XODUS_SHIPPING
     public var notice: String? {
         switch self {
         case .complete: nil
@@ -107,6 +108,7 @@ public enum InventoryState: String, CaseIterable, Sendable {
         case .failed: "Library could not be loaded. This is a simulated inventory error, not an empty account."
         }
     }
+#endif
 }
 
 #if !XODUS_SHIPPING
@@ -135,8 +137,8 @@ public struct InstallPlan: Equatable, Sendable {
         self.availableBytes = availableBytes
         destination = "Demo storage / Games (not written)"
     }
-    #endif
 }
+#endif
 
 public enum InstallDecision: Equatable, Sendable {
     case allowed
@@ -182,6 +184,7 @@ public enum ActionPolicy {
     }
 }
 
+#if !XODUS_SHIPPING
 public enum JobPhase: String, Sendable {
     case queued, downloading, paused, verifying, extracting, committing, completed, cancelled, failed
 
@@ -200,7 +203,6 @@ public enum JobPhase: String, Sendable {
     }
 }
 
-#if !XODUS_SHIPPING
 public struct FixtureJob: Identifiable, Equatable, Sendable {
     public let id: UUID
     public let gameID: String
@@ -211,7 +213,6 @@ public struct FixtureJob: Identifiable, Equatable, Sendable {
         self.gameID = gameID
         self.phase = phase
     }
-    #endif
 
     public mutating func advance() {
         switch phase {
@@ -244,6 +245,7 @@ public struct FixtureJob: Identifiable, Equatable, Sendable {
         phase = .queued
     }
 }
+#endif
 
 public enum DisplayFormat {
     public static func bytes(_ value: Int64) -> String {
