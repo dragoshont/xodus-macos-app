@@ -70,10 +70,11 @@ a bounded snapshot retry, not a guessed queue state. Failed reconciliation retai
 previously verified jobs as non-current and disables cancellation/retry until
 the current snapshot is established.
 
-The Library and product detail also consume typed `installed.snapshot` records,
-including package identity/version and recorded health. An empty management-only
-registry is not evidence that other game folders are absent. Failed status
-refreshes show unknown/error instead of retaining a success-shaped empty result.
+The client retains typed `installed.snapshot` wire responses, but the current
+producer returns a constant empty vector: no populated durable registry or Mac
+scan is implemented. Library explicitly remains unavailable and product detail
+keeps This Mac as Not checked. Empty responses are not evidence that no games
+are installed; failed refreshes retain only non-current wire snapshots.
 Public catalog `notInstalled` metadata is not treated as a whole-Mac installation
 scan. User-selected, read-only inspection now uses `installed.inspect` through a native
 directory-only picker with alias resolution disabled. The result must echo the
@@ -428,11 +429,15 @@ fresh owned-process checks, in a new isolated canonical-source stage:
 
 ```sh
 sh tools/check.sh
-sh tools/build_app.sh /absolute/reviewed/engine UNSIGNED_SHA BYTES PROVENANCE_SHA PROVENANCE_BYTES APPROVED_APP_COMMIT APPROVED_APP_TREE /absolute/owned/output
+sh tools/build_app.sh /absolute/reviewed/engine UNSIGNED_SHA BYTES PROVENANCE_SHA PROVENANCE_BYTES APPROVED_APP_COMMIT APPROVED_APP_TREE /absolute/owned/output --signing-identity CERT_SHA1
 ```
 
 The script reports a new distinct bundle and external package receipt; it never
 opens a window or replaces `dist/Xodus.app`. Launch requires separate approval.
+The supplied identity must already exist in the OS Keychain; provisioning and
+private-key prompts require separate human approval. Fixed signing identifiers,
+the required two-different-build designated-requirement comparison and explicit
+UI-only signed-CLI preservation are described in [shipping admission](SHIPPING-ADMISSION.md).
 
 The existing deployed `.app` includes a release executable, SwiftPM resources,
 original native icon and development bundle identifier. Its Rust native worker

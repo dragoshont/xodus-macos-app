@@ -4,6 +4,7 @@ set -eu
 cd "$(dirname "$0")/.."
 python3 tools/sync_contract.py
 python3 tools/sync_runtime_provider_contract.py --check
+python3 tools/check_signing_identity.py
 swift build
 python3 tools/check_shipping_pair.py
 sh tools/check_shipping.sh

@@ -19,7 +19,7 @@ The repository's `ShippingPairPins.approved` is nil. This compiles, but manageme
 and pure planning fail closed before any process. Packaging generates a
 stage-only Swift pin table after independently approved sealed inputs and
 separate signing. The table binds schema1, approved app commit/tree,
-producer9ef/tree8b2f, signed engine/helper SHA256 and byte sizes, helper version1
+the pinned producer/tree, signed engine/helper SHA256 and byte sizes, helper version1
 and matching helper source. Runtime JSON, HELLO and ad-hoc signing alone cannot
 create that approval.
 
@@ -34,9 +34,9 @@ plaintext/debug/console feature changes or mismatched sealed identity reject
 the input. These claims are accepted only under the operator's independent
 external pins, not because the JSON asserts them.
 
-The source producer is `9ef0f298481fb48840734b538e0f6d22e1c98ff3`,
-tree `8b2f7abb54f91e347afe013eee18c93873b111a5`, containing the reviewed auth943
-boundary. Required Cargo profile is opt3/debug0, no debug assertions/overflow
+The current source producer is `c42e21aee18da893546cca94cbee09820bcbca95`,
+tree `652c4b9e8b85e310ade62224c221991d89a97f80`. Required Cargo profile
+is opt3/debug0, no debug assertions/overflow
 checks/test. Exact features are xodus/CLI empty, management live, native Keychain
 and security-framework. The old e7/304 engine cannot satisfy this gate.
 
@@ -49,6 +49,40 @@ The final app sign is followed by deep verification, helper receipt/identity,
 arm64 and C95/provider-resource checks, then the original unsigned inputs are
 reverified. Signing/source generation is never performed on the current checkout
 or a protected bundle.
+
+## Explicit signing policy
+
+Packaging requires a supplied valid OS Keychain code-signing certificate SHA1
+through `--signing-identity`; there is no automatic ad-hoc fallback. Signing
+identifiers are fixed to `io.github.dragoshont.xodus`,
+`io.github.dragoshont.xodus.cli` and `io.github.dragoshont.xodus.auth-host`.
+The designated requirement binds the fixed identifier to that certificate's
+fingerprint, not a build-specific code hash. The development bundle identifier
+and existing preferences are unchanged by this signing-identifier preparation.
+
+Certificate creation, trust changes and any private-key permission prompt need
+separate human approval. The tooling never creates/unlocks a Keychain, exports a
+private key or changes a credential ACL. Preparation and neutral tests are not
+proof that a usable identity exists or that saved credentials became accessible.
+Before accepting an identity migration, compare two independently built and
+signed CLI artifacts:
+
+```sh
+python3 tools/signing_identity.py compare --kind cli --identity CERT_SHA1 \
+    --first /absolute/first/signed-cli --second /absolute/second/signed-cli
+```
+
+Both must have valid signatures, different bytes and exactly the same fixed,
+certificate-bound designated requirement. This real check remains pending
+until approved identity provisioning and signing; neutral policy tests do not
+substitute for it.
+
+An explicitly approved UI-only package may select `--local-ad-hoc` together
+with `--preserve-signed-cli /absolute/accepted/cli SHA256 BYTES`. It copies the
+externally approved signed CLI unchanged and verifies it before/after copying
+and after the app sign; it never re-signs that engine. This preserves the
+existing engine identity, not credential access or a durable signing fix.
+Stable-identity mode refuses this historical ad-hoc preservation combination.
 
 Runtime admission requires canonical no-follow current-UID single-link regular
 executables, non-group/world-writable files, exact sizes and SHA256; helper

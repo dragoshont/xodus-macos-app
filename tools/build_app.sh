@@ -3,8 +3,8 @@
 # Execute only after independent operator approval of source and sealed CLI inputs.
 set -eu
 cd "$(dirname "$0")/.."
-if [ "$#" -ne 8 ]; then
-    printf '%s\n' 'Usage: build_app.sh engine unsignedSHA bytes provenanceSHA bytes approvedAppCommit approvedAppTree newOutputRoot' >&2
+if [ "$#" -lt 9 ]; then
+    printf '%s\n' 'Usage: build_app.sh engine unsignedSHA bytes provenanceSHA bytes approvedAppCommit approvedAppTree newOutputRoot (--signing-identity CERT_SHA1 | --local-ad-hoc) [--preserve-signed-cli path SHA256 bytes]' >&2
     exit 2
 fi
 engine=$1
@@ -15,6 +15,46 @@ proof_bytes=$5
 source=$6
 tree=$7
 output_root=$8
+shift 8
+signer=
+local_ad_hoc=false
+signed_cli=
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --signing-identity)
+            test "$#" -ge 2
+            test -z "$signer"
+            signer=$2
+            shift 2 ;;
+        --local-ad-hoc)
+            test "$local_ad_hoc" = false
+            local_ad_hoc=true
+            shift ;;
+        --preserve-signed-cli)
+            test "$#" -ge 4
+            test -z "$signed_cli"
+            signed_cli=$2
+            signed_cli_hash=$3
+            signed_cli_bytes=$4
+            shift 4 ;;
+        *) printf '%s\n' 'Unknown signing option; no fallback.' >&2; exit 2 ;;
+    esac
+done
+if [ "$local_ad_hoc" = true ]; then
+    test -z "$signer"
+    set -- --local-ad-hoc
+else
+    if [ -z "$signer" ]; then
+        printf '%s\n' 'Supplied OS Keychain signing identity is required; provisioning requires human approval.' >&2
+        exit 2
+    fi
+    set -- --identity "$signer"
+fi
+if [ -n "$signed_cli" ] && [ "$local_ad_hoc" != true ]; then
+    printf '%s\n' 'CLI preservation is a UI-only local-ad-hoc mode, not a stable identity migration.' >&2
+    exit 2
+fi
+python3 tools/signing_identity.py preflight "$@"
 test "$(git rev-parse HEAD)" = "$source"
 test "$(git rev-parse 'HEAD^{tree}')" = "$tree"
 if [ -n "$(git status --porcelain --untracked-files=normal)" ]; then
@@ -37,25 +77,33 @@ mkdir "$stage/source"
 tar -xf "$stage/source.tar" -C "$stage/source"
 cd "$stage/source"
 python3 tools/sync_runtime_provider_contract.py --check
-XODUS_SHIPPING=1 swift build -c release --product XodusAuthHost
+XODUS_SHIPPING=1 swift build --jobs 1 -c release --product XodusAuthHost
 bin=$(XODUS_SHIPPING=1 swift build -c release --show-bin-path)
 app="$stage/Xodus.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/XodusEngine"
 cp "$bin/XodusAuthHost" "$app/Contents/MacOS/XodusAuthHost"
-cp "$engine" "$app/Contents/Resources/XodusEngine/xodus-cli"
+if [ -n "$signed_cli" ]; then
+    python3 tools/signing_identity.py reuse-cli --source "$signed_cli" \
+        --destination "$app/Contents/Resources/XodusEngine/xodus-cli" \
+        --hash "$signed_cli_hash" --bytes "$signed_cli_bytes"
+else
+    cp "$engine" "$app/Contents/Resources/XodusEngine/xodus-cli"
 python3 - "$app/Contents/Resources/XodusEngine/xodus-cli" "$engine_hash" "$engine_bytes" <<'PY'
 import sys
 from tools.shipping_pair import owned_bytes
 owned_bytes(sys.argv[1], sys.argv[2], int(sys.argv[3]))
 PY
+fi
 chmod 755 "$app/Contents/MacOS/XodusAuthHost" "$app/Contents/Resources/XodusEngine/xodus-cli"
-codesign --force --sign - "$app/Contents/MacOS/XodusAuthHost"
-codesign --force --sign - "$app/Contents/Resources/XodusEngine/xodus-cli"
+python3 tools/signing_identity.py sign --kind helper --path "$app/Contents/MacOS/XodusAuthHost" "$@"
+if [ -z "$signed_cli" ]; then
+    python3 tools/signing_identity.py sign --kind cli --path "$app/Contents/Resources/XodusEngine/xodus-cli" "$@"
+fi
 python3 tools/shipping_pair.py generate --source "$source" --tree "$tree" \
     --engine "$app/Contents/Resources/XodusEngine/xodus-cli" --helper "$app/Contents/MacOS/XodusAuthHost" \
     --approval "$stage/unsigned-approval.json" --output Sources/XodusPreview/ShippingPairPins.swift \
     --receipt "$stage/paired-inputs.json"
-XODUS_SHIPPING=1 swift build -c release --product XodusPreview
+XODUS_SHIPPING=1 swift build --jobs 1 -c release --product XodusPreview
 cp "$bin/XodusPreview" "$app/Contents/MacOS/Xodus"
 cp tools/Info.plist "$app/Contents/Info.plist"
 cp LICENSE "$app/Contents/Resources/LICENSE.txt"
@@ -70,7 +118,7 @@ pathlib.Path(sys.argv[2]).write_text(json.dumps({
 PY
 swift tools/RenderAppIcon.swift "$app/Contents/Resources/Xodus.iconset"
 iconutil -c icns "$app/Contents/Resources/Xodus.iconset" -o "$app/Contents/Resources/Xodus.icns"
-codesign --force --sign - "$app"
+python3 tools/signing_identity.py sign --kind app --path "$app" "$@"
 codesign --verify --deep --strict "$app"
 plutil -lint "$app/Contents/Info.plist"
 python3 tools/verify_shipping_package.py "$stage"
@@ -79,5 +127,16 @@ python3 tools/shipping_pair.py verify --engine "$engine" --engine-hash "$engine_
     --engine-bytes "$engine_bytes" --proof-hash "$proof_hash" --proof-bytes "$proof_bytes" \
     --output "$stage/unsigned-approval-after.json"
 cmp "$stage/unsigned-approval.json" "$stage/unsigned-approval-after.json"
+if [ -n "$signed_cli" ]; then
+    python3 - "$signed_cli" "$app/Contents/Resources/XodusEngine/xodus-cli" "$signed_cli_hash" "$signed_cli_bytes" <<'PY'
+import sys
+from tools.shipping_pair import owned_bytes
+for path in sys.argv[1:3]:
+    owned_bytes(path, sys.argv[3], int(sys.argv[4]))
+PY
+fi
 printf '%s\n' "$app" "$stage/package-receipt.json"
 printf '%s\n' 'Controlled local pair only. No launch, account operation, previous app replacement, notarization or gameplay qualification.'
+if [ "$local_ad_hoc" = true ]; then
+    printf '%s\n' 'Explicit local ad-hoc mode is not a durable Keychain signing-identity fix.'
+fi
