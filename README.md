@@ -2,7 +2,7 @@
 
 A native Mac launcher in development for legitimately entitled Xbox PC games, integrating with the Xodus management engine.
 
-**Current status: native development app, not a complete game launcher.** The default SwiftUI/AppKit app has a real bounded management client, isolated Microsoft Store sign-in integration, source-backed PC Game Pass discovery and Microsoft Store network search, edition detail, activity and scoped installed-registry status. A native folder picker also supports a read-only marker check in one explicitly selected game folder; observed header identifiers never become retail identity, registration or permission to launch. A packaged development build includes its matching engine and connects without Terminal setup; negotiated capabilities determine which actions work. Search coverage is explicitly partial, and public results never establish ownership. Successful human sign-in, authoritative owned-PC inventory, authorized game installation and certified gameplay remain active verification/implementation gaps. Saved sign-in is **not** proof of PC ownership or package access.
+**Current status: native development app, not a complete game launcher.** The default SwiftUI/AppKit app has a real bounded management client, isolated Microsoft Store sign-in integration, source-backed PC Game Pass discovery and Microsoft Store network search, edition detail, activity and scoped installed-registry status. A native folder picker also supports a read-only marker check in one explicitly selected game folder; observed header identifiers never become retail identity, registration or permission to launch. A packaged development build includes its matching engine and connects without Terminal setup; negotiated capabilities determine which actions work. Search coverage is explicitly partial, and public results never establish ownership. A controlled development pair has completed human sign-in and retained saved-session status across a normal app restart. Authenticated provider reads, authoritative owned-PC inventory, authorized game installation and certified gameplay remain active verification/implementation gaps. Saved sign-in is **not** proof of PC ownership or package access.
 
 The original offline demonstration is **nonshipping only**. `XODUS_SHIPPING=1`
 compiles out its views, invented state, artwork, resources and check/export
@@ -51,7 +51,7 @@ sh tools/build_app.sh /absolute/reviewed/engine UNSIGNED_SHA BYTES PROVENANCE_SH
 ```
 
 The packager verifies independently supplied unsigned CLI/provenance hashes,
-sizes, exact reviewed9ef source/tree, release profile and feature sets. It creates
+sizes, exact approved producer source/tree, release profile and feature sets. It creates
 a new stage, separately signs engine/helper, generates stage-only compiled
 pair pins and then builds the shipping launcher. The final helper receipt and
 signed identities must match those compiler inputs. No engine override, picker,
@@ -76,15 +76,15 @@ Wine/graphics versions and hashes remain independent declarations. The separate
 bounded `runtime-plan` validates configuration only; it never executes CrossOver,
 checks a license, creates a prefix, migrates saves or enables Play. A verified
 app signature is not entitlement or game compatibility. The nonshipping fixture
-Settings cannot inspect CrossOver or start planning. This source is not a
-verified deployed release or successful human login.
+Settings cannot inspect CrossOver or start planning. The controlled development
+sign-in result does not qualify this runtime policy for gameplay or distribution.
 
 `XodusAuthHost` implements AppKit/WebKit window ownership and a strict private,
 anonymous-channel protocol. Its exact seven-string legacy handoff remains
 memory-only; Rust retains proof/SOAP processing and credential commit. Neutral
-WebKit and channel checks do not contact Microsoft. This is not verified
-passkey support, a demonstrated fix for the reported prompt, or successful
-authentication. Sign-in and deployment are paused.
+WebKit and channel checks do not contact Microsoft. The controlled human flow
+now reaches saved sign-in, including after restart; passkey coverage and
+authenticated provider-read verification remain unqualified.
 
 **Visual revision v0.2 supersedes the unapproved flat v0.1 concepts.** SVGs describe editable layout and intended glass placement, not live compositor refraction. Native own-view exports also cannot establish backdrop/refraction fidelity; the native implementation, not an SVG blur, owns system Glass.
 

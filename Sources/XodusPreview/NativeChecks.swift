@@ -346,6 +346,27 @@ enum NativeChecks {
                   && gated.accountLabel == "Sign in with Microsoft"
                   && gated.accountExplanation.contains("no saved launcher sign-in"),
                   "Confirmed cancellation returns signed-out presentation without a saved-account badge")
+            let cancelledFlow = gated.authentication?.flow?.flowID
+            check(gated.canSignIn && !gated.accountBusy,
+                  "Confirmed cancellation enables an explicit next sign-in without deleting credentials")
+            await gated.beginSignIn()
+            check(try gated.signInPending && !gated.canSignIn
+                  && gated.authentication?.flow?.flowID != cancelledFlow
+                  && trace(gateConfiguration).filter { $0 == "auth.begin" }.count == 2,
+                  "A user retry starts one distinct flow and immediately fences duplicate sign-in")
+            let closedFlow = gated.authentication?.flow?.flowID
+            try Data().write(to: gateConfiguration.stateDirectory.appendingPathComponent("native-window-closed"))
+            try await wait { gated.authentication?.flow?.state == .cancelled && gated.canSignIn }
+            check(try !gated.signInPending && gated.currentCredentialState == .signedOut
+                  && gated.authentication?.flow?.flowID == closedFlow
+                  && gated.authentication?.entitlementAuthorized == false
+                  && trace(gateConfiguration).filter { $0 == "auth.cancel" }.count == 1,
+                  "Observed helper-close cancellation clears pending via polling without an app cancel or saved badge")
+            await gated.beginSignIn()
+            check(try gated.signInPending && gated.authentication?.flow?.flowID != closedFlow
+                  && trace(gateConfiguration).filter { $0 == "auth.begin" }.count == 3,
+                  "An automatically closed attempt permits exactly one fresh user retry")
+            await gated.cancelSignIn()
             await gated.disconnect()
             try cleanLifecycle(gateConfiguration)
 

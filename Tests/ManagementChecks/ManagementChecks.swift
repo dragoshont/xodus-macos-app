@@ -824,6 +824,7 @@ enum MockBackend {
             }
             var loggedOut = false, flowStarted = false, cancelledLate = false
             var flowReads = 0, discoveryReads = 0, profileReads = 0
+            var gatedAttempts = 0
             hello["capabilities"] = .array(ManagementCommand.allCases.map { command in .object([
                 "command": .string(command.rawValue), "supported": .bool(supported.contains(command)),
                 "audience": .null, "reason": supported.contains(command) ? .null : .string("Fixture gate.")
@@ -915,14 +916,24 @@ enum MockBackend {
                     }
                     if scenario == "authgate", command.hasPrefix("auth.") {
                         var flowState = "pending"
-                        if command == "auth.begin" { flowStarted = true; try trace("auth.begin") }
+                        let windowClosedMarker = lifecycleDirectory.appendingPathComponent("native-window-closed")
+                        if command == "auth.begin" {
+                            flowStarted = true
+                            gatedAttempts += 1
+                            if FileManager.default.fileExists(atPath: windowClosedMarker.path) {
+                                try FileManager.default.removeItem(at: windowClosedMarker)
+                            }
+                            try trace("auth.begin")
+                        }
+                        let windowClosed = FileManager.default.fileExists(atPath: windowClosedMarker.path)
+                        if windowClosed { flowStarted = false; flowState = "cancelled" }
                         if command == "auth.cancel" { flowStarted = false; flowState = "cancelled"; try trace("auth.cancel") }
                         var status: [String: JSONValue] = [
                             "state": .string("signedOut"), "credentialStore": .string("macOSKeychain"),
                             "audience": .null, "expiresAt": .null, "entitlementAuthorized": .bool(false)
                         ]
-                        if flowStarted || command == "auth.cancel" {
-                            status["flow"] = .object(["flowID": .string("fixture-gated-flow"),
+                        if flowStarted || command == "auth.cancel" || windowClosed {
+                            status["flow"] = .object(["flowID": .string("fixture-gated-flow-\(gatedAttempts)"),
                                 "state": .string(flowState), "error": .null])
                         }
                         let response = result(request, data: .object(status))

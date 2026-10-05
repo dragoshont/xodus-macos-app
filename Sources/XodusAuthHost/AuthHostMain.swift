@@ -18,6 +18,13 @@ struct AuthHostMain {
             CFRunLoopRun()
             exit(1)
         }
+        if CommandLine.arguments.count == 3,
+           CommandLine.arguments[1] == "--self-check-window-close-peer",
+           ["performClose", "close"].contains(CommandLine.arguments[2]) {
+            Task { exit(await AuthHostChecks.windowClosePeer(CommandLine.arguments[2])) }
+            CFRunLoopRun()
+            exit(1)
+        }
 #endif
         guard CommandLine.arguments.count == 1 else { exit(64) }
         var limit = rlimit(rlim_cur: 0, rlim_max: 0)
@@ -54,6 +61,20 @@ final class AuthHostController: NSObject, NSApplicationDelegate, NSWindowDelegat
     private var workerUnavailable = false
 
     init(channel: PrivateChannel) { self.channel = channel }
+
+#if !XODUS_SHIPPING
+    func openNeutralWindowForChecks(_ frame: CommandFrame) async throws -> NSWindow {
+        guard case .open = frame.command else { throw HostFailure.protocolInvalid }
+        try session.accept(frame)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 720),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.delegate = self
+        self.window = window
+        try await send(.ready)
+        return window
+    }
+#endif
 
     func start() {
         readTask = Task {
@@ -193,9 +214,15 @@ final class AuthHostController: NSObject, NSApplicationDelegate, NSWindowDelegat
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
+        guard sender === window else { return true }
         guard !ending else { return true }
         Task { await finish(failure: .cancelled) }
         return false
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        guard let sender = notification.object as? NSWindow, sender === window, !ending else { return }
+        Task { await finish(failure: .cancelled) }
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

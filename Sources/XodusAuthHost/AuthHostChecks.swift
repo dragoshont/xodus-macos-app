@@ -240,6 +240,7 @@ enum AuthHostChecks {
             check(expired.terminal, "Expiry produces only a terminal failure, never an authorization-budget extension")
             try await channelChecks(check: check)
             try await outputFenceChecks(check: check)
+            try await windowCloseChecks(check: check)
             try await browserChecks(check: check)
         } catch {
             let failure = (error as? HostFailure)?.rawValue
@@ -368,6 +369,51 @@ enum AuthHostChecks {
             released = true
             completion?.resume()
             completion = nil
+        }
+    }
+
+    private static func windowCloseChecks(check: (Bool, String) -> Void) async throws {
+        var executablePath = [CChar](repeating: 0, count: 4096)
+        guard proc_pidpath(getpid(), &executablePath, UInt32(executablePath.count)) > 0 else {
+            throw HostFailure.protocolInvalid
+        }
+        for action in ["performClose", "close"] {
+            let sockets = try pair()
+            let parent = try PrivateChannel(descriptor: sockets[0])
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: String(cString: executablePath))
+            process.arguments = ["--self-check-window-close-peer", action]
+            process.environment = ["HOME": NSHomeDirectory(), "PATH": "/usr/bin:/bin"]
+            process.standardInput = FileHandle(fileDescriptor: sockets[1], closeOnDealloc: false)
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            try process.run()
+            Darwin.close(sockets[1])
+            Darwin.close(sockets[0])
+            defer { if process.isRunning { kill(process.processIdentifier, SIGKILL) } }
+            do {
+                try await parent.write(frame(message: open()), deadline: .now.advanced(by: .seconds(2)))
+                let ready = try await parent.read(deadline: .now.advanced(by: .seconds(2)))
+                let terminal = try await parent.read(deadline: .now.advanced(by: .seconds(2)))
+                check(try resultKind(ready) == "ready" && resultKind(terminal) == "cancelled",
+                      "Real hidden AppKit \(action) before handoff sends cancellation, never issuer data")
+                do {
+                    _ = try await parent.read(deadline: .now.advanced(by: .seconds(2)))
+                    check(false, "Window cancellation must end the private channel without a second result")
+                } catch {
+                    check(error as? HostFailure == .channelClosed,
+                          "Window cancellation sends one terminal result followed by private-channel EOF")
+                }
+                let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+                while process.isRunning && ContinuousClock.now < deadline {
+                    try await Task.sleep(for: .milliseconds(10))
+                }
+                check(!process.isRunning && process.terminationStatus == HostDisposition.cancelled.exitCode,
+                      "Window cancellation exits its own neutral helper with the cancellation code")
+            } catch {
+                check(false, "Real hidden AppKit \(action) did not close its attempt within the bounded deadline")
+            }
+            await parent.stop()
         }
     }
 
@@ -834,6 +880,31 @@ enum AuthHostChecks {
                     return disposition.exitCode
                 }
             }
+        } catch { return 1 }
+    }
+
+    static func windowClosePeer(_ action: String) async -> Int32 {
+        let application = NSApplication.shared
+        application.setActivationPolicy(.prohibited)
+        do {
+            let channel = try PrivateChannel(descriptor: STDIN_FILENO)
+            Darwin.close(STDIN_FILENO)
+            let frame = try CommandFrame(await channel.read(deadline: .now.advanced(by: .seconds(2))))
+            let controller = AuthHostController(channel: channel)
+            let window = try await controller.openNeutralWindowForChecks(frame)
+            let unrelated = NSWindow(contentRect: .zero, styleMask: [.titled, .closable],
+                                     backing: .buffered, defer: false)
+            unrelated.isReleasedWhenClosed = false
+            unrelated.delegate = controller
+            unrelated.close()
+            if action == "performClose" { window.performClose(nil) }
+            else {
+                window.close()
+                window.close()
+            }
+            try await Task.sleep(for: .seconds(5))
+            withExtendedLifetime(controller) {}
+            return 1
         } catch { return 1 }
     }
 }

@@ -315,6 +315,13 @@ the original remaining monotonic budget, a fresh nonpersistent WebKit store,
 trusted main-frame/origin/document-generation checks and one-shot exact
 seven-string legacy handoff. Native callback, genuine navigation, renderer,
 checked-JS, close, EOF and deadline failures are explicit static outcomes.
+Closing the owned native window, including `NSWindow.close()` paths that bypass
+`windowShouldClose`, sends one terminal cancellation and exits the helper.
+Unrelated windows do not cancel the attempt. The app reconciles the terminal
+flow through `auth.status` and enables an explicit new sign-in; it never retries
+automatically or treats closing a window as saved credentials. Neutral checks
+exercise hidden AppKit window closure, private-channel EOF, helper exit and the
+following user retry without contacting Microsoft.
 The additive navigation correction permits all subframe loads, scoped HTTPS
 Microsoft top-level redirects and same-view popups without treating ordinary
 cancellation/policy interruptions as whole-flow failures. Blank popup initialization
