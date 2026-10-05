@@ -59,7 +59,7 @@ def main():
     management = resources / "XodusAppFoundation_XodusManagement.bundle"
     layouts = [management, management / "Contents/Resources"]
     schemas = ("management-v1.schema.json", "runtime-providers-v1.schema.json")
-    present = [layout for layout in layouts if (layout / schemas[0]).exists()]
+    present = [layout for layout in layouts if all((layout / name).is_file() for name in schemas)]
     require(len(present) == 1, "Expected exactly one SwiftPM management resource layout")
     selected = present[0]
     require(all(not (layout / name).exists() and not (layout / name).is_symlink()

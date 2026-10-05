@@ -197,4 +197,26 @@ with tempfile.TemporaryDirectory(prefix="xodus-pair-portable-") as temporary:
         count += 1
     finally:
         native_schema.write_bytes(original)
+    runtime_bytes = runtime_schema.read_bytes()
+    runtime_schema.unlink()
+    try:
+        package_check()
+        raise AssertionError("Incomplete native resource layout accepted")
+    except ValueError:
+        count += 1
+    finally:
+        runtime_schema.write_bytes(runtime_bytes)
+    if os.name == "posix":
+        linked_source = root / "linked-neutral-schema.json"
+        linked_source.write_bytes(original)
+        native_schema.unlink()
+        native_schema.symlink_to(linked_source)
+        try:
+            package_check()
+            raise AssertionError("Linked native resource with a matching hash accepted")
+        except ValueError:
+            count += 1
+        finally:
+            native_schema.unlink()
+            native_schema.write_bytes(original)
 print(f"{count} portable packaging admission checks, 0 failures. Neutral bytes only.")
