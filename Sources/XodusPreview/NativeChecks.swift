@@ -59,7 +59,15 @@ enum NativeChecks {
             for reason in ["helper.invalidFrame", "helper.invalidNavigation", "helper.navigationFailed",
                            "helper.popupUnsupported", "helper.contentTerminated", "helper.javaScriptFailed",
                            "helper.bridgeInvalid", "helper.deadlineExpired", "helper.parentUnavailable",
-                           "channelEOF", "unclassified", "tokenExchangeFailed", "helperCompletionFailed"] {
+                           "channelEOF", "unclassified", "tokenExchangeFailed", "helperCompletionFailed",
+                           "tokenExchange.requestBuild", "tokenExchange.requestSerialization",
+                           "tokenExchange.requestTransport", "tokenExchange.requestTimeout",
+                           "tokenExchange.httpClientError", "tokenExchange.httpServerError",
+                           "tokenExchange.httpStatusRejected", "tokenExchange.responseParsing",
+                           "tokenExchange.responseSignature", "tokenExchange.responseCryptography",
+                           "tokenExchange.responseEncoding", "tokenExchange.continuationRequired",
+                           "tokenExchange.faultWithoutContinuation", "tokenExchange.continuationRejected",
+                           "exchangeRetentionFailed"] {
                 let message = "Native sign-in failed: \(reason)."
                 check(try LiveSession.validatedNativeSignInObservation(observationFailure(message)) == message,
                       "Exact approved \(reason) observation is available under Account Details")
@@ -71,7 +79,13 @@ enum NativeChecks {
                             "Native sign-in failed: helper.tokenExchangeFailed.",
                             "Native sign-in failed: tokenExchangeFailed. extra",
                             "Native sign-in failed: helperCompletionFailed.\n",
-                            "Native sign-in failed: helperCompletionFailed"] {
+                            "Native sign-in failed: helperCompletionFailed",
+                            "Native sign-in failed: tokenExchange.unknown.",
+                            "Native sign-in failed: tokenExchange.requestTransport. extra",
+                            "Native sign-in failed: tokenExchange.requestTimeout.\n",
+                            "Native sign-in failed: tokenExchange.responseParsing. https://provider.invalid/",
+                            "Native sign-in failed: exchangeRetentionFailed. extra",
+                            "Native sign-in failed: exchangeRetentionFailed"] {
                 check(try LiveSession.validatedNativeSignInObservation(observationFailure(message)) == nil,
                       "Unapproved or extended engine wording never enters the displayed native observation")
             }
@@ -80,7 +94,15 @@ enum NativeChecks {
                   && LiveSession.validatedNativeSignInObservation(
                     observationFailure("Native sign-in failed: helper.bridgeInvalid.", reason: "unexpected")) == nil,
                   "An exact observation is rejected without the agreed AUTH_INVALID/nativeSignIn/pipelineFailed tuple")
-            for reason in ["tokenExchangeFailed", "helperCompletionFailed"] {
+            for reason in ["tokenExchangeFailed", "helperCompletionFailed",
+                           "tokenExchange.requestBuild", "tokenExchange.requestSerialization",
+                           "tokenExchange.requestTransport", "tokenExchange.requestTimeout",
+                           "tokenExchange.httpClientError", "tokenExchange.httpServerError",
+                           "tokenExchange.httpStatusRejected", "tokenExchange.responseParsing",
+                           "tokenExchange.responseSignature", "tokenExchange.responseCryptography",
+                           "tokenExchange.responseEncoding", "tokenExchange.continuationRequired",
+                           "tokenExchange.faultWithoutContinuation", "tokenExchange.continuationRejected",
+                           "exchangeRetentionFailed"] {
                 let message = "Native sign-in failed: \(reason)."
                 check(try LiveSession.validatedNativeSignInObservation(
                     observationFailure(message, code: "INTERNAL")) == nil

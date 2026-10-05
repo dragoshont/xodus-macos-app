@@ -10,8 +10,8 @@ import re
 import stat
 import sys
 
-PRODUCER = "9faa8755683b88ca95bd17012d82c89e2f1a58ce"
-PRODUCER_TREE = "4b937ec03f8d2cf9ddde9132a9351a82a9c83c6a"
+PRODUCER = "397dd0249c81414dae3d75b3562f696378fd6b11"
+PRODUCER_TREE = "ae213b02eb5f01b8028d300dd85a17014ad05c24"
 FEATURES = {"xodus": [], "xodus-cli": [], "xodus-management": ["live"],
             "apple-native-keyring-store": ["keychain", "security-framework"]}
 PROFILE = {"opt_level": "3", "debuginfo": 0, "debug_assertions": False,

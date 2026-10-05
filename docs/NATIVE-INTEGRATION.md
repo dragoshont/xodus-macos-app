@@ -345,6 +345,13 @@ the exact `Native sign-in failed: channelEOF.` / `Native sign-in failed: unclass
 or the fixed boundary messages `Native sign-in failed: tokenExchangeFailed.` /
 `Native sign-in failed: helperCompletionFailed.`. These identify failed operations,
 not provider error text, and never establish credential commit.
+The additional `tokenExchange.STAGE` literals are limited to `requestBuild`,
+`requestSerialization`, `requestTransport`, `requestTimeout`, `httpClientError`,
+`httpServerError`, `httpStatusRejected`, `responseParsing`, `responseSignature`,
+`responseCryptography`, `responseEncoding`, `continuationRequired`,
+`faultWithoutContinuation` and `continuationRejected`. The exact
+`Native sign-in failed: exchangeRetentionFailed.` is also accepted. No unknown
+stage, prefix match, extended message or provider exception is displayed.
 Account Details accepts these exact strings only with the existing
 `AUTH_INVALID / nativeSignIn / pipelineFailed` tuple; all other message text remains
 undisplayed. No new wire fields, logs, provider content or secret-bearing diagnostics

@@ -242,7 +242,15 @@ final class LiveSession: ObservableObject {
         let reasons = ["helper.invalidFrame", "helper.invalidNavigation", "helper.navigationFailed",
                        "helper.popupUnsupported", "helper.contentTerminated", "helper.javaScriptFailed",
                        "helper.bridgeInvalid", "helper.deadlineExpired", "helper.parentUnavailable",
-                       "channelEOF", "unclassified", "tokenExchangeFailed", "helperCompletionFailed"]
+                       "channelEOF", "unclassified", "tokenExchangeFailed", "helperCompletionFailed",
+                       "tokenExchange.requestBuild", "tokenExchange.requestSerialization",
+                       "tokenExchange.requestTransport", "tokenExchange.requestTimeout",
+                       "tokenExchange.httpClientError", "tokenExchange.httpServerError",
+                       "tokenExchange.httpStatusRejected", "tokenExchange.responseParsing",
+                       "tokenExchange.responseSignature", "tokenExchange.responseCryptography",
+                       "tokenExchange.responseEncoding", "tokenExchange.continuationRequired",
+                       "tokenExchange.faultWithoutContinuation", "tokenExchange.continuationRejected",
+                       "exchangeRetentionFailed"]
         return reasons.map { "Native sign-in failed: \($0)." }.first { $0 == failure.message }
     }
 
