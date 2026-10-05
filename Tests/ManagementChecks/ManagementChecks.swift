@@ -932,7 +932,7 @@ enum MockBackend {
                             continue
                         }
                         if command == "auth.logout" {
-                            try emitFailure(request, code: "INTERNAL")
+                            try emitFailure(request, code: "INTERNAL_ERROR")
                             continue
                         }
                         if command == "catalog.query" {
