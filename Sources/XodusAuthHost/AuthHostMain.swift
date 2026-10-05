@@ -7,6 +7,7 @@ import Foundation
 @main
 struct AuthHostMain {
     @MainActor static func main() {
+#if !XODUS_SHIPPING
         if CommandLine.arguments.dropFirst() == ["--self-check"] {
             Task { exit(await AuthHostChecks.run() ? 0 : 1) }
             CFRunLoopRun()
@@ -17,6 +18,7 @@ struct AuthHostMain {
             CFRunLoopRun()
             exit(1)
         }
+#endif
         guard CommandLine.arguments.count == 1 else { exit(64) }
         var limit = rlimit(rlim_cur: 0, rlim_max: 0)
         guard setrlimit(RLIMIT_CORE, &limit) == 0 else { exit(1) }

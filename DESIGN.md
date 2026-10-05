@@ -25,6 +25,13 @@ visually confirmed.
 
 ## Actual native implementation
 
+**Production hardening:** the shipping/live path no longer uses the invented
+harbor/orbit promotional hero or game poster in Account. No rights-cleared real
+artwork is available, so real setup/empty/loading/error/data views use semantic
+native window backgrounds. Fixture illustrations remain only in the nonshipping
+preview source/resource set. This user-directed truth boundary preserves the
+system header/navigation/search/no-visible-title contract, not the demo hero.
+
 `XodusToolbar` uses a principal `ToolbarItemGroup`, a real `.tabs` `Picker` on
 macOS 27+ with a `.segmented` fallback on 14-26, stock `NSSearchField` and an
 ordinary trailing toolbar `Button`. These are platform controls, not a

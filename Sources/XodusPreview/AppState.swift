@@ -8,6 +8,7 @@ enum Destination: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+#if !XODUS_SHIPPING
 enum BrowseCategory: String, CaseIterable, Identifiable {
     case all = "All worlds", adventure = "Quiet adventures", space = "Space", puzzles = "Puzzles"
     var id: String { rawValue }
@@ -28,15 +29,14 @@ final class SheetInteraction: ObservableObject {
     @Published var acceptsExperimental = false
     @Published var cancelled = false
 }
+#endif
 
 @MainActor
 final class AppState: ObservableObject {
     let runtimeSettings = RuntimeProviderSettings()
+#if !XODUS_SHIPPING
     @Published var fixtureMode = CommandLine.arguments.contains("--fixture")
         || CommandLine.arguments.contains("--export-preview")
-    @Published var showingAccount = false
-    @Published var destination: Destination = .library
-    @Published var query = ""
     @Published var sortByTitle = false
     @Published var accessFilter: Entitlement? = nil
     @Published var category: BrowseCategory = .all
@@ -48,11 +48,26 @@ final class AppState: ObservableObject {
     @Published var installed = Set(Fixtures.games.filter(\.initiallyInstalled).map(\.id))
     @Published var lowSpace = false
     @Published var message: String?
+#endif
+    @Published var showingAccount = false
+    @Published var destination: Destination = .library
+    @Published var query = ""
 
     var navigationSelection: Binding<Destination> {
         Binding(get: { self.destination }, set: { self.navigate($0) })
     }
 
+    func navigate(_ value: Destination) {
+        destination = value
+        query = ""
+#if !XODUS_SHIPPING
+        accessFilter = nil
+        sortByTitle = false
+        category = .all
+#endif
+    }
+
+#if !XODUS_SHIPPING
     var visibleGames: [Game] {
         guard inventory != .empty && inventory != .failed else { return [] }
         let games = Fixtures.games.filter {
@@ -63,14 +78,6 @@ final class AppState: ObservableObject {
                 && (query.isEmpty || $0.title.localizedStandardContains(query))
         }
         return sortByTitle ? games.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending } : games
-    }
-
-    func navigate(_ value: Destination) {
-        destination = value
-        query = ""
-        accessFilter = nil
-        sortByTitle = false
-        category = .all
     }
 
     func decision(for game: Game) -> InstallDecision {
@@ -130,4 +137,5 @@ final class AppState: ObservableObject {
         showingAccount = false
         message = nil
     }
+#endif
 }

@@ -9,6 +9,16 @@ real Microsoft access or compatibility.
 
 ## Navigation and search
 
+**Current shipping boundary:** the proposed artwork-led screens below are not
+synthetic production content. The live source uses native window-background
+setup/empty/loading/error/data views until rights-cleared real art exists.
+Preview illustrations/state/resources and simulated actions are compiled out
+of shipping. No live Settings transition can open the offline demo.
+Catalog loading takes precedence in both heading and description; only a checked
+zero-result Store response says no matches. A post-ready user query survives
+initial/reconnect activity and registry reconciliation without an empty startup
+seed replacing its products/corpus/cursor.
+
 One native Mac window with full-width system toolbar chrome, native traffic lights and no visible app title. Library / Discover / Downloads and compact stock search share the principal toolbar group; Account stays separately trailing. The older floating-capsule mock direction is superseded. Original artwork extends beneath system chrome, without custom tint or decorative glass; whole-toolbar placement/tint still awaits safe live visual confirmation. Library is the proposed first screen: artwork-led focused-game area, compact Continue Playing, then Your Games/count/sort-filter and adaptive horizontal square-icon entries with separate access/compatibility text and contextual action. Discover has immersive feature/browse/shelves; detail imagery is edge-to-edge. Search is scoped to the current tab; Downloads uses a queue, not catalog search. Command-1/2/3 navigate and Command-F focuses search. Native Settings has account/storage, declared runtime configuration and Advanced diagnostics. Back from a detail sheet restores selection and scroll position. No persistent sidebar, Friends or Arcade destination.
 
 [Editable FigJam flow](https://www.figma.com/board/3MejlFaXHkogmJ3J5k79Gw) and [latest v0.2 Figma mockups](https://www.figma.com/design/5iQu716UFImHjRxJkf0t8V?node-id=3-115) are proposed UX artifacts, not observed API behavior or exact system compositor effects.

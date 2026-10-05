@@ -4,7 +4,11 @@ A native Mac launcher in development for legitimately entitled Xbox PC games, in
 
 **Current status: native development app, not a complete game launcher.** The default SwiftUI/AppKit app has a real bounded management client, isolated Microsoft Store sign-in integration, source-backed PC Game Pass discovery and Microsoft Store network search, edition detail, activity and scoped installed-registry status. A native folder picker also supports a read-only marker check in one explicitly selected game folder; observed header identifiers never become retail identity, registration or permission to launch. A packaged development build includes its matching engine and connects without Terminal setup; negotiated capabilities determine which actions work. Search coverage is explicitly partial, and public results never establish ownership. Successful human sign-in, authoritative owned-PC inventory, authorized game installation and certified gameplay remain active verification/implementation gaps. Saved sign-in is **not** proof of PC ownership or package access.
 
-The original offline demonstration is now an explicit `--fixture` mode. Its titles, access, compatibility and progress are invented and never populate the live app. See [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
+The original offline demonstration is **nonshipping only**. `XODUS_SHIPPING=1`
+compiles out its views, invented state, artwork, resources and check/export
+entrypoints. Shipping screens use native setup/empty/loading/error states and
+actual public product data, not synthetic game illustrations. See
+[native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
 ![Original Library concept](design/previews/library.png)
 
@@ -39,16 +43,25 @@ swift run XodusPreview
 
 The historical SwiftPM executable name remains `XodusPreview`; its default is now the live development shell, **not simulated gameplay**. Source-only development can select a trusted engine in Advanced Settings or explicitly use `XODUS_BACKEND_PATH`. A packaged build uses its included engine automatically; a missing/nonexecutable included engine shows an actionable error rather than silently using a saved external build or convincing fixtures. There is no interactive-CLI scraping or arbitrary Wine picker. The main launcher never receives credentials; the isolated Swift authentication host handles only its private memory-only handoff, not credential storage or cryptography.
 
-Build a double-clickable local `.app` with original icon and resource bundles:
+Build a controlled local `.app` only after independent source and sealed-input
+approval; placeholders below are required operator pins, not values to guess:
 
 ```sh
-sh tools/build_app.sh
-open dist/Xodus.app
+sh tools/build_app.sh /absolute/reviewed/engine UNSIGNED_SHA BYTES PROVENANCE_SHA PROVENANCE_BYTES APPROVED_APP_COMMIT APPROVED_APP_TREE /absolute/owned/output
 ```
 
-The optional positional argument to `build_app.sh` is an explicit matching management-engine executable. The script now requires clean committed source and includes the dependency-free Swift `XodusAuthHost`, its resources and fixed-path/version/post-sign-hash metadata. This packaging revision has **not been executed or deployed**. Its private worker integration requires a separately reviewed matching producer; unchanged management-schema bytes alone do not establish compatibility. The current deployed producer still owns its older worker. A future package is an **ad-hoc-signed development app**, not a notarized/distributed installer or signed gameplay runtime. Runtime licensing and public distribution remain separate gates.
+The packager verifies independently supplied unsigned CLI/provenance hashes,
+sizes, exact reviewed9ef source/tree, release profile and feature sets. It creates
+a new stage, separately signs engine/helper, generates stage-only compiled
+pair pins and then builds the shipping launcher. The final helper receipt and
+signed identities must match those compiler inputs. No engine override, picker,
+remembered path or runtime JSON can grant shipping approval. An unpaired shipping
+build fails before any engine process. The prior `dist/Xodus.app` is never moved
+or replaced. This source tooling is not an executed package, notarization,
+distribution attestation or successful human login; deployment/launch require
+separate approval. See [controlled pair admission](docs/SHIPPING-ADMISSION.md).
 
-The proposed deployment baseline is **macOS 14**, not a user-approved support commitment. The shared native toolbar groups Library / Discover / Downloads with compact stock `NSSearchField` search: real `.tabs` on macOS 27+, segmented fallback on 14-26. Search expands for editing, Command-F or a retained query; Account stays separate at the trailing edge. The Scene hides the visible title while retaining native traffic lights and app identity. Original hero artwork extends behind system chrome without a sampled tint or fabricated glass overlay. Account content scrolls independently of its adaptive action footer, and normal activation remains AppKit-owned. These source corrections are built and headlessly checked, **not deployed or visually confirmed**; artwork-dependent toolbar tint is still a live compositor gate.
+The proposed deployment baseline is **macOS 14**, not a user-approved support commitment. The shared native toolbar groups Library / Discover / Downloads with compact stock `NSSearchField` search: real `.tabs` on macOS 27+, segmented fallback on 14-26. Search expands for editing, Command-F or a retained query; Account stays separate at the trailing edge. The Scene hides the visible title while retaining native traffic lights and app identity. Live screens use the native window background until rights-cleared real artwork exists. Account content scrolls independently of its adaptive action footer, and normal activation remains AppKit-owned. Source/headless evidence is **not deployed or visually confirmed**.
 
 Native Settings source now exposes **Apple GPTK3, Apple GPTK4, legitimately
 user-installed CrossOver, and standalone/source-built Wine**, with no initial
@@ -76,7 +89,7 @@ For the original offline design demonstration:
 swift run XodusPreview --fixture
 ```
 
-In that separate mode, choose **Library / Discover / Downloads**, search within the current scope, open an invented game, and use **Simulate install** or **Simulate next step**. Fixture Settings inject empty, partial, stale, offline and cancelled-auth scenarios. Simulated jobs exist only in memory and reset on relaunch. Fixture mode never contacts the engine, opens sign-in or writes a game registry; entering it disconnects the live engine first.
+In that nonshipping mode, choose **Library / Discover / Downloads**, search within the current scope, open an invented game, and use **Simulate install** or **Simulate next step**. Fixture Settings inject empty, partial, stale, offline and cancelled-auth scenarios. Simulated jobs exist only in memory and reset on relaunch. Fixture mode never contacts the engine, opens sign-in or writes a game registry. There is no live Settings transition to preview; start it explicitly as a separate nonshipping invocation.
 
 ```sh
 swift run XodusPreview --self-check
@@ -93,7 +106,12 @@ off the main actor; failures remain explicit. Overlapping disconnect/reconnect
 operations share bounded shutdown ownership rather than starting another engine
 before the old child exits.
 
-`sh tools/check.sh` runs the complete native/management/fixture/private-host check sequence. The existing GitHub Actions job uses the preview `xcode-27` runner and checks actual Xcode/SDK/runtime versions before the suite and SVG regeneration. Runner availability/queueing is a risk; a workflow definition is not itself a claim that a particular revision passed hosted CI.
+`sh tools/check.sh` runs the native/management/nonshipping-fixture/private-host checks,
+portable packaging negatives, actual shipping release compilation and separate
+shipping XCTest admission checks. The latter require full Xcode's test framework,
+not only Command Line Tools; they never become application entrypoints.
+The existing GitHub-hosted `xcode-27` job checks actual SDK/runtime versions and
+SVG regeneration. A workflow definition is not evidence of a passing revision.
 
 Own-view exports use `--export-preview <directory>` for fixtures or `--export-live <directory>` for a **disconnected**, non-account live shell. They export this app's Library, Discover and Downloads view hierarchy and exit; they do not capture the desktop/other apps or establish Glass-compositor fidelity.
 

@@ -32,6 +32,14 @@ Develop and verify native code on the user's Mac over trusted SSH, using isolate
 
 **User-decided:** original app code/docs/art use GPL-3.0-only, matching the user's stated Xodus licensing intent without assuming an "or later" grant.
 
+**Shipping truth boundary:** the production compile excludes the offline demo's
+views/state/art/resources and development check/export paths. Live screens use
+actual public management data and honest native setup/empty/loading/error states,
+not promotional synthetic game scenes. Shipping executes only an externally
+approved, compiled-pin-bound bundled engine/helper pair; an unpaired repository
+build fails closed. This source hardening is not shipping deployment or proven
+human authentication. See [controlled admission](docs/SHIPPING-ADMISSION.md).
+
 **User-directed runtime follow-up:** selectable Apple GPTK3, Apple GPTK4,
 legitimately user-installed/licensed CrossOver, and user-selected standalone or
 source-built Wine. GPTK4 is only the current external trial default, not a

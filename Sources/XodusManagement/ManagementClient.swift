@@ -7,11 +7,14 @@ public struct BackendConfiguration: Sendable {
     public let executable: URL
     public let stateDirectory: URL
     public let nativeAuthHost: NativeAuthHostBinding?
+    public let executableIdentity: NativeAuthHostBinding?
 
-    public init(executable: URL, stateDirectory: URL, nativeAuthHost: NativeAuthHostBinding? = nil) {
+    public init(executable: URL, stateDirectory: URL, nativeAuthHost: NativeAuthHostBinding? = nil,
+                executableIdentity: NativeAuthHostBinding? = nil) {
         self.executable = executable
         self.stateDirectory = stateDirectory
         self.nativeAuthHost = nativeAuthHost
+        self.executableIdentity = executableIdentity
     }
 }
 
@@ -22,6 +25,7 @@ public actor ManagementClient {
     private let logger = Logger(subsystem: "io.github.dragoshont.xodus.development", category: "management")
     private let writer = DispatchQueue(label: "Xodus.management.stdin")
     private var process: Process?
+    private var admittedConfiguration: BackendConfiguration?
     private var stdin: FileHandle?
     private var outputTask: Task<Void, Never>?
     private var diagnosticTask: Task<Void, Never>?
@@ -76,9 +80,22 @@ public actor ManagementClient {
             let status = value.terminationStatus
             Task { await self?.ended(status: status) }
         }
-        do { try child.run() }
+        do {
+            if let identity = configuration.executableIdentity {
+                guard identity.executable == configuration.executable else {
+                    throw ManagementError.pairedEngineUnavailable
+                }
+                do { _ = try identity.validatedArguments() }
+                catch { throw ManagementError.pairedEngineUnavailable }
+            }
+            do { _ = try configuration.nativeAuthHost?.validatedArguments() }
+            catch { throw ManagementError.nativeAuthHostUnavailable }
+            try child.run()
+        }
+        catch let error as ManagementError { throw error }
         catch { throw ManagementError.startFailed }
         process = child
+        admittedConfiguration = configuration
         stdin = input.fileHandleForWriting
         logger.info("Management process started.")
 
@@ -120,6 +137,13 @@ public actor ManagementClient {
         guard budget > .zero else { throw ManagementError.invalidRequest }
         guard !stopped, let child = process, child.isRunning, let stdin else {
             throw ManagementError.disconnected
+        }
+        if command == .authBegin || command == .authLogout,
+           let admitted = admittedConfiguration, let identity = admitted.executableIdentity {
+            do {
+                _ = try identity.validatedArguments()
+                _ = try admitted.nativeAuthHost?.validatedArguments()
+            } catch { throw ManagementError.pairedEngineUnavailable }
         }
         if command != .hello {
             guard let hello else { throw ManagementError.disconnected }

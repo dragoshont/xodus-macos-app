@@ -33,7 +33,7 @@ final class LiveSession: ObservableObject {
     @Published var selectedProduct: CatalogProduct?
     @Published var errorMessage: String?
     @Published var catalogError: String?
-    @Published var backendPath: String
+    @Published private(set) var backendPath: String
     @Published var market = "US" { didSet { if market != oldValue { invalidateCatalogScope() } } }
     @Published var language = "en-US" { didSet { if language != oldValue { invalidateCatalogScope() } } }
     @Published var lookupID = ""
@@ -82,6 +82,15 @@ final class LiveSession: ObservableObject {
     init(configuration: BackendConfiguration? = nil,
          shutdownClient: @escaping @Sendable (ManagementClient) async -> Bool = { await $0.close() }) {
         self.shutdownClient = shutdownClient
+#if XODUS_SHIPPING
+        self.configuration = nil
+        backendPath = Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Resources/XodusEngine/xodus-cli").path
+        if ShippingPairPins.approved == nil {
+            errorMessage = ManagementError.pairedEngineUnavailable.localizedDescription
+        }
+        return
+#else
         self.configuration = configuration
         if let configuration {
             backendPath = configuration.executable.path
@@ -101,6 +110,7 @@ final class LiveSession: ObservableObject {
         } else {
             backendPath = bundledPath ?? UserDefaults.standard.string(forKey: "Xodus.developerBackendPath") ?? ""
         }
+#endif
     }
 
     var isReady: Bool { phase == .ready }
@@ -118,6 +128,27 @@ final class LiveSession: ObservableObject {
             && !accountBusy && !signInPending
     }
     var canLoadMoreCatalog: Bool { nextCursor != nil && !searching }
+    var catalogEmptyTitle: String {
+        if searching { return "Checking the catalog" }
+        if catalogStopped { return "Search stopped" }
+        if catalogCorpus == "publicMicrosoftStoreSearch", catalogError == nil,
+           discoveryFailures.isEmpty, discoveryCheckedAt != nil { return "No Store matches" }
+        return "No checked products to show"
+    }
+    func catalogEmptyExplanation(query: String, canRefresh: Bool) -> String {
+        if searching { return "Checking public products in this scope. Results are not available yet." }
+        if !isReady { return "Connect Xodus in Settings to load public product metadata." }
+        if !canRefresh { return "This engine does not provide this catalog operation. Update the paired Xodus build." }
+        if catalogStopped { return "Run a new search or refresh this scope when you are ready." }
+        if catalogError != nil || !discoveryFailures.isEmpty {
+            return "The public catalog could not be fully checked. Refresh to try again; no empty owned library is inferred."
+        }
+        if query.isEmpty { return "Request public catalog data in this scope. Catalog results do not establish ownership or installation access." }
+        if catalogCorpus == "publicMicrosoftStoreSearch", discoveryCheckedAt != nil {
+            return "The public Store returned no matching games in this scope. This does not establish availability in other regions or your ownership."
+        }
+        return "No matching product in this partial catalog. This does not mean the game is unavailable or unowned."
+    }
 
     var currentCredentialState: CredentialState? {
         guard isReady, accountStatusCurrent, !signInPending else { return nil }
@@ -274,6 +305,7 @@ final class LiveSession: ObservableObject {
 
     func supports(_ command: ManagementCommand) -> Bool { hello?.supports(command) == true }
 
+#if !XODUS_SHIPPING
     func chooseBackend() {
         guard !connectionTransitioning else {
             errorMessage = "Wait for the current connection transition to finish before choosing another engine."
@@ -292,6 +324,7 @@ final class LiveSession: ObservableObject {
         backendPath = url.path
         UserDefaults.standard.set(url.path, forKey: "Xodus.developerBackendPath")
     }
+#endif
 
     func connect() async {
         guard !applicationTerminating else { return }
@@ -315,14 +348,21 @@ final class LiveSession: ObservableObject {
         errorMessage = nil
         let token = generation
         do {
-            let target = try configuration ?? BackendConfiguration(
+#if XODUS_SHIPPING
+            let target = try ShippingPairAdmission.configuration(
+                bundle: .main, stateDirectory: state, pins: ShippingPairPins.approved)
+            let admittedTarget = target
+#else
+            let admittedTarget = try configuration ?? BackendConfiguration(
                 executable: URL(fileURLWithPath: backendPath), stateDirectory: state,
                 nativeAuthHost: NativeAuthHostBinding.bundled(in: .main))
+#endif
             let connection = try ManagementClient()
             client = connection
-            let negotiated = try await connection.connect(target)
+            let negotiated = try await connection.connect(admittedTarget)
             guard token == generation, revision == lifecycleRevision, client === connection else { return }
             hello = negotiated
+            let startupQueryRevision = queryGeneration
             phase = .ready
             if supports(.jobs) { try await reconcileActivity() }
             guard token == generation, revision == lifecycleRevision, client === connection else { return }
@@ -347,7 +387,7 @@ final class LiveSession: ObservableObject {
             // Credential-store authorization belongs to explicit Account actions, not anonymous startup.
             await refreshInstalled()
             guard token == generation, revision == lifecycleRevision, client === connection else { return }
-            await search("")
+            if queryGeneration == startupQueryRevision { await search("") }
         } catch {
             guard token == generation, revision == lifecycleRevision else { return }
             await connectionFailed(error)

@@ -7,11 +7,13 @@ public struct NativeAuthHostBinding: Sendable {
     public let executable: URL
     public let sha256: String
     public let version: Int
+    public let expectedBytes: Int64?
 
-    public init(executable: URL, sha256: String, version: Int = 1) {
+    public init(executable: URL, sha256: String, version: Int = 1, expectedBytes: Int64? = nil) {
         self.executable = executable
         self.sha256 = sha256
         self.version = version
+        self.expectedBytes = expectedBytes
     }
 
     public func validatedArguments() throws -> [String] {
@@ -28,6 +30,9 @@ public struct NativeAuthHostBinding: Sendable {
         guard fstat(fd, &before) == 0, before.st_mode & S_IFMT == S_IFREG,
               before.st_uid == getuid(), before.st_nlink == 1, before.st_mode & 0o022 == 0,
               before.st_mode & 0o100 != 0, before.st_size > 0 else {
+            throw ManagementError.backendUnavailable
+        }
+        if let expectedBytes, expectedBytes <= 0 || before.st_size != expectedBytes {
             throw ManagementError.backendUnavailable
         }
         let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: false)
@@ -52,7 +57,7 @@ public struct NativeAuthHostBinding: Sendable {
                 "--native-auth-host-version", String(version)]
     }
 
-    public static func bundled(in bundle: Bundle) throws -> Self? {
+    public static func bundled(in bundle: Bundle, expectedSourceCommit: String? = nil) throws -> Self? {
         let executable = bundle.bundleURL.appendingPathComponent("Contents/MacOS/XodusAuthHost")
         let metadata = bundle.resourceURL?.appendingPathComponent("XodusAuthHost.json")
         let hasExecutable = FileManager.default.fileExists(atPath: executable.path)
@@ -72,6 +77,7 @@ public struct NativeAuthHostBinding: Sendable {
               case .integer(1) = object["version"], case .string(let hash) = object["sha256"],
               case .string(let source) = object["sourceCommit"],
               source.range(of: "^[0-9a-f]{40}$", options: .regularExpression) != nil,
+              expectedSourceCommit == nil || expectedSourceCommit == source,
               bytes == Data("{\"sha256\": \"\(hash)\", \"sourceCommit\": \"\(source)\", \"version\": 1}\n".utf8) else {
             throw ManagementError.nativeAuthHostUnavailable
         }

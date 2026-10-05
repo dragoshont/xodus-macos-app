@@ -28,17 +28,28 @@ struct XodusPreviewApp: App {
     @StateObject private var session = LiveSession()
 
     init() {
+#if XODUS_SHIPPING
+        if !CommandLine.arguments.dropFirst().isEmpty {
+            FileHandle.standardError.write(Data("This application does not accept preview, test or development arguments.\n".utf8))
+            exit(64)
+        }
+#else
         if CommandLine.arguments.contains("--live-check") { NativeChecks.launch() }
         if CommandLine.arguments.contains("--self-check") {
             exit(PreviewChecks.run() ? 0 : 1)
         }
+#endif
     }
 
     var body: some Scene {
-        WindowGroup(state.fixtureMode ? "Xodus - Fixture Preview" : "Xodus") {
+        WindowGroup("Xodus") {
             Group {
+#if !XODUS_SHIPPING
                 if state.fixtureMode { RootView() }
                 else { LiveRootView() }
+#else
+                LiveRootView()
+#endif
             }
                 .environmentObject(state)
                 .environmentObject(session)
@@ -59,17 +70,23 @@ struct XodusPreviewApp: App {
             }
             CommandMenu("Xodus") {
                 Button("Account") { state.showingAccount = true }
+#if !XODUS_SHIPPING
                     .disabled(state.fixtureMode)
                 Button("Return to live Xodus") {
                     state.fixtureMode = false
                     state.navigate(.library)
                 }.disabled(!state.fixtureMode)
+#endif
             }
         }
         Settings {
             Group {
+#if !XODUS_SHIPPING
                 if state.fixtureMode { PreviewSettings() }
                 else { LiveSettingsView() }
+#else
+                LiveSettingsView()
+#endif
             }
                 .environmentObject(state)
                 .environmentObject(session)

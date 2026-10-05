@@ -9,6 +9,13 @@ struct LiveRootView: View {
     @FocusState private var searchFocused: Bool
 
     private var scopedQuery: String { state.query.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var startupAllowed: Bool {
+#if XODUS_SHIPPING
+        true
+#else
+        !CommandLine.arguments.contains("--export-live")
+#endif
+    }
     private var canRefreshCatalog: Bool {
         session.isReady && (session.supports(.search)
             || (scopedQuery.isEmpty ? session.supports(.discover) : session.supports(.query)))
@@ -25,17 +32,13 @@ struct LiveRootView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                hero
-                VStack(alignment: .leading, spacing: 28) {
-                    if state.destination == .library { library }
-                    else if state.destination == .discover { catalog }
-                    else { LiveActivityView() }
-                }
-                .padding(30)
+            VStack(alignment: .leading, spacing: 28) {
+                if state.destination == .library { library }
+                else if state.destination == .discover { catalog }
+                else { LiveActivityView() }
             }
+            .padding(30)
         }
-        .ignoresSafeArea(.container, edges: .top)
         .background(Color(nsColor: .windowBackgroundColor))
         .toolbar {
             XodusToolbar(selection: state.navigationSelection, searchText: $state.query,
@@ -45,11 +48,12 @@ struct LiveRootView: View {
                          accountSymbol: session.accountSymbol) { state.showingAccount = true }
         }
         .onAppear {
+#if !XODUS_SHIPPING
             PreviewExporter.startIfRequested(state: state)
+#endif
         }
         .task {
-            if !CommandLine.arguments.contains("--export-live"),
-               session.phase == .disconnected, !session.connectionTransitioning,
+            if startupAllowed, session.phase == .disconnected, !session.connectionTransitioning,
                !session.backendPath.isEmpty { await session.connect() }
         }
         .task(id: "\(state.destination.rawValue):\(state.query):\(session.market):\(session.language):\(session.isReady)") {
@@ -63,39 +67,6 @@ struct LiveRootView: View {
         .background {
             Button("Focus search") { searchFocused = true }.keyboardShortcut("f").hidden()
         }
-    }
-
-    private var hero: some View {
-        ZStack(alignment: .bottomLeading) {
-            GameArtwork(kind: state.destination == .downloads ? "orbit" : "harbor")
-            LinearGradient(colors: [.clear, .black.opacity(0.72)], startPoint: .top, endPoint: .bottom)
-            VStack(alignment: .leading, spacing: 14) {
-                Text(state.destination == .library ? "A place for your next adventure."
-                     : state.destination == .discover ? "Find your next world." : "Keep an eye on every step.")
-                    .font(.system(size: 42, weight: .bold)).fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 760, alignment: .leading)
-                Text(state.destination == .library ? "Start with your account. Keep access and compatibility clear."
-                     : state.destination == .discover ? (scopedQuery.isEmpty
-                         ? "Browse public PC Game Pass titles. Keep access and compatibility clear."
-                         : session.supports(.query) ? "Search Microsoft Store games. Keep access and compatibility clear."
-                         : "Search checked public products. Keep access and compatibility clear.")
-                     : session.isReady ? "Catalog checks are live. Game downloads are not enabled in this build."
-                     : "Connect Xodus to recover catalog checks. Game downloads are not enabled in this build.")
-                    .font(.title3).fixedSize(horizontal: false, vertical: true)
-                if state.destination == .library {
-                    GlassAction(title: session.accountLabel) { state.showingAccount = true }
-                        .controlSize(.large)
-                }
-                Label(session.isReady ? "Connected development engine" : "Development build - engine not connected",
-                      systemImage: session.isReady ? "cable.connector" : "hammer")
-                    .font(.caption)
-                Text("Original landscape illustration - not a game screenshot.")
-                    .font(.caption).foregroundStyle(.white.opacity(0.9))
-            }
-            .foregroundStyle(.white).padding(30)
-        }
-        .frame(height: state.destination == .downloads ? 330 : 430)
-        .clipped()
     }
 
     private var library: some View {
@@ -280,19 +251,10 @@ struct LiveRootView: View {
             }
             if session.products.isEmpty {
                 ContentUnavailableView {
-                    Label(session.searching ? "Checking the catalog" : session.catalogStopped ? "Search stopped"
-                          : session.catalogCorpus == "publicMicrosoftStoreSearch" && session.catalogError == nil
-                            && session.discoveryFailures.isEmpty ? "No Store matches" : "No checked products to show",
+                    Label(session.catalogEmptyTitle,
                           systemImage: "magnifyingglass")
                 } description: {
-                    Text(!session.isReady ? "Connect Xodus in Settings to load its public product cache."
-                         : !canRefreshCatalog ? "This engine does not provide this catalog operation. Update the paired Xodus build."
-                         : session.catalogStopped ? "Run a new search or refresh this scope when you are ready."
-                         : session.catalogError != nil ? "The public catalog could not be verified. Refresh to try again; no empty owned library is inferred."
-                         : scopedQuery.isEmpty && session.supports(.discover) ? "Open Discover to check one public PC Game Pass page. It does not establish ownership or installation access."
-                         : scopedQuery.isEmpty ? "This engine lists only products it has checked. Public discovery requires a matching engine update."
-                         : session.catalogCorpus == "publicMicrosoftStoreSearch" ? "The public Store returned no matching games in this scope. This does not establish availability in other regions or your ownership."
-                         : "No matching product in this partial catalog. This does not mean the game is unavailable or unowned.")
+                    Text(session.catalogEmptyExplanation(query: scopedQuery, canRefresh: canRefreshCatalog))
                 } actions: {
                     Button("Open Settings", action: openSettings.callAsFunction)
                     if !state.query.isEmpty { Button("Clear search") { state.query = "" } }
@@ -368,7 +330,7 @@ struct LiveActivityView: View {
             }
             if session.activity.jobs.isEmpty {
                 ContentUnavailableView("No catalog checks", systemImage: "arrow.down.circle",
-                    description: Text("Public product checks appear here with real cancellation and recovery. Game-download support is still in development."))
+                    description: Text("Public product checks appear here after you request them. No game download or installation is started."))
                     .frame(maxWidth: .infinity, minHeight: 240)
             }
             ForEach(session.activity.jobs) { job in

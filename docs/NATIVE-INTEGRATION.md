@@ -323,8 +323,9 @@ an incomplete receipt pair or an invalid helper fails before engine launch,
 with a static helper-specific recovery message and without PATH selection.
 Unpackaged anonymous/developer checks may still omit the binding. This local
 helper check does not qualify the selected engine or attest its source.
-The packaging script now includes the helper,
-resources and post-sign metadata from clean source, but has not been executed.
+The packaging script includes the shipping helper and post-sign metadata from
+clean source, but this new revision has not been executed. Private synthetic
+host-check resources are excluded from the shipping source/resource set.
 The deployed e7 producer lacks the new concurrent engine-EOF guardian; the
 paired producer must implement it through issuance, cleanup and publication,
 then pass the agreed engine-only death/write-half/race tests and combined review.
@@ -335,16 +336,18 @@ including auth producer `94353b5cc3196a2b73b89655855ec50c31d35b81`.
 The old e7/304 engine does not support the three native-host flags; omitting them
 selects its old legacy path, not the new Swift host. HELLO's supported auth
 capabilities, version and C95 hash do not establish this producer pairing.
-`XODUS_BACKEND_PATH` and the explicit developer engine picker remain supported,
-but an override cannot borrow approval from the bundled helper or bundled engine.
+`XODUS_BACKEND_PATH` and the explicit developer engine picker are nonshipping
+only. Shipping has neither override and cannot borrow bundled helper evidence.
 
-There is no committed/versioned engine-provenance loader, and the older owner's
-sealed e7 provenance is not evidence for943/9ef. Until a separate admission
-contract is established, native-login assembly requires an independent manual
-gate: verify the newly approved unsigned CLI and adjacent provenance against
-externally pinned source/tree, hash, size, profile and feature evidence before
-copying; record and verify the separately signed copy's different hash afterward.
-The packager's executable check alone is insufficient. Do not reuse304/4d04,
+The new [controlled local admission](SHIPPING-ADMISSION.md) tooling verifies
+externally pinned unsigned CLI/provenance and exact source/tree/profile/features,
+then separately signs and generates compiler-bound signed engine/helper pins.
+The runtime rejects missing/mismatched pins, helper receipt source/version/hash
+and nonfixed paths before execution; pure planning shares this boundary.
+The committed pin template is nil, not an arbitrary-engine grant. This is the
+approved external operator gate made enforceable for one local pair, **not**
+generic distribution attestation. The older owner's sealed e7 provenance is
+not evidence for943/9ef. Do not reuse304/4d04,
 infer source from HELLO or a binary hash, or fabricate a seal. Build only in a
 new isolated canonical-Git stage, verify the final helper receipt/hash/version,
 resources and complete bundle, and preserve the prior app as rollback. A verified
@@ -370,9 +373,11 @@ fresh owned-process checks, in a new isolated canonical-source stage:
 
 ```sh
 sh tools/check.sh
-sh tools/build_app.sh
-open dist/Xodus.app
+sh tools/build_app.sh /absolute/reviewed/engine UNSIGNED_SHA BYTES PROVENANCE_SHA PROVENANCE_BYTES APPROVED_APP_COMMIT APPROVED_APP_TREE /absolute/owned/output
 ```
+
+The script reports a new distinct bundle and external package receipt; it never
+opens a window or replaces `dist/Xodus.app`. Launch requires separate approval.
 
 The existing deployed `.app` includes a release executable, SwiftPM resources,
 original native icon and development bundle identifier. Its Rust native worker
@@ -383,7 +388,7 @@ the Swift host and requires a matching new producer; it does not replace this
 preserved pairing. No Wine/runtime payload, real library or credential cache is
 bundled.
 
-Settings provides a native engine picker, account controls, explicit catalog market/language, advanced public-product lookup and a bounded redacted diagnostic preview. After preview, a native save panel can save exactly the displayed counts-only summary atomically off the main actor. Unreviewed/stale preview and nonlocal destinations are rejected; filesystem errors are visible, not success. No account data, raw logs, URLs or personal paths enter this summary. Backend discovery in a developer bundle does not establish signed runtime certification.
+Settings provides account controls, explicit catalog market/language, advanced public-product lookup and a bounded redacted diagnostic preview; the native engine picker exists only in nonshipping development. After preview, a native save panel can save exactly the displayed counts-only summary atomically off the main actor. Unreviewed/stale preview and nonlocal destinations are rejected; filesystem errors are visible, not success. No account data, raw logs, URLs or personal paths enter this summary. Backend discovery in a developer bundle does not establish signed runtime certification.
 
 Default LaunchServices startup was exercised with `open Xodus.app`, no mode,
 backend flag or environment override. After fixing the automatic account read,

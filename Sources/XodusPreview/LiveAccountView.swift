@@ -15,13 +15,8 @@ struct LiveAccountView: View {
     @StateObject private var interaction = AccountInteraction()
 
     var body: some View {
-        AccountSheetLayout {
-            ZStack(alignment: .bottomLeading) {
-                GameArtwork(kind: "orbit")
-                LinearGradient(colors: [.clear, .black.opacity(0.7)], startPoint: .top, endPoint: .bottom)
-                Text("Your account.\nSafely on your Mac.")
-                    .font(.system(size: 32, weight: .bold)).foregroundStyle(.white).padding(24)
-            }
+        AccountSheetLayout(showsHeader: false) {
+            EmptyView()
         } content: {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(spacing: 12) {
@@ -115,11 +110,18 @@ struct LiveSettingsView: View {
     var body: some View {
         Form {
             Section("Xodus engine") {
+#if XODUS_SHIPPING
+                Text("Only this app's approved bundled engine and sign-in helper can be used. Gameplay runtime certification is separate.")
+                    .foregroundStyle(.secondary)
+#else
                 Text("Development integration. Only choose a management engine you trust; signed runtime distribution is not implemented yet.")
                     .foregroundStyle(.secondary)
+#endif
                 LabeledContent("Build", value: session.backendPath.isEmpty ? "Not selected" : URL(fileURLWithPath: session.backendPath).lastPathComponent)
                 HStack {
+#if !XODUS_SHIPPING
                     Button("Choose Xodus build") { session.chooseBackend() }.disabled(session.connectionTransitioning)
+#endif
                     Spacer()
                     Button(session.isReady ? "Reconnect" : "Connect") { Task { await session.connect() } }
                         .disabled(session.backendPath.isEmpty || session.connectionTransitioning)
@@ -192,17 +194,6 @@ struct LiveSettingsView: View {
                 if let error = session.diagnosticExportError {
                     Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.secondary)
                 }
-            }
-            Section("Original design preview") {
-                Button("Open offline fixture preview") {
-                    Task {
-                        guard await session.disconnect() else { return }
-                        state.reset()
-                        state.fixtureMode = true
-                    }
-                }
-                Text("Invented games and simulated actions remain in a separate, explicitly labelled mode.")
-                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped).padding()

@@ -336,6 +336,9 @@ enum NativeChecks {
                   && empty.catalogError == nil && empty.catalogCorpus == "publicMicrosoftStoreSearch"
                   && empty.nextCursor == nil && empty.discoveryCheckedAt != nil,
                   "Genuine empty query remains live, scoped and distinct from all-failure pages")
+            check(empty.catalogEmptyTitle == "No Store matches"
+                  && empty.catalogEmptyExplanation(query: "No match", canRefresh: true).contains("no matching games"),
+                  "Only a confirmed zero-result Store response displays the no-match message")
             await empty.refreshAccount()
             check(empty.isReady && empty.accountStatusCurrent,
                   "Native status reconciliation still works after a genuine empty query")
@@ -345,11 +348,36 @@ enum NativeChecks {
             await stopped.connect()
             let late = Task { await stopped.refreshCatalog("XodusNoMatch9F4A12C7") }
             try await wait { stopped.searching }
+            check(stopped.products.isEmpty && stopped.catalogEmptyTitle == "Checking the catalog"
+                  && stopped.discoveryCheckedAt == nil
+                  && stopped.catalogEmptyExplanation(query: "Pending", canRefresh: true).contains("not available yet")
+                  && !stopped.catalogEmptyExplanation(query: "Pending", canRefresh: true).contains("no matching"),
+                  "Pending empty catalog shows loading, never a premature no-match result")
             stopped.stopCatalogSearch()
             await late.value
             check(stopped.isReady && stopped.catalogStopped && stopped.discoveryCheckedAt == nil,
                   "Stopped search discards later bounded results without pretending HTTP was cancelled")
+            check(stopped.catalogEmptyTitle == "Search stopped"
+                  && stopped.catalogEmptyExplanation(query: "Stopped", canRefresh: true).contains("new search"),
+                  "Cancelled catalog UI remains distinct from a confirmed empty result")
             await stopped.disconnect()
+
+            let startupConfiguration = configuration("startupquery")
+            let startup = LiveSession(configuration: startupConfiguration)
+            for attempt in 1...2 {
+                let connecting = Task { await startup.connect() }
+                try await wait { startup.isReady }
+                await startup.refreshCatalog("Latest startup query \(attempt)")
+                let products = startup.products, cursor = startup.nextCursor
+                await connecting.value
+                check(startup.products == products && startup.products.first?.title == "Latest startup query \(attempt)"
+                      && startup.catalogCorpus == "publicMicrosoftStoreSearch" && startup.nextCursor == cursor,
+                      "Post-ready user query survives delayed startup reconciliation and reconnect")
+                check(await startup.disconnect(), "Startup query regression retires its owned neutral child")
+            }
+            check(try !trace(startupConfiguration).contains("catalog.search"),
+                  "Superseded startup never seeds an empty cache search over the user's Store query")
+            try cleanLifecycle(startupConfiguration)
 
             let sourceFailure = session("querynodetails")
             await sourceFailure.connect()

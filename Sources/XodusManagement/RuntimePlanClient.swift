@@ -79,7 +79,8 @@ public actor RuntimePlanClient {
     }
 
     public func plan(executable: URL, configuration: RuntimeProviderConfiguration,
-                     timeoutSeconds: TimeInterval = 5) async throws -> RuntimeConfigurationPlan {
+                     timeoutSeconds: TimeInterval = 5,
+                     executableIdentity: NativeAuthHostBinding? = nil) async throws -> RuntimeConfigurationPlan {
         guard child == nil else { throw RuntimePlanningError.shutdownFailed }
         guard timeoutSeconds.isFinite, timeoutSeconds > 0, timeoutSeconds <= 30 else {
             throw RuntimePlanningError.invalidConfiguration
@@ -110,6 +111,10 @@ public actor RuntimePlanClient {
             }
             guard fcntl(input.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1) == 0 else {
                 throw RuntimePlanningError.transportFailed
+            }
+            if let identity = executableIdentity {
+                guard identity.executable == executable else { throw RuntimePlanningError.unavailable }
+                _ = try identity.validatedArguments()
             }
             try process.run()
         } catch {

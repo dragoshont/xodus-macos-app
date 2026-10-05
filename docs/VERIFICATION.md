@@ -4,6 +4,24 @@ Foundation recorded 2026-10-03; subsequent native/read-only milestones are
 identified separately below. None establishes successful human authentication,
 game download, install or gameplay.
 
+## Shipping hardening candidate
+
+The adversarial841 review required compile-time shipping/demo separation,
+removal of synthetic live heroes, paired-engine admission rather than helper-only
+trust, catalog-loading precedence and startup-query revision fencing.
+`XODUS_SHIPPING=1` now excludes fixture views/state/resources and check entrypoints.
+The interactive live-to-preview Settings transition is removed, making the
+independent-planning preview-transition hazard unreachable without a new mode API.
+See [controlled local admission](SHIPPING-ADMISSION.md) for the approved pin
+generation and external operator trust chain; no generated artifact pins are
+committed.
+
+This candidate must pass its own normal-push SDK27 native/nonshipping checks,
+shipping release compilation, actual rejected-entrypoint processes, owned-neutral
+shipping admission checks and strict portable packaging negatives. No previous689
+result qualifies it. No new Mac artifact, package, provider attempt, account
+status, Keychain interaction or gameplay result is claimed by source qualification.
+
 ## Freshness-aware live account presentation
 
 Source inspection found that a failed status read disabled account mutations

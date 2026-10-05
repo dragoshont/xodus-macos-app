@@ -43,12 +43,28 @@ final class RuntimeProviderSettings: ObservableObject {
 
     func makePlan(executable: URL) {
         guard let configuration, !planning, !applicationTerminating else { return }
+        let engineIdentity: NativeAuthHostBinding?
+#if XODUS_SHIPPING
+        do {
+            let pair = try ShippingPairAdmission.configuration(
+                bundle: .main, stateDirectory: URL(fileURLWithPath: NSHomeDirectory()),
+                pins: ShippingPairPins.approved)
+            guard pair.executable == executable else { throw ManagementError.pairedEngineUnavailable }
+            engineIdentity = pair.executableIdentity
+        } catch {
+            errorMessage = ManagementError.pairedEngineUnavailable.localizedDescription
+            return
+        }
+#else
+        engineIdentity = nil
+#endif
         invalidate()
         let captured = revision
         planning = true
         task = Task {
             do {
-                let result = try await client.plan(executable: executable, configuration: configuration)
+                let result = try await client.plan(executable: executable, configuration: configuration,
+                                                  executableIdentity: engineIdentity)
                 if captured == revision && !Task.isCancelled { plan = result }
             } catch {
                 if captured == revision {

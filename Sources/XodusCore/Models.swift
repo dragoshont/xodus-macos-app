@@ -109,6 +109,7 @@ public enum InventoryState: String, CaseIterable, Sendable {
     }
 }
 
+#if !XODUS_SHIPPING
 public struct InstallPlan: Equatable, Sendable {
     public let editionID: String
     public let package: PackageIdentity
@@ -134,6 +135,7 @@ public struct InstallPlan: Equatable, Sendable {
         self.availableBytes = availableBytes
         destination = "Demo storage / Games (not written)"
     }
+    #endif
 }
 
 public enum InstallDecision: Equatable, Sendable {
@@ -198,6 +200,7 @@ public enum JobPhase: String, Sendable {
     }
 }
 
+#if !XODUS_SHIPPING
 public struct FixtureJob: Identifiable, Equatable, Sendable {
     public let id: UUID
     public let gameID: String
@@ -208,6 +211,7 @@ public struct FixtureJob: Identifiable, Equatable, Sendable {
         self.gameID = gameID
         self.phase = phase
     }
+    #endif
 
     public mutating func advance() {
         switch phase {

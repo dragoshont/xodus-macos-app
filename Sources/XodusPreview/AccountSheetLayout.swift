@@ -5,12 +5,14 @@ struct AccountSheetLayout<Header: View, Content: View, Actions: View>: View {
     let header: Header
     let content: Content
     let actions: Actions
+    let showsHeader: Bool
 
-    init(@ViewBuilder header: () -> Header, @ViewBuilder content: () -> Content,
-         @ViewBuilder actions: () -> Actions) {
+    init(showsHeader: Bool = true, @ViewBuilder header: () -> Header,
+         @ViewBuilder content: () -> Content, @ViewBuilder actions: () -> Actions) {
         self.header = header()
         self.content = content()
         self.actions = actions()
+        self.showsHeader = showsHeader
     }
 
     static func headerHeight(for height: CGFloat) -> CGFloat {
@@ -23,7 +25,7 @@ struct AccountSheetLayout<Header: View, Content: View, Actions: View>: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
                         let height = Self.headerHeight(for: geometry.size.height)
-                        if height > 0 { header.frame(height: height).clipped() }
+                        if showsHeader && height > 0 { header.frame(height: height).clipped() }
                         content.padding(.horizontal, 28).padding(.vertical, 24)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

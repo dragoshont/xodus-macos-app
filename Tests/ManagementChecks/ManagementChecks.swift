@@ -787,7 +787,7 @@ enum MockBackend {
         do {
             let lifecycleDirectory = URL(fileURLWithPath: CommandLine.arguments[index + 1])
             let lifecycleScenario = ["retireslow", "retirefailed", "retirehello", "retiresnapshot", "authgate",
-                                     "savedpermission"].contains(scenario)
+                                     "savedpermission", "startupquery"].contains(scenario)
             func trace(_ entry: String) throws {
                 guard lifecycleScenario else { return }
                 try FileManager.default.createDirectory(at: lifecycleDirectory, withIntermediateDirectories: true,
@@ -807,7 +807,8 @@ enum MockBackend {
             if scenario == "diagnostics" { supported.insert(.diagnostics) }
             if ["discoveryfail", "discoveryrecover"].contains(scenario) { supported.insert(.discover) }
             if ["queryfail", "badqueryfail", "queryempty", "queryslow", "querynodetails",
-                "querynulldetails", "querycoalesce"].contains(scenario) { supported.insert(.query) }
+                "querynulldetails", "querycoalesce", "startupquery"].contains(scenario) { supported.insert(.query) }
+            if scenario == "startupquery" { supported.insert(.search) }
             if ["inspection", "inspectionmissing", "inspectionmismatch"].contains(scenario) {
                 supported.insert(.inspectInstallation)
             }
@@ -836,7 +837,30 @@ enum MockBackend {
                     if scenario == "mismatch" { result["protocol"] = .object(["major": .integer(2), "minor": .integer(0)]) }
                     try emit(.object(result))
                 } else {
-                    if scenario == "savedpermission" { try trace(command) }
+                    if ["savedpermission", "startupquery"].contains(scenario) { try trace(command) }
+                    if scenario == "startupquery", command == "jobs.snapshot" {
+                        let response = result(request, data: .object([
+                            "sessionID": .string("fixture-session"), "watermark": .integer(0), "jobs": .array([])
+                        ]))
+                        DispatchQueue.global().async {
+                            Thread.sleep(forTimeInterval: 0.6)
+                            do { try emit(.object(response)) } catch { exit(3) }
+                        }
+                        continue
+                    }
+                    if scenario == "startupquery", command == "catalog.query" {
+                        guard var page = frames.first(where: {
+                            $0["data"]?["corpus"]?.string == "publicMicrosoftStoreSearch"
+                                && $0["data"]?["products"]?.array?.isEmpty == false
+                        })?["data"]?.object, var product = page["products"]?.array?.first?.object else { exit(3) }
+                        product["title"] = request["params"]?["query"]
+                        product["source"] = .string("syntheticPublicSource")
+                        page["query"] = request["params"]?["query"]
+                        page["products"] = .array([.object(product)])
+                        page["failures"] = .array([])
+                        try emit(.object(result(request, data: .object(page))))
+                        continue
+                    }
                     if (["failedflow", "failedflownocode"].contains(scenario) || scenario.hasPrefix("failedstage-")),
                        command == "auth.begin" {
                         var failureObject: [String: JSONValue] = [
