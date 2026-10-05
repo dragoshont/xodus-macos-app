@@ -47,7 +47,8 @@ final class ShippingChecks: XCTestCase {
         let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
             .appendingPathComponent("XodusShippingChecks-\(UUID().uuidString)")
         do {
-            guard let neutralEngine = ProcessInfo.processInfo.environment["XODUS_NEUTRAL_ENGINE"] else {
+            guard let neutralEngine = ProcessInfo.processInfo.environment["XODUS_NEUTRAL_ENGINE"],
+                  let neutralFixture = ProcessInfo.processInfo.environment["XODUS_NEUTRAL_FIXTURE"] else {
                 throw ManagementError.invalidRequest
             }
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false,
@@ -84,8 +85,12 @@ final class ShippingChecks: XCTestCase {
                 engineSHA256: hash(engineData), engineBytes: Int64(engineData.count),
                 helperSHA256: hash(helperData), helperBytes: Int64(helperData.count),
                 helperVersion: 1, helperSourceCommit: source)
+            let neutralState = root.appendingPathComponent("shippingpair")
+            try FileManager.default.createDirectory(at: neutralState, withIntermediateDirectories: false)
+            try FileManager.default.copyItem(at: URL(fileURLWithPath: neutralFixture),
+                                             to: neutralState.appendingPathComponent("positive.json"))
             let configuration = try ShippingPairAdmission.configuration(bundle: bundle,
-                stateDirectory: root.appendingPathComponent("queryempty"), pins: pins)
+                stateDirectory: neutralState, pins: pins)
             let client = try ManagementClient()
             _ = try await client.connect(configuration)
             check(true, "Compiled shipping admission accepts only the exact owned neutral engine/helper pair")

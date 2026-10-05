@@ -801,7 +801,13 @@ enum MockBackend {
                 guard written == bytes.count, closed == 0 else { throw ManagementError.writeFailed }
             }
             try trace("started")
-            let frames = try fixture("positive").array ?? []
+            let frames: [JSONValue]
+            if scenario == "shippingpair" {
+                frames = try JSONDecoder().decode(JSONValue.self, from: Data(contentsOf:
+                    lifecycleDirectory.appendingPathComponent("positive.json"))).array ?? []
+            } else {
+                frames = try fixture("positive").array ?? []
+            }
             var hello = frames.first(where: { $0["data"]?["schema"] != nil })?["data"]?.object ?? [:]
             var supported: Set<ManagementCommand> = [.authStatus, .authLogout, .jobs]
             if scenario == "diagnostics" { supported.insert(.diagnostics) }
