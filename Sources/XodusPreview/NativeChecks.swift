@@ -59,7 +59,7 @@ enum NativeChecks {
             for reason in ["helper.invalidFrame", "helper.invalidNavigation", "helper.navigationFailed",
                            "helper.popupUnsupported", "helper.contentTerminated", "helper.javaScriptFailed",
                            "helper.bridgeInvalid", "helper.deadlineExpired", "helper.parentUnavailable",
-                           "channelEOF", "unclassified"] {
+                           "channelEOF", "unclassified", "tokenExchangeFailed", "helperCompletionFailed"] {
                 let message = "Native sign-in failed: \(reason)."
                 check(try LiveSession.validatedNativeSignInObservation(observationFailure(message)) == message,
                       "Exact approved \(reason) observation is available under Account Details")
@@ -67,7 +67,11 @@ enum NativeChecks {
             for message in ["Native sign-in failed: helper.unknown.", "Native sign-in failed: channelEOF. secret",
                             " Native sign-in failed: helper.bridgeInvalid.", "Native sign-in failed: channelEOF.\n",
                             "secret raw provider text", "Native sign-in failed: helper.navigationFailed",
-                            "Native sign-in failed: helper.navigationFailed. https://provider.invalid/?token=secret"] {
+                            "Native sign-in failed: helper.navigationFailed. https://provider.invalid/?token=secret",
+                            "Native sign-in failed: helper.tokenExchangeFailed.",
+                            "Native sign-in failed: tokenExchangeFailed. extra",
+                            "Native sign-in failed: helperCompletionFailed.\n",
+                            "Native sign-in failed: helperCompletionFailed"] {
                 check(try LiveSession.validatedNativeSignInObservation(observationFailure(message)) == nil,
                       "Unapproved or extended engine wording never enters the displayed native observation")
             }
@@ -76,6 +80,14 @@ enum NativeChecks {
                   && LiveSession.validatedNativeSignInObservation(
                     observationFailure("Native sign-in failed: helper.bridgeInvalid.", reason: "unexpected")) == nil,
                   "An exact observation is rejected without the agreed AUTH_INVALID/nativeSignIn/pipelineFailed tuple")
+            for reason in ["tokenExchangeFailed", "helperCompletionFailed"] {
+                let message = "Native sign-in failed: \(reason)."
+                check(try LiveSession.validatedNativeSignInObservation(
+                    observationFailure(message, code: "INTERNAL")) == nil
+                      && LiveSession.validatedNativeSignInObservation(
+                        observationFailure(message, reason: "unexpected")) == nil,
+                      "Exact \(reason) boundary wording requires the unchanged approved failure tuple")
+            }
             try await CrossOverDependencyChecks.run(check: check)
             try await ApplicationTerminationChecks.run(check: check)
             let expired = session("expired")

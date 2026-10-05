@@ -242,7 +242,7 @@ final class LiveSession: ObservableObject {
         let reasons = ["helper.invalidFrame", "helper.invalidNavigation", "helper.navigationFailed",
                        "helper.popupUnsupported", "helper.contentTerminated", "helper.javaScriptFailed",
                        "helper.bridgeInvalid", "helper.deadlineExpired", "helper.parentUnavailable",
-                       "channelEOF", "unclassified"]
+                       "channelEOF", "unclassified", "tokenExchangeFailed", "helperCompletionFailed"]
         return reasons.map { "Native sign-in failed: \($0)." }.first { $0 == failure.message }
     }
 

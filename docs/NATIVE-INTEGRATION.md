@@ -341,7 +341,10 @@ The compatible producer observation uses the existing failure message only:
 `Native sign-in failed: helper.REASON.` with the closed reasons `invalidFrame`,
 `invalidNavigation`, `navigationFailed`, `popupUnsupported`, `contentTerminated`,
 `javaScriptFailed`, `bridgeInvalid`, `deadlineExpired`, `parentUnavailable`, or
-the exact `Native sign-in failed: channelEOF.` / `Native sign-in failed: unclassified.`.
+the exact `Native sign-in failed: channelEOF.` / `Native sign-in failed: unclassified.`,
+or the fixed boundary messages `Native sign-in failed: tokenExchangeFailed.` /
+`Native sign-in failed: helperCompletionFailed.`. These identify failed operations,
+not provider error text, and never establish credential commit.
 Account Details accepts these exact strings only with the existing
 `AUTH_INVALID / nativeSignIn / pipelineFailed` tuple; all other message text remains
 undisplayed. No new wire fields, logs, provider content or secret-bearing diagnostics
