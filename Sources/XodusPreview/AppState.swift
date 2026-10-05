@@ -50,7 +50,14 @@ final class AppState: ObservableObject {
     @Published var message: String?
 #endif
     @Published var showingAccount = false
-    @Published var destination: Destination = .library
+    @Published var destination: Destination = {
+#if !XODUS_SHIPPING
+        if CommandLine.arguments.contains("--fixture") || CommandLine.arguments.contains("--export-preview") {
+            return .library
+        }
+#endif
+        return .discover
+    }()
     @Published var query = ""
 
     var navigationSelection: Binding<Destination> {

@@ -157,6 +157,44 @@ enum NativeUIChecks {
               "Native control/layout checks create no window, provider or backend connection")
     }
 
+    static func checkLiveLayouts(session: LiveSession, check: (Bool, String) -> Void) {
+        let windows = NSApplication.shared.windows.count
+        let state = AppState()
+        for destination in [Destination.discover, .library] {
+            state.navigate(destination)
+            for size in [CGSize(width: 820, height: 640), CGSize(width: 1200, height: 800)] {
+                let host = NSHostingView(rootView: LiveRootView(allowsStartupTasks: false)
+                    .environmentObject(state).environmentObject(session))
+                host.sizingOptions = []
+                host.frame = CGRect(origin: .zero, size: size)
+                host.layoutSubtreeIfNeeded()
+                let scrollViews = descendants(of: host).compactMap { $0 as? NSScrollView }
+                check(host.window == nil && host.bounds.size == size && !scrollViews.isEmpty
+                      && scrollViews.allSatisfy {
+                          !$0.hasHorizontalScroller
+                              && ($0.documentView?.bounds.width ?? 0) <= host.bounds.width + 1
+                      },
+                      "Replayed public \(destination.rawValue) and synthetic local records fit a bounded native viewport")
+            }
+        }
+        if let product = session.products.first {
+            let host = NSHostingView(rootView: LiveProductView(product: product).environmentObject(session))
+            host.sizingOptions = []
+            host.frame = CGRect(x: 0, y: 0, width: 680, height: 620)
+            host.layoutSubtreeIfNeeded()
+            check(host.window == nil && host.fittingSize.width <= 680 && host.fittingSize.height <= 620,
+                  "Replayed public multi-edition detail fits the bounded native sheet")
+        }
+        let account = NSHostingView(rootView: LiveAccountView(refreshStatusOnAppear: false)
+            .environmentObject(state).environmentObject(session))
+        account.sizingOptions = []
+        account.frame = CGRect(x: 0, y: 0, width: 480, height: 340)
+        account.layoutSubtreeIfNeeded()
+        check(account.window == nil && NSApplication.shared.windows.count == windows
+              && session.authentication == nil && !session.accountBusy && !session.signInPending,
+              "Lean Account and live-data layouts create no window or credential request")
+    }
+
     private static func ancestors(of view: NSView) -> [NSView] {
         guard let parent = view.superview else { return [] }
         return [parent] + ancestors(of: parent)

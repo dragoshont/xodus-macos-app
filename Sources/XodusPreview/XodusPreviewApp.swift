@@ -74,7 +74,7 @@ struct XodusPreviewApp: App {
                     .disabled(state.fixtureMode)
                 Button("Return to live Xodus") {
                     state.fixtureMode = false
-                    state.navigate(.library)
+                    state.navigate(.discover)
                 }.disabled(!state.fixtureMode)
 #else
                 Button("Account") { state.showingAccount = true }

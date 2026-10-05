@@ -10,6 +10,11 @@ entrypoints. Shipping screens use native setup/empty/loading/error states and
 actual public product data, not synthetic game illustrations. See
 [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
+Live startup opens Discover, with real public results and scoped search.
+Library shows only Xodus-managed records; neither registration nor last-verified
+health establishes current game integrity or permission to play. Technical
+metadata stays in Details. No Install or Play action is offered yet.
+
 ![Original Library concept](design/previews/library.png)
 
 ## Explore the foundation

@@ -119,6 +119,63 @@ final class LiveSession: ObservableObject {
         isReady && supports(.authBegin) && supports(.authCancel) && supports(.authStatus)
             && accountStatusCurrent && authentication?.state == .signedOut && !accountBusy && !signInPending
     }
+    var accountNoticeTitle: String {
+        guard isReady, accountStatusCurrent else { return accountLabel }
+        if authentication?.flow?.state == .failed { return "Sign-in failed" }
+        if authentication?.flow?.state == .cancelled { return "Sign-in cancelled" }
+        return accountLabel
+    }
+    var accountMessage: String {
+        if phase == .connecting { return "Connecting to Xodus." }
+        guard isReady else { return "Xodus couldn't connect. Open Settings to reconnect." }
+        if signInPending {
+            return accountStatusCurrent
+                ? "Continue in Microsoft's window if it opened, or cancel sign-in."
+                : "Sign-in's current result is unknown. Check status before trying again."
+        }
+        guard accountStatusCurrent else { return "Check status to see whether you're signed in." }
+        if authentication?.flow?.state == .failed {
+            return "This sign-in didn't finish. Check Details or try again when you're ready. You can still browse games."
+        }
+        if authentication?.flow?.state == .cancelled { return "You can sign in whenever you're ready." }
+        switch currentCredentialState {
+        case .credentialPresent: return "You're signed in. Library syncing isn't available yet."
+        case .expired, .invalid: return "Disconnect this sign-in, then sign in again."
+        case .signedOut: return "Connect your Microsoft account. You can browse games without signing in."
+        case nil: return "Check status to see whether you're signed in."
+        }
+    }
+    var libraryTitle: String {
+        guard isReady else { return phase == .connecting ? "Connecting" : "Xodus couldn't connect" }
+        if installedRefreshing && installedSnapshot == nil { return "Checking games on this Mac" }
+        if installedError != nil { return "Games couldn't be checked" }
+        if installedSnapshot == nil { return "Local games haven't been checked" }
+        return "No games registered yet"
+    }
+    var libraryMessage: String {
+        guard isReady else { return "You can reconnect in Settings." }
+        if installedError != nil { return "Refresh to try again. Your game files haven't been changed." }
+        return "Your Microsoft library isn't available in this build. Browse games in Discover, or check a game folder in Details."
+    }
+    var catalogNotice: String? {
+        if catalogStopped { return "Search stopped." }
+        if catalogError != nil { return "Games couldn't be loaded. Try again." }
+        if !discoveryFailures.isEmpty { return "Some results couldn't be checked." }
+        return nil
+    }
+    var catalogTitle: String {
+        catalogCorpus == "publicMicrosoftStoreSearch" ? "Search results"
+            : catalogCorpus == "pcGamePassDiscovery" ? "Explore PC games" : "PC games"
+    }
+    func catalogMessage(query: String, canRefresh: Bool) -> String {
+        if searching { return "Looking for games. Results aren't ready yet." }
+        if !isReady { return "Reconnect in Settings to browse games." }
+        if !canRefresh { return "This catalog isn't available in this build." }
+        if catalogStopped { return "Start a new search when you're ready." }
+        if catalogError != nil || !discoveryFailures.isEmpty { return "Try another search or refresh the results." }
+        if query.isEmpty { return "Find your next game with Discover or search." }
+        return "Try a different title or a shorter search."
+    }
     var needsAccountDisconnect: Bool {
         guard let state = authentication?.state else { return false }
         return [.credentialPresent, .expired, .invalid].contains(state)
@@ -129,11 +186,11 @@ final class LiveSession: ObservableObject {
     }
     var canLoadMoreCatalog: Bool { nextCursor != nil && !searching }
     var catalogEmptyTitle: String {
-        if searching { return "Checking the catalog" }
+        if searching { return "Finding games" }
         if catalogStopped { return "Search stopped" }
         if catalogCorpus == "publicMicrosoftStoreSearch", catalogError == nil,
            discoveryFailures.isEmpty, discoveryCheckedAt != nil { return "No Store matches" }
-        return "No checked products to show"
+        return "No games to show"
     }
     func catalogEmptyExplanation(query: String, canRefresh: Bool) -> String {
         if searching { return "Checking public products in this scope. Results are not available yet." }
@@ -559,7 +616,28 @@ final class LiveSession: ObservableObject {
     }
 
     func installationTitle(_ installation: RegisteredInstallation) -> String {
-        products.first { $0.id == installation.productID }?.title ?? "Product \(installation.productID)"
+        products.first { $0.id == installation.productID }?.title ?? "Registered game"
+    }
+
+    func installationMessage(_ installation: RegisteredInstallation) -> String {
+        switch installation.health {
+        case .verified: "Added to Xodus - last verified"
+        case .broken: "Needs repair"
+        case .recoveryRequired: "Recovery needed"
+        }
+    }
+
+    func installationStatus(_ edition: ProductEvidence) -> String {
+        guard isReady, let snapshot = installedSnapshot else { return "Not checked" }
+        let matches = snapshot.installations.filter {
+            $0.productID == edition.productID && $0.editionID == edition.editionID
+        }
+        return matches.isEmpty ? "No managed installation found"
+            : matches.map(installationMessage).joined(separator: ", ")
+    }
+
+    func activityTitle(_ job: CatalogJob) -> String {
+        products.first { $0.id == job.product.productID }?.title ?? "Game details check"
     }
 
     func chooseInstallationFolder() {

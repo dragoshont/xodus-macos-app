@@ -16,6 +16,8 @@ enum PreviewChecks {
         }
 
         let state = AppState()
+        check(state.destination == .discover, "Live startup opens real Discover, not unavailable owned inventory")
+        state.navigate(.library)
         check(ArtAssets.images.count == 6, "Six original fixture image resources load")
         check(state.visibleGames.count == 4, "Library excludes catalog-only and unknown-access fixtures")
         state.query = "moss"

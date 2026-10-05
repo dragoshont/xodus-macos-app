@@ -813,8 +813,11 @@ enum MockBackend {
             if scenario == "diagnostics" { supported.insert(.diagnostics) }
             if ["discoveryfail", "discoveryrecover"].contains(scenario) { supported.insert(.discover) }
             if ["queryfail", "badqueryfail", "queryempty", "queryslow", "querynodetails",
-                "querynulldetails", "querycoalesce", "startupquery"].contains(scenario) { supported.insert(.query) }
+                "querynulldetails", "querycoalesce", "startupquery", "publiccapture"].contains(scenario) { supported.insert(.query) }
             if scenario == "startupquery" { supported.insert(.search) }
+            if ["publiccapture", "registryempty", "registryunavailable"].contains(scenario) {
+                supported.insert(.installed)
+            }
             if ["inspection", "inspectionmissing", "inspectionmismatch"].contains(scenario) {
                 supported.insert(.inspectInstallation)
             }
@@ -944,6 +947,37 @@ enum MockBackend {
                                 catch { exit(3) }
                             }
                         } else { try emit(.object(response)) }
+                        continue
+                    }
+                    if scenario == "publiccapture", command == "catalog.query" {
+                        guard let page = try fixture("public-halo-query")["data"] else { exit(3) }
+                        try emit(.object(result(request, data: page)))
+                        continue
+                    }
+                    if command == "installed.snapshot",
+                       ["publiccapture", "registryempty", "registryunavailable"].contains(scenario) {
+                        if scenario == "registryunavailable" {
+                            try emitFailure(request, code: "NETWORK_UNAVAILABLE")
+                        } else {
+                            guard var registry = frames.first(where: {
+                                $0["data"]?["installations"]?.array != nil
+                            })?["data"]?.object else { exit(3) }
+                            if scenario == "registryempty" { registry["installations"] = .array([]) }
+                            else {
+                                registry["installations"] = .array([.object([
+                                    "installationID": .string("synthetic-local-installation"),
+                                    "revision": .integer(1), "productID": .string("synthetic-local-product"),
+                                    "editionID": .string("synthetic-local-edition"),
+                                    "packageID": .string("synthetic-local-package"),
+                                    "packageVersion": .string("synthetic-version"),
+                                    "packageDigest": .string("synthetic-digest"),
+                                    "runtimeFingerprint": .string("synthetic-runtime"),
+                                    "managedRoot": .string("/synthetic/never-inspected"),
+                                    "savePolicy": .string("preserve"), "health": .string("verified")
+                                ])])
+                            }
+                            try emit(.object(result(request, data: .object(registry))))
+                        }
                         continue
                     }
                     if scenario == "querynodetails", command == "catalog.query" {

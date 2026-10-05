@@ -17,32 +17,31 @@ struct LiveProductView: View {
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 8) {
                         Text(product.title).font(.title.bold())
-                        Text("Public catalog - not ownership evidence").foregroundStyle(.secondary)
-                        Text("\(product.market) / \(product.language) - \(product.freshness) metadata")
-                            .font(.caption).foregroundStyle(.secondary)
-                        if let resolved = product.resolvedLanguage,
-                           resolved.caseInsensitiveCompare(product.language) != .orderedSame {
-                            Text("Source metadata language: \(resolved). Requested scope: \(product.language).")
-                                .font(.caption).foregroundStyle(.secondary)
+                        if product.freshness == "cached" {
+                            Text("Offline details").foregroundStyle(.secondary)
                         }
                     }
                     Spacer()
                 }
-                Text("Artwork is not provided by this integration. No placeholder is presented as this game's cover.")
-                    .font(.callout).foregroundStyle(.secondary)
                 Divider()
-                ForEach(product.editions) { edition in
+                ForEach(Array(product.editions.enumerated()), id: \.element.id) { index, edition in
                     VStack(alignment: .leading, spacing: 15) {
-                        Text("Edition \(edition.editionID)").font(.headline).textSelection(.enabled)
+                        Text(product.editions.count == 1 ? "Game details" : "Edition \(index + 1)").font(.headline)
                         Grid(alignment: .leading, horizontalSpacing: 28, verticalSpacing: 14) {
-                            facet("Access", edition.entitlement.kind.label,
-                                  source: edition.entitlement.source)
-                            facet("PC package", edition.installability.kind.label,
-                                  source: edition.installability.reason ?? "No package authorization established.")
-                            facet("Compatibility", edition.compatibility.kind.label,
-                                  source: edition.compatibility.source)
-                            facet("This Mac", installationStatus(edition),
-                                  source: "Managed registry only; other game folders have not been checked.")
+                            facet("Access", edition.entitlement.kind.label)
+                            facet("PC package", edition.installability.kind.label)
+                            facet("Compatibility", edition.compatibility.kind.label)
+                            facet("This Mac", session.installationStatus(edition))
+                        }
+                        DisclosureGroup("Details") {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Edition \(edition.editionID)")
+                                Text("Access: \(edition.entitlement.source)")
+                                Text("PC package: \(edition.installability.reason ?? "No package authorization established.")")
+                                Text("Compatibility: \(edition.compatibility.source)")
+                                Text("This Mac: Xodus management registry only; other game folders haven't been checked.")
+                            }
+                            .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                         }
                         Divider()
                     }
@@ -50,10 +49,23 @@ struct LiveProductView: View {
                 if product.editions.isEmpty {
                     Label("No edition has been resolved. Installation is unavailable.", systemImage: "exclamationmark.circle")
                 }
-                Text("Install and Play are unavailable: authoritative PC access, a verified package plan and a signed paired runtime have not been established.")
+                Text("Install and Play aren't available in this build.")
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                DisclosureGroup("Catalog details") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Source: \(product.source)")
+                        Text("Product \(product.productID)")
+                        Text("\(product.market) / \(product.language) - \(product.freshness) metadata")
+                        Text("Checked \(product.checkedAt)")
+                        if let resolved = product.resolvedLanguage,
+                           resolved.caseInsensitiveCompare(product.language) != .orderedSame {
+                            Text("Source metadata language: \(resolved). Requested scope: \(product.language).")
+                        }
+                        Text("Public catalog presence doesn't establish access. Installation requires verified access, a package plan and a paired gameplay runtime. Artwork isn't supplied by this catalog.")
+                    }
+                    .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                }
                 HStack {
-                    Text("Checked \(product.checkedAt)").font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
                 }
@@ -63,23 +75,11 @@ struct LiveProductView: View {
         .frame(width: 680, height: 620)
     }
 
-    private func facet(_ title: String, _ value: String, source: String) -> some View {
+    private func facet(_ title: String, _ value: String) -> some View {
         GridRow {
             Text(title).foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(value)
-                Text(source).font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
+            Text(value).fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    private func installationStatus(_ edition: ProductEvidence) -> String {
-        guard let snapshot = session.installedSnapshot else { return "Not checked" }
-        let matches = snapshot.installations.filter {
-            $0.productID == edition.productID && $0.editionID == edition.editionID
-        }
-        return matches.isEmpty ? "Not in managed registry" : matches.map { $0.health.label }.joined(separator: ", ")
-    }
 }

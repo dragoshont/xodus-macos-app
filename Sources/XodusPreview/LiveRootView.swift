@@ -7,13 +7,16 @@ struct LiveRootView: View {
     @EnvironmentObject private var session: LiveSession
     @Environment(\.openSettings) private var openSettings
     @FocusState private var searchFocused: Bool
+#if !XODUS_SHIPPING
+    var allowsStartupTasks = true
+#endif
 
     private var scopedQuery: String { state.query.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var startupAllowed: Bool {
 #if XODUS_SHIPPING
         true
 #else
-        !CommandLine.arguments.contains("--export-live")
+        allowsStartupTasks && !CommandLine.arguments.contains("--export-live")
 #endif
     }
     private var canRefreshCatalog: Bool {
@@ -60,7 +63,7 @@ struct LiveRootView: View {
                !session.backendPath.isEmpty { await session.connect() }
         }
         .task(id: "\(state.destination.rawValue):\(state.query):\(session.market):\(session.language):\(session.isReady)") {
-            guard state.destination == .discover else { return }
+            guard startupAllowed, state.destination == .discover else { return }
             do { try await Task.sleep(for: .milliseconds(250)) }
             catch { return }
             await session.refreshCatalog(state.query)
@@ -75,85 +78,91 @@ struct LiveRootView: View {
     private var library: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack {
-                Text("Your Library").font(.title2.bold())
+                Text("Your Library").font(.largeTitle.bold())
                 Spacer()
                 if session.phase == .connecting { ProgressView().controlSize(.small) }
-                Button("Account") { state.showingAccount = true }
-            }
-            if let error = session.errorMessage {
-                Label(error, systemImage: "exclamationmark.circle")
-                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            }
-            ContentUnavailableView {
-                Label(session.accountLibraryTitle, systemImage: session.isReady ? "square.stack" : "cable.connector")
-            } description: {
-                Text(session.accountLibraryExplanation).frame(maxWidth: 520)
-            } actions: {
-                if !session.isReady {
-                    Button("Open Settings", action: openSettings.callAsFunction)
-                    if !session.backendPath.isEmpty {
-                        Button("Reconnect") { Task { await session.connect() } }
-                            .disabled(session.connectionTransitioning)
-                    }
-                } else {
-                    Button("Open account") { state.showingAccount = true }
-                    Button("Browse checked catalog") { state.navigate(.discover) }
-                        .disabled(!session.supports(.search) && !session.supports(.discover) && !session.supports(.query))
+                if session.isReady && session.supports(.installed) {
+                    Button("Refresh") { Task { await session.refreshInstalled() } }
+                        .disabled(session.installedRefreshing)
+                        .accessibilityIdentifier("xodus.library.refresh")
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 220)
-            if session.isReady && session.supports(.installed) {
+            if session.installedSnapshot?.installations.isEmpty != false {
+                ContentUnavailableView {
+                    Label(session.libraryTitle, systemImage: session.isReady ? "gamecontroller" : "cable.connector")
+                } description: {
+                    Text(session.libraryMessage).frame(maxWidth: 520)
+                } actions: {
+                    if !session.isReady {
+                        Button("Settings", action: openSettings.callAsFunction)
+                        if !session.backendPath.isEmpty {
+                            Button("Reconnect") { Task { await session.connect() } }
+                                .disabled(session.connectionTransitioning)
+                        }
+                    } else {
+                        GlassAction(title: "Browse games") { state.navigate(.discover) }
+                            .disabled(!session.supports(.search) && !session.supports(.discover) && !session.supports(.query))
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: 220)
+            }
+            if let snapshot = session.installedSnapshot, !snapshot.installations.isEmpty {
                 Divider()
                 HStack {
-                    Text("Registered on this Mac").font(.title2.bold())
+                    Text("On this Mac").font(.title2.bold())
                     Spacer()
                     if session.installedRefreshing { ProgressView().controlSize(.small) }
-                    Button("Check installed status") { Task { await session.refreshInstalled() } }
-                        .disabled(session.installedRefreshing)
                 }
-                Text("Xodus management registry only. Other game folders have not been scanned. Registration does not establish current access or permission to play.")
-                    .font(.callout).foregroundStyle(.secondary)
-                if let error = session.installedError {
-                    Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.secondary)
+                Text("Games registered with Xodus. Other folders haven't been checked.")
+                    .foregroundStyle(.secondary)
+                let matches = snapshot.installations.filter {
+                    scopedQuery.isEmpty || session.installationTitle($0).localizedCaseInsensitiveContains(scopedQuery)
+                        || $0.productID.localizedCaseInsensitiveContains(scopedQuery)
                 }
-                if let snapshot = session.installedSnapshot {
-                    let matches = snapshot.installations.filter {
-                        state.query.isEmpty || session.installationTitle($0).localizedCaseInsensitiveContains(state.query)
-                            || $0.productID.localizedCaseInsensitiveContains(state.query)
-                    }
-                    if snapshot.installations.isEmpty {
-                        Text("No installations in this managed registry. Existing games outside it have not been checked.")
-                            .foregroundStyle(.secondary)
-                    } else if matches.isEmpty {
-                        Text("No registered installation matches this Library search.").foregroundStyle(.secondary)
-                    }
-                    ForEach(matches) { installation in
-                        HStack(spacing: 16) {
-                            Image(systemName: "gamecontroller").font(.title2).foregroundStyle(.secondary)
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(session.installationTitle(installation)).font(.headline)
-                                Text("Package \(installation.packageVersion) - \(installation.health.label)")
-                                    .font(.callout).foregroundStyle(.secondary)
-                                Text("Access and current file integrity must be checked before launch.")
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
+                if matches.isEmpty {
+                    Text("No games match this Library search.").foregroundStyle(.secondary)
+                }
+                ForEach(matches) { installation in
+                    HStack(alignment: .top, spacing: 16) {
+                        Image(systemName: "gamecontroller").font(.title2).foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(session.installationTitle(installation)).font(.headline)
+                            Text(session.installationMessage(installation))
+                                .font(.callout).foregroundStyle(.secondary)
+                            Text("Ownership not checked").font(.caption).foregroundStyle(.secondary)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Spacer()
+                        DisclosureGroup("Details") {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Product \(installation.productID)")
+                                Text("Edition \(installation.editionID)")
+                                Text("Package \(installation.packageVersion)")
+                                Text("Registration doesn't prove current game-file integrity or permission to play.")
+                            }
+                            .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                        }
+                        .frame(maxWidth: 280, alignment: .leading)
                     }
-                } else {
-                    Text("Installed status has not been verified.").foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                Text("Playing these games isn't available in this build.").foregroundStyle(.secondary)
             }
             Divider()
-            selectedFolderInspection
-            Divider()
-            HStack(alignment: .top, spacing: 28) {
-                readiness("Account", session.accountLabel, symbol: "person.crop.circle")
-                readiness("PC access", "Not established by catalog or sign-in", symbol: "key")
-                readiness("Runtime", "Paired gameplay runtime not certified", symbol: "desktopcomputer")
+            DisclosureGroup("Details") {
+                VStack(alignment: .leading, spacing: 18) {
+                    Text(session.accountLibraryExplanation).foregroundStyle(.secondary)
+                    if let error = session.errorMessage { Text(error).foregroundStyle(.secondary) }
+                    Text("Installed status covers the Xodus management registry, not other game folders.")
+                        .foregroundStyle(.secondary)
+                    if let error = session.installedError { Text(error).foregroundStyle(.secondary) }
+                    if session.supports(.installed), session.installedSnapshot == nil {
+                        Text("No current local-games result is available. Missing results aren't proof that a game isn't installed.")
+                    }
+                    selectedFolderInspection
+                }
+                .padding(.top, 12)
             }
-            RuntimeDependencyStatus(settings: state.runtimeSettings, offersSettings: true)
         }
     }
 
@@ -201,26 +210,14 @@ struct LiveRootView: View {
             }
         }
     }
-    private func readiness(_ title: String, _ detail: String, symbol: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: symbol).font(.title3).foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 5) {
-                Text(title).font(.headline)
-                Text(detail).font(.callout).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
     private var catalog: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
-                Text(scopedQuery.isEmpty && session.supports(.discover) ? "PC Game Pass discovery"
-                     : scopedQuery.isEmpty ? "Checked PC catalog"
-                     : session.supports(.query) ? "Microsoft Store search results" : "Checked catalog search results")
-                    .font(.title2.bold())
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(scopedQuery.isEmpty ? "Discover" : session.catalogTitle).font(.largeTitle.bold())
+                    Text(scopedQuery.isEmpty ? "Find your next PC game." : "Games matching your search.")
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
                 if session.searching {
                     ProgressView().controlSize(.small)
@@ -229,38 +226,22 @@ struct LiveRootView: View {
                 Button("Refresh") { Task { await session.refreshCatalog(state.query) } }
                     .disabled(session.searching || !canRefreshCatalog)
             }
-            Text("Partial coverage, \(session.market) / \(session.language). These public products are not your owned library.")
+            Text(scopedQuery.isEmpty ? "Public PC game catalog. Your ownership hasn't been checked."
+                 : session.supports(.query) ? "Microsoft Store results. Your ownership hasn't been checked."
+                 : "Checked public games. Coverage is partial; ownership hasn't been checked.")
                 .font(.callout).foregroundStyle(.secondary)
-            if session.catalogCorpus == "pcGamePassDiscovery", let checked = session.discoveryCheckedAt {
-                Text("Microsoft PC Game Pass public feed - checked \(checked). Public catalog, not ownership proof.")
-                    .font(.caption).foregroundStyle(.secondary)
-            } else if session.catalogCorpus == "publicMicrosoftStoreSearch", let checked = session.discoveryCheckedAt {
-                Text("Microsoft Store public search - checked \(checked). PC candidates are independently checked against public product metadata; coverage remains partial.")
-                    .font(.caption).foregroundStyle(.secondary)
-            } else if !scopedQuery.isEmpty && !session.supports(.query) {
-                Text("This engine searches only products already checked, not the whole Microsoft Store. Update the paired engine for network search.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            if session.catalogStopped {
-                Label("Search stopped. Refresh when you are ready; no later result from that request will be shown.",
-                      systemImage: "pause.circle").foregroundStyle(.secondary)
-            }
-            if let error = session.catalogError {
-                Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.secondary)
-            }
-            ForEach(session.discoveryFailures) { failure in
-                Label("Product \(failure.productID) could not be checked. \(LiveSession.describe(ManagementError.backendError(failure.error.code, retryable: failure.error.retryable)))",
-                      systemImage: "exclamationmark.circle")
-                    .font(.callout).foregroundStyle(.secondary)
+            if let notice = session.catalogNotice {
+                Label(notice, systemImage: session.catalogStopped ? "pause.circle" : "exclamationmark.circle")
+                    .foregroundStyle(.secondary)
             }
             if session.products.isEmpty {
                 ContentUnavailableView {
                     Label(session.catalogEmptyTitle,
                           systemImage: "magnifyingglass")
                 } description: {
-                    Text(session.catalogEmptyExplanation(query: scopedQuery, canRefresh: canRefreshCatalog))
+                    Text(session.catalogMessage(query: scopedQuery, canRefresh: canRefreshCatalog))
                 } actions: {
-                    Button("Open Settings", action: openSettings.callAsFunction)
+                    if !session.isReady { Button("Settings", action: openSettings.callAsFunction) }
                     if !state.query.isEmpty { Button("Clear search") { state.query = "" } }
                 }
                 .frame(maxWidth: .infinity, minHeight: 220)
@@ -273,28 +254,29 @@ struct LiveRootView: View {
                                     .font(.title2).foregroundStyle(.secondary)
                                     .frame(width: 64, height: 64)
                                     .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
+                                    .accessibilityHidden(true)
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(product.title).font(.headline).foregroundStyle(.primary)
                                         .fixedSize(horizontal: false, vertical: true)
-                                    Text("Access unverified").font(.callout).foregroundStyle(.secondary)
-                                    Text(product.freshness == "cached" ? "Cached public metadata" : "Public metadata")
-                                        .font(.caption).foregroundStyle(.secondary)
-                                    Text("View editions").font(.caption).foregroundStyle(.secondary)
+                                    Text("View game").font(.callout).foregroundStyle(.secondary)
+                                    if product.freshness == "cached" {
+                                        Text("Offline details").font(.caption).foregroundStyle(.secondary)
+                                    }
                                 }
                                 Spacer(minLength: 0)
+                                Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                                    .accessibilityHidden(true)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("\(product.title), public catalog. Access unverified. View editions.")
+                        .accessibilityLabel("\(product.title). View game. Access not checked.")
                     }
                 }
             }
             if session.nextCursor != nil {
-                Button(session.catalogCorpus == "pcGamePassDiscovery" ? "Browse more PC titles"
-                       : session.catalogCorpus == "publicMicrosoftStoreSearch" ? "Search more Store games"
-                       : "Load more checked products") {
+                Button("More games") {
                     Task { await session.refreshCatalog(state.query, more: true) }
                 }
                     .disabled(!session.canLoadMoreCatalog)
@@ -303,6 +285,24 @@ struct LiveRootView: View {
                     .accessibilityIdentifier("xodus.catalog.loadMore")
                     .accessibilityAddTraits(.isButton)
                     .accessibilityAction { Task { await session.refreshCatalog(state.query, more: true) } }
+            }
+            DisclosureGroup("Details") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Public catalog, not your library. Coverage is partial.")
+                    Text("\(session.market) / \(session.language)")
+                    if let checked = session.discoveryCheckedAt { Text("Checked \(checked)") }
+                    Text(session.catalogCorpus == "publicMicrosoftStoreSearch"
+                         ? "Source: Microsoft Store search and public PC metadata."
+                         : session.catalogCorpus == "pcGamePassDiscovery"
+                            ? "Source: Microsoft's public PC Game Pass feed."
+                            : "Source: previously checked public products.")
+                    if let error = session.catalogError { Text(error) }
+                    ForEach(session.discoveryFailures) { failure in
+                        Text("Product \(failure.productID): \(LiveSession.describe(ManagementError.backendError(failure.error.code, retryable: failure.error.retryable)))")
+                    }
+                }
+                .font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+                .padding(.top, 12)
             }
         }
     }
@@ -314,7 +314,7 @@ struct LiveActivityView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack {
-                Text("Activity").font(.title2.bold())
+                Text("Downloads").font(.largeTitle.bold())
                 Spacer()
                 Button("Refresh activity") {
                     Task {
@@ -323,19 +323,17 @@ struct LiveActivityView: View {
                     }
                 }.disabled(!session.supports(.jobs) || session.activity.isReconciling)
             }
-            Text("Durable catalog checks only. No game packages are being downloaded or installed.")
-                .foregroundStyle(.secondary)
             if session.activity.needsSnapshot {
-                Label("Activity is not current. Reconnect or refresh before cancelling or retrying a check.",
+                Label("Refresh activity before changing a check.",
                       systemImage: "arrow.clockwise").foregroundStyle(.secondary)
             }
-            if let error = session.errorMessage {
-                Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.secondary)
-            }
             if session.activity.jobs.isEmpty {
-                ContentUnavailableView("No catalog checks", systemImage: "arrow.down.circle",
-                    description: Text("Public product checks appear here after you request them. No game download or installation is started."))
+                ContentUnavailableView("No downloads yet", systemImage: "arrow.down.circle",
+                    description: Text("Game downloads aren't available in this build."))
                     .frame(maxWidth: .infinity, minHeight: 240)
+            } else {
+                Text("Game details checks").font(.title2.bold())
+                Text("These checks don't download games.").foregroundStyle(.secondary)
             }
             ForEach(session.activity.jobs) { job in
                 VStack(alignment: .leading, spacing: 12) {
@@ -343,8 +341,8 @@ struct LiveActivityView: View {
                         Image(systemName: job.state == .completed ? "checkmark.circle" : "arrow.triangle.2.circlepath")
                             .font(.title2).foregroundStyle(.secondary)
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Catalog check").font(.headline)
-                            Text(job.product.productID).font(.callout).textSelection(.enabled)
+                            Text(session.activityTitle(job)).font(.headline)
+                            Text("Game details check").font(.callout).foregroundStyle(.secondary)
                         }
                         Spacer()
                         Text(job.state.rawValue.capitalized).foregroundStyle(.secondary)
@@ -358,10 +356,19 @@ struct LiveActivityView: View {
                         }
                     }
                     if let error = job.error {
-                        Text("Xodus reported \(error.code).").font(.callout).foregroundStyle(.secondary)
+                        Text(LiveSession.describe(ManagementError.backendError(error.code, retryable: error.retryable)))
+                            .font(.callout).foregroundStyle(.secondary)
                     }
+                    DisclosureGroup("Details") {
+                        Text("Product \(job.product.productID)").textSelection(.enabled)
+                        if let error = job.error { Text("Error: \(error.code)") }
+                    }
+                    .font(.caption).foregroundStyle(.secondary)
                     Divider()
                 }
+            }
+            if let error = session.errorMessage {
+                DisclosureGroup("Details") { Text(error).foregroundStyle(.secondary) }
             }
         }
     }

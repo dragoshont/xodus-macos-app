@@ -14,6 +14,9 @@ struct LiveAccountView: View {
     @Environment(\.openSettings) private var openSettings
     @Environment(\.layoutDirection) private var layoutDirection
     @StateObject private var interaction = AccountInteraction()
+#if !XODUS_SHIPPING
+    var refreshStatusOnAppear = true
+#endif
 
     var body: some View {
         AccountSheetLayout(showsHeader: false) {
@@ -23,45 +26,34 @@ struct LiveAccountView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "person.crop.circle").font(.largeTitle).foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 5) {
-                        Text(session.accountLabel).font(.title2.bold())
-                        Text("Xodus owns sign-in. Credentials stay in the native Keychain.")
-                            .foregroundStyle(.secondary)
+                        Text(session.accountNoticeTitle).font(.title2.bold())
                     }
                     Spacer()
                     if session.accountBusy || session.signInPending { ProgressView().controlSize(.small) }
                 }
-                Text(session.accountExplanation)
+                Text(session.accountMessage)
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("xodus.account.statusExplanation")
-                RuntimeDependencyStatus(settings: state.runtimeSettings, offersSettings: true)
-                if let flow = session.authentication?.flow {
-                    if flow.state == .cancelled {
-                        Label("Sign-in cancelled. No new connection was assumed.", systemImage: "xmark.circle")
-                    } else if flow.state == .failed {
-                        Label("Sign-in failed.", systemImage: "exclamationmark.circle")
-                        DisclosureGroup("Details") {
-                            VStack(alignment: .leading, spacing: 8) {
-                                if let summary = session.accountFailureSummary {
-                                    Text(summary).foregroundStyle(.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                        .accessibilityIdentifier("xodus.account.failureSummary")
-                                }
-                                if let observation = session.accountFailureObservation {
-                                    Text(observation).foregroundStyle(.secondary)
-                                        .accessibilityIdentifier("xodus.account.failureObservation")
-                                }
-                            }
-                            .textSelection(.enabled).padding(.top, 8)
+                if session.isReady && !session.supports(.authBegin) {
+                    Text("Sign-in isn't available in this build.").foregroundStyle(.secondary)
+                }
+                DisclosureGroup("Details") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(session.accountExplanation)
+                        Text("Credentials stay in the native Keychain.")
+                        if let summary = session.accountFailureSummary {
+                            Text(summary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("xodus.account.failureSummary")
+                        }
+                        if let observation = session.accountFailureObservation {
+                            Text(observation).accessibilityIdentifier("xodus.account.failureObservation")
+                        }
+                        if let error = session.errorMessage {
+                            Text(error).fixedSize(horizontal: false, vertical: true)
                         }
                     }
-                }
-                if session.isReady && !session.supports(.authBegin) {
-                    Text("This engine can check existing Keychain sign-in, but its native sign-in provider is not available yet.")
-                        .foregroundStyle(.secondary)
-                }
-                if let error = session.errorMessage {
-                    Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(.secondary).textSelection(.enabled).padding(.top, 12)
                 }
             }
         } actions: {
@@ -92,19 +84,27 @@ struct LiveAccountView: View {
                     }
                         .disabled(!session.canDisconnectAccount)
                 } else {
-                    GlassAction(title: "Sign in with Microsoft") { Task { await session.beginSignIn() } }
+                    GlassAction(title: "Sign in with Microsoft") {
+                        if session.canSignIn { Task { await session.beginSignIn() } }
+                    }
                         .disabled(!session.canSignIn)
                         .accessibilityElement(children: .ignore)
                         .accessibilityLabel("Sign in with Microsoft")
                         .accessibilityIdentifier("xodus.account.signIn")
                         .accessibilityAddTraits(.isButton)
-                        .accessibilityAction { Task { await session.beginSignIn() } }
+                        .accessibilityAction {
+                            if session.canSignIn { Task { await session.beginSignIn() } }
+                        }
                 }
             }
             .controlSize(.regular)
         }
-        .task { await session.refreshAccount() }
-        .task { await state.runtimeSettings.refreshCrossOverDependency() }
+        .task {
+#if !XODUS_SHIPPING
+            if !refreshStatusOnAppear { return }
+#endif
+            await session.refreshAccount()
+        }
         .interactiveDismissDisabled(session.accountBusy || session.signInPending)
         .confirmationDialog("Sign out of Xodus on this Mac?", isPresented: $interaction.confirmingSignOut) {
             Button("Disconnect sign-in", role: .destructive) { Task { await session.signOut() } }
@@ -154,10 +154,8 @@ struct LiveSettingsView: View {
             RuntimeProviderSection(settings: state.runtimeSettings, backendPath: session.backendPath)
             Section("Account") {
                 LabeledContent("Status", value: session.accountLabel)
-                Text(session.accountExplanation).foregroundStyle(.secondary)
                 Button("Open account") { state.showingAccount = true }
-                Text("Microsoft sign-in, PC ownership and package authorization are independent.")
-                    .foregroundStyle(.secondary)
+                DisclosureGroup("Details") { Text(session.accountExplanation).foregroundStyle(.secondary) }
             }
             Section("Advanced public catalog") {
                 Text(session.supports(.query)

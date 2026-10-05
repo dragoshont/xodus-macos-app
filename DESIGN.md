@@ -25,6 +25,19 @@ visually confirmed.
 
 ## Actual native implementation
 
+**Lean live-data slice:** live startup opens Discover while owned-library
+enumeration is unavailable; the original fixture still starts in Library.
+The existing native toolbar, deployment target and repository tokens are
+unchanged. Discover shows real scoped public products and search, with one
+ownership caveat rather than repeated source/status labels on each row.
+Library shows only known managed records, or a scoped empty/error state;
+registration and last-verified health never assert current file integrity,
+ownership or playability. Product IDs, package metadata, provenance and
+selected-folder marker inspection remain available in Details. Account stays
+in the toolbar, and its cancellation, refresh and credential gates are
+unchanged. No Home shelves, invented installed games, new framework or
+speculative navigation API is introduced.
+
 **Production hardening:** the shipping/live path no longer uses the invented
 harbor/orbit promotional hero or game poster in Account. No rights-cleared real
 artwork is available, so real setup/empty/loading/error/data views use semantic
@@ -89,8 +102,8 @@ TextField, DisclosureGroup and buttons; no new navigation, decorative material
 or custom control chrome. CrossOver is first-release supported; only a verified
 official app observation defaults an unset profile. All alternatives are
 Experimental with visible acknowledgement, outside the advanced disclosure.
-Shared dependency status/copy appears in Library, Account and Settings, with
-native check, official information and Settings actions. Controls adapt to
+Dependency status and its native check/official information actions stay in
+Settings, rather than repeating a runtime wall in Library and Account. Controls adapt to
 constrained widths; checking/absent/unverified states do not fabricate readiness
 or disable unrelated catalog/account actions. Advanced component
 declarations remain separate from the primary provider choice, and configuration

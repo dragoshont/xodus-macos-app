@@ -225,6 +225,8 @@ enum NativeChecks {
                 check(scenario == "failedflow" ? summary.contains("AUTH_INVALID")
                       : summary.contains("Failure stage is unavailable") && !summary.contains("AUTH_INVALID"),
                       "Auth summary preserves the validated failure code and never invents a missing cause")
+                check(failed.canSignIn && !failed.accountBusy,
+                      "Terminal failure preserves the explicit user retry gate without an automatic retry")
                 await failed.disconnect()
             }
 
@@ -414,6 +416,46 @@ enum NativeChecks {
                   "Successful continuation retains earlier failures without ownership promotion")
             await discovery.disconnect()
 
+            let publicCatalog = session("publiccapture")
+            await publicCatalog.connect()
+            await publicCatalog.refreshCatalog("Halo")
+            check(publicCatalog.products.count == 1 && publicCatalog.products.first?.title == "Halo Infinite"
+                  && publicCatalog.discoveryFailures.count == 4
+                  && publicCatalog.catalogNotice == "Some results couldn't be checked.",
+                  "Partial public metadata has one concise notice and keeps the checked real product")
+            check(publicCatalog.authentication == nil && !publicCatalog.accountStatusCurrent
+                  && publicCatalog.products.flatMap(\.editions).allSatisfy { $0.entitlement.kind == .unknown },
+                  "Browsing and presenting games performs no credential read or ownership promotion")
+            guard let edition = publicCatalog.products.first?.editions.first,
+                  let registered = publicCatalog.installedSnapshot?.installations.first else {
+                throw ManagementError.invalidPayload
+            }
+            check(publicCatalog.installationStatus(edition) == "No managed installation found"
+                  && edition.installation.kind == "notInstalled",
+                  "Catalog notInstalled metadata never becomes a global filesystem or installed-state claim")
+            check(LiveSession().installationStatus(edition) == "Not checked",
+                  "Missing current registry evidence keeps installation status unknown")
+            check(publicCatalog.installationTitle(registered) == "Registered game"
+                  && !publicCatalog.installationTitle(registered).contains(registered.productID)
+                  && publicCatalog.installationMessage(registered) == "Added to Xodus - last verified",
+                  "Unknown local titles and last-verified health expose no internal IDs or current-play guarantee")
+            NativeUIChecks.checkLiveLayouts(session: publicCatalog, check: check)
+            await publicCatalog.disconnect()
+
+            let localEmpty = session("registryempty")
+            await localEmpty.connect()
+            check(localEmpty.installedSnapshot?.installations.isEmpty == true
+                  && localEmpty.libraryTitle == "No games registered yet"
+                  && localEmpty.libraryMessage.contains("Microsoft library isn't available"),
+                  "Empty managed records are separate from an unimplemented owned library")
+            await localEmpty.disconnect()
+            let localUnavailable = session("registryunavailable")
+            await localUnavailable.connect()
+            check(localUnavailable.installedSnapshot == nil && localUnavailable.installedError != nil
+                  && localUnavailable.libraryTitle == "Games couldn't be checked",
+                  "Failed local-record reads are actionable and never appear as an empty library")
+            await localUnavailable.disconnect()
+
             let empty = session("queryempty")
             await empty.connect()
             await empty.refreshCatalog("XodusNoMatch9F4A12C7")
@@ -433,7 +475,7 @@ enum NativeChecks {
             await stopped.connect()
             let late = Task { await stopped.refreshCatalog("XodusNoMatch9F4A12C7") }
             try await wait { stopped.searching }
-            check(stopped.products.isEmpty && stopped.catalogEmptyTitle == "Checking the catalog"
+            check(stopped.products.isEmpty && stopped.catalogEmptyTitle == "Finding games"
                   && stopped.discoveryCheckedAt == nil
                   && stopped.catalogEmptyExplanation(query: "Pending", canRefresh: true).contains("not available yet")
                   && !stopped.catalogEmptyExplanation(query: "Pending", canRefresh: true).contains("no matching"),
