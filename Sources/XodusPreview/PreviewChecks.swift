@@ -72,6 +72,9 @@ enum PreviewChecks {
         check(!state.fixtureMode, "Default application mode does not present fixture games")
         check(live.products.isEmpty, "Live catalog never starts with invented titles")
         check(live.authentication == nil, "Live account does not start with simulated sign-in")
+        check(live.currentCredentialState == nil && live.accountSymbol == "person.crop.circle"
+              && live.accountLabel == "Connect Xodus",
+              "Disconnected live account presentation never borrows the fixture's connection or profile badge")
         check(live.activity.jobs.isEmpty, "Live activity does not start with simulated jobs")
         check(!live.canSignIn, "Sign-in is disabled until backend capability negotiation")
         check(!live.supports(.launch) && !live.supports(.plan), "Live gameplay and installation fail closed")

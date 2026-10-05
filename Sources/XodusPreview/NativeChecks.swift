@@ -51,6 +51,13 @@ enum NativeChecks {
             let expired = session("expired")
             await expired.connect()
             check(expired.isReady && !expired.canSignIn, "Unchecked account cannot blindly retry a mutation")
+            check(expired.authentication == nil && !expired.accountStatusCurrent
+                  && expired.currentCredentialState == nil && expired.accountSymbol == "person.crop.circle"
+                  && expired.accountLabel == "Account status not checked"
+                  && expired.accountLibraryTitle == expired.accountLabel
+                  && expired.accountExplanation.contains("engine is connected")
+                  && expired.accountExplanation.contains("has not been checked"),
+                  "HELLO and advertised auth support display connected-but-unchecked, never saved account evidence")
             await expired.refreshAccount()
             check(expired.authentication?.state == .expired && expired.needsAccountDisconnect
                   && expired.canDisconnectAccount && !expired.canSignIn,
@@ -62,14 +69,59 @@ enum NativeChecks {
             try await wait { expired.authentication?.flow?.state == .completed }
             check(expired.authentication?.state == .credentialPresent && !expired.signInPending,
                   "Expired-profile recovery completes through actual mocked native session requests")
+            check(expired.currentCredentialState == .credentialPresent
+                  && expired.accountLabel == "Microsoft sign-in saved"
+                  && expired.accountSymbol == "person.crop.circle.fill"
+                  && expired.accountExplanation.contains("not proof of PC ownership")
+                  && expired.accountLibraryTitle == "PC library access is not available yet",
+                  "Fresh saved sign-in displays only credential evidence, not an owned or playable library")
             await expired.disconnect()
+
+            let savedConfiguration = configuration("savedpermission")
+            let saved = LiveSession(configuration: savedConfiguration)
+            await saved.connect()
+            await saved.refreshAccount()
+            check(saved.currentCredentialState == .credentialPresent
+                  && saved.accountSymbol == "person.crop.circle.fill" && saved.canDisconnectAccount,
+                  "Neutral saved profile initially displays the current credential result")
+            await saved.refreshAccount()
+            check(saved.isReady && saved.authentication?.state == .credentialPresent
+                  && !saved.accountStatusCurrent && saved.currentCredentialState == nil
+                  && saved.accountLabel == "Account status needs checking"
+                  && saved.accountSymbol == "person.crop.circle"
+                  && saved.accountLibraryTitle == saved.accountLabel
+                  && !saved.accountLibraryExplanation.contains("sign-in is saved")
+                  && saved.accountExplanation.contains("earlier result is not current")
+                  && !saved.canSignIn && !saved.canDisconnectAccount,
+                  "Failed status read retains the safe snapshot but removes saved-account claims across all live surfaces")
+            await saved.refreshAccount()
+            check(saved.accountStatusCurrent && saved.currentCredentialState == .credentialPresent
+                  && saved.accountLabel == "Microsoft sign-in saved" && saved.canDisconnectAccount
+                  && saved.authentication?.entitlementAuthorized == false,
+                  "Fresh status restores credential display without promoting PC access")
+            check(try trace(savedConfiguration).filter { $0.hasPrefix("auth.") } ==
+                  ["auth.status", "auth.status", "auth.status"],
+                  "Account display recovery performs only neutral requested status reads, no sign-in or logout mutation")
+            check(await saved.disconnect(), "Account presentation regression retires its owned neutral child")
+            check(saved.currentCredentialState == nil && saved.accountSymbol == "person.crop.circle"
+                  && saved.accountLabel == "Connect Xodus",
+                  "Disconnect removes current account presentation evidence")
+            try cleanLifecycle(savedConfiguration)
 
             let denied = session("expiredpermission")
             await denied.connect()
             await denied.refreshAccount()
+            check(denied.currentCredentialState == .expired
+                  && denied.accountExplanation.hasPrefix("Disconnect this saved launcher sign-in first"),
+                  "Only a current expired result displays saved-profile recovery advice")
             await denied.refreshAccount()
             check(denied.authentication?.state == .expired && !denied.canDisconnectAccount,
                   "An inaccessible-store error disables disconnect of an earlier expired snapshot")
+            check(denied.currentCredentialState == nil
+                  && denied.accountLabel == "Account status needs checking"
+                  && !denied.accountExplanation.contains("Disconnect this saved")
+                  && denied.accountLibraryTitle == denied.accountLabel,
+                  "Unconfirmed expired snapshot does not display current expiry or recommend credential removal")
             await denied.signOut()
             await denied.refreshAccount()
             check(denied.authentication?.state == .expired,
@@ -82,6 +134,9 @@ enum NativeChecks {
             await uncertain.beginSignIn()
             check(!uncertain.accountStatusCurrent && !uncertain.canSignIn,
                   "Failed sign-in preparation invalidates pre-mutation status before another attempt")
+            check(uncertain.accountLabel == "Account status needs checking"
+                  && uncertain.currentCredentialState == nil,
+                  "Failed sign-in preparation does not leave a current signed-out display")
             let preparationSummary = uncertain.errorMessage ?? ""
             check(preparationSummary.hasPrefix("Microsoft sign-in could not start.")
                   && preparationSummary.contains("AUTH_INVALID") && preparationSummary.contains("Stage: stageUnavailable")
@@ -210,6 +265,11 @@ enum NativeChecks {
             check(try gated.signInPending && !gated.canSignIn && gated.accountFailureSummary == nil
                   && trace(gateConfiguration).filter { $0 == "auth.begin" }.count == 1,
                   "Busy and pending state reject duplicate native sign-in activation before any second mutation")
+            check(gated.accountLabel == "Sign-in pending" && gated.currentCredentialState == nil
+                  && gated.accountSymbol == "person.crop.circle"
+                  && gated.accountExplanation.contains("If Microsoft has opened a sign-in window")
+                  && gated.accountLibraryTitle == "Sign-in pending",
+                  "Pending contract state does not assert an observed provider window or completed account connection")
             let cancelling = Task { await gated.cancelSignIn() }
             try await wait { gated.accountBusy }
             await gated.cancelSignIn()
@@ -218,6 +278,10 @@ enum NativeChecks {
                   && gated.accountFailureSummary == nil
                   && trace(gateConfiguration).filter { $0 == "auth.cancel" }.count == 1,
                   "Busy cancellation gate sends one request and does not invent failure-stage diagnostics")
+            check(gated.currentCredentialState == .signedOut && gated.accountSymbol == "person.crop.circle"
+                  && gated.accountLabel == "Sign in with Microsoft"
+                  && gated.accountExplanation.contains("no saved launcher sign-in"),
+                  "Confirmed cancellation returns signed-out presentation without a saved-account badge")
             await gated.disconnect()
             try cleanLifecycle(gateConfiguration)
 
@@ -228,6 +292,11 @@ enum NativeChecks {
             try await wait { !unavailable.accountStatusCurrent && unavailable.signInPending }
             check(!unavailable.canSignIn && !unavailable.canDisconnectAccount,
                   "Transient inaccessible store never permits deletion or new sign-in")
+            check(unavailable.accountLabel == "Sign-in status needs checking"
+                  && unavailable.currentCredentialState == nil && unavailable.signInPending
+                  && unavailable.accountExplanation.contains("current outcome could not be confirmed")
+                  && unavailable.accountLibraryTitle == unavailable.accountLabel,
+                  "Unconfirmed pending flow remains cancellation-fenced and displays an unknown outcome")
             try await wait { unavailable.authentication?.flow?.state == .completed }
             check(unavailable.isReady && unavailable.authentication?.state == .credentialPresent,
                   "Pending sign-in reconciles after one credential-store-unavailable result")

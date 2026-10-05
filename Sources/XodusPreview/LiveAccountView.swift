@@ -34,13 +34,10 @@ struct LiveAccountView: View {
                     Spacer()
                     if session.accountBusy || session.signInPending { ProgressView().controlSize(.small) }
                 }
-                if session.signInPending {
-                    Text("Complete Microsoft sign-in in the native authentication window. You can cancel without connecting an account.")
-                        .fixedSize(horizontal: false, vertical: true)
-                } else if session.authentication == nil && session.isReady {
-                    Text("Check your saved sign-in or sign in with Microsoft. Public browsing does not read your Keychain.")
-                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                } else if let flow = session.authentication?.flow {
+                Text(session.accountExplanation)
+                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("xodus.account.statusExplanation")
+                if let flow = session.authentication?.flow {
                     if flow.state == .cancelled {
                         Label("Sign-in cancelled. No new connection was assumed.", systemImage: "xmark.circle")
                     } else if flow.state == .failed {
@@ -52,14 +49,7 @@ struct LiveAccountView: View {
                         }
                     }
                 }
-                if session.authentication?.state == .expired || session.authentication?.state == .invalid {
-                    Text("Disconnect this saved launcher sign-in first, then connect again. Other apps' accounts are not changed.")
-                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-                if session.authentication?.state == .credentialPresent {
-                    Label("Saved Microsoft sign-in is not proof of PC ownership, package access or gameplay compatibility.",
-                          systemImage: "info.circle").foregroundStyle(.secondary)
-                } else if session.isReady && !session.supports(.authBegin) {
+                if session.isReady && !session.supports(.authBegin) {
                     Text("This engine can check existing Keychain sign-in, but its native sign-in provider is not available yet.")
                         .foregroundStyle(.secondary)
                 }
@@ -91,7 +81,7 @@ struct LiveAccountView: View {
                         .accessibilityAction { Task { await session.refreshAccount() } }
                 } else { Button("Settings", action: openSettings.callAsFunction) }
                 if session.needsAccountDisconnect {
-                    Button(session.authentication?.state == .expired ? "Disconnect expired sign-in" : "Sign out") {
+                    Button(session.currentCredentialState == .expired ? "Disconnect expired sign-in" : "Sign out") {
                         interaction.confirmingSignOut = true
                     }
                         .disabled(!session.canDisconnectAccount)
@@ -150,6 +140,7 @@ struct LiveSettingsView: View {
             RuntimeProviderSection(settings: state.runtimeSettings, backendPath: session.backendPath)
             Section("Account") {
                 LabeledContent("Status", value: session.accountLabel)
+                Text(session.accountExplanation).foregroundStyle(.secondary)
                 Button("Open account") { state.showingAccount = true }
                 Text("Microsoft sign-in, PC ownership and package authorization are independent.")
                     .foregroundStyle(.secondary)

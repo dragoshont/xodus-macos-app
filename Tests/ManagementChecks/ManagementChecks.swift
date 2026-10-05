@@ -786,7 +786,8 @@ enum MockBackend {
         let scenario = URL(fileURLWithPath: CommandLine.arguments[index + 1]).lastPathComponent
         do {
             let lifecycleDirectory = URL(fileURLWithPath: CommandLine.arguments[index + 1])
-            let lifecycleScenario = ["retireslow", "retirefailed", "retirehello", "retiresnapshot", "authgate"].contains(scenario)
+            let lifecycleScenario = ["retireslow", "retirefailed", "retirehello", "retiresnapshot", "authgate",
+                                     "savedpermission"].contains(scenario)
             func trace(_ entry: String) throws {
                 guard lifecycleScenario else { return }
                 try FileManager.default.createDirectory(at: lifecycleDirectory, withIntermediateDirectories: true,
@@ -810,7 +811,7 @@ enum MockBackend {
             if ["inspection", "inspectionmissing", "inspectionmismatch"].contains(scenario) {
                 supported.insert(.inspectInstallation)
             }
-            if ["expired", "expiredpermission", "transientauth", "latecancel", "humanwait", "hangmutation", "beginfail",
+            if ["expired", "expiredpermission", "savedpermission", "transientauth", "latecancel", "humanwait", "hangmutation", "beginfail",
                 "failedflow", "failedflownocode", "authgate"].contains(scenario) || scenario.hasPrefix("failedstage-") {
                 supported.formUnion([.authBegin, .authCancel])
             }
@@ -835,6 +836,7 @@ enum MockBackend {
                     if scenario == "mismatch" { result["protocol"] = .object(["major": .integer(2), "minor": .integer(0)]) }
                     try emit(.object(result))
                 } else {
+                    if scenario == "savedpermission" { try trace(command) }
                     if (["failedflow", "failedflownocode"].contains(scenario) || scenario.hasPrefix("failedstage-")),
                        command == "auth.begin" {
                         var failureObject: [String: JSONValue] = [
@@ -966,7 +968,7 @@ enum MockBackend {
                                         message: "Original preparation upstream sentinel must not enter local UI.")
                         continue
                     }
-                    if ["expired", "expiredpermission", "transientauth", "latecancel"].contains(scenario) {
+                    if ["expired", "expiredpermission", "savedpermission", "transientauth", "latecancel"].contains(scenario) {
                         if command == "auth.begin" { flowStarted = true; flowReads = 0 }
                         if command == "auth.logout" { loggedOut = true; flowStarted = false }
                         if command == "auth.cancel", scenario == "latecancel" {
@@ -975,7 +977,7 @@ enum MockBackend {
                             continue
                         }
                         if command.hasPrefix("auth.") {
-                            if command == "auth.status", scenario == "expiredpermission" {
+                            if command == "auth.status", ["expiredpermission", "savedpermission"].contains(scenario) {
                                 profileReads += 1
                                 if profileReads == 2 {
                                     try emitFailure(request, code: "AUTH_INVALID", category: "credentialStoreUnavailable")
@@ -992,7 +994,7 @@ enum MockBackend {
                             let completed = flowStarted && command == "auth.status"
                                 && (scenario != "latecancel" || cancelledLate)
                             var status: [String: JSONValue] = [
-                                "state": .string(completed ? "credentialPresent"
+                                "state": .string(completed || (scenario == "savedpermission" && !loggedOut) ? "credentialPresent"
                                     : ["expired", "expiredpermission"].contains(scenario) && !loggedOut && !flowStarted
                                         ? "expired" : "signedOut"),
                                 "credentialStore": .string("macOSKeychain"), "audience": .null,

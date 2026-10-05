@@ -119,18 +119,74 @@ final class LiveSession: ObservableObject {
     }
     var canLoadMoreCatalog: Bool { nextCursor != nil && !searching }
 
+    var currentCredentialState: CredentialState? {
+        guard isReady, accountStatusCurrent, !signInPending else { return nil }
+        return authentication?.state
+    }
+
+    var accountSymbol: String {
+        currentCredentialState == .credentialPresent ? "person.crop.circle.fill" : "person.crop.circle"
+    }
+
     var accountLabel: String {
         if phase == .connecting { return "Connecting to Xodus" }
         if phase == .disconnecting { return "Disconnecting from Xodus" }
         guard isReady else { return "Connect Xodus" }
-        if signInPending { return "Finish Microsoft sign-in" }
-        switch authentication?.state {
+        if signInPending {
+            return accountStatusCurrent ? "Sign-in pending" : "Sign-in status needs checking"
+        }
+        guard accountStatusCurrent else {
+            return authentication == nil ? "Account status not checked" : "Account status needs checking"
+        }
+        switch currentCredentialState {
         case .credentialPresent: return "Microsoft sign-in saved"
         case .expired: return "Sign-in expired"
         case .invalid: return "Sign-in needs attention"
         case .signedOut: return "Sign in with Microsoft"
-        case nil: return "Account"
+        case nil: return "Account status not checked"
         }
+    }
+
+    var accountExplanation: String {
+        guard isReady else {
+            return "Connect a trusted development engine in Settings before checking account status. Engine connection is not proof of sign-in."
+        }
+        if signInPending {
+            if !accountStatusCurrent {
+                return "The last sign-in result was pending, but its current outcome could not be confirmed. Check status or request cancellation; no completion or cancellation is assumed."
+            }
+            return "Xodus reports a pending sign-in, not a completed account connection. If Microsoft has opened a sign-in window, continue there yourself or use Cancel sign-in."
+        }
+        guard accountStatusCurrent else {
+            return authentication == nil
+                ? "The engine is connected, but account status has not been checked. Checking status may require your Keychain permission. Public browsing does not read your Keychain."
+                : "Current account status could not be confirmed. Check status before another sign-in or sign-out action; the earlier result is not current account evidence."
+        }
+        switch currentCredentialState {
+        case .credentialPresent:
+            return "Saved Microsoft sign-in is not proof of PC ownership, package access or gameplay compatibility."
+        case .expired, .invalid:
+            return "Disconnect this saved launcher sign-in first, then connect again. Other apps' accounts are not changed."
+        case .signedOut:
+            return "Xodus reports no saved launcher sign-in. Advertised sign-in support does not verify a paired engine and helper, PC ownership or permission to play."
+        case nil:
+            return "Account status has not been checked. No saved sign-in or PC access is assumed."
+        }
+    }
+
+    var accountLibraryTitle: String {
+        guard isReady else { return "Connect your Xodus engine" }
+        if signInPending { return accountLabel }
+        guard accountStatusCurrent else { return accountLabel }
+        return currentCredentialState == .credentialPresent
+            ? "PC library access is not available yet" : "Your library starts with sign-in"
+    }
+
+    var accountLibraryExplanation: String {
+        if currentCredentialState == .credentialPresent {
+            return "Your Microsoft sign-in is saved, but this engine has not established authoritative PC ownership. No catalog result or play history is shown as an owned game."
+        }
+        return accountExplanation + " This build cannot yet prove a complete owned-PC library."
     }
 
     var accountFailureSummary: String? {

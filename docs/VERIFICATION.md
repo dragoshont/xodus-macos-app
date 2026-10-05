@@ -4,6 +4,24 @@ Foundation recorded 2026-10-03; subsequent native/read-only milestones are
 identified separately below. None establishes successful human authentication,
 game download, install or gameplay.
 
+## Freshness-aware live account presentation
+
+Source inspection found that a failed status read disabled account mutations
+but still displayed a retained saved/expired snapshot as current in several
+views. Shared `LiveSession` presentation now gates the profile symbol, label,
+explanation and Library empty state on fresh account evidence. The retained
+snapshot and pending cancellation/dismissal fences remain intact. Pending
+copy does not assert an observed Microsoft window or classify an MFA step.
+
+Targeted neutral checks use the actual LiveSession coordinator and a synthetic
+saved-profile/status-unavailable/fresh-recovery child, plus the existing
+expired, preparation-failure, pending, cancellation and transient-pending
+scenarios. The saved recovery trace must contain only requested `auth.status`
+reads, no auth mutation. Fixture/live separation and unavailable ownership,
+installation and gameplay remain unchanged. No shared Mac, provider, Keychain
+or human window is used by these checks; this revision needs its own isolated
+normal-push SDK27 compile/regression result, not inherited674 evidence.
+
 ## Additive native-helper preflight correction
 
 Windows source inspection found that a packaged app missing both the helper
@@ -14,8 +32,14 @@ Neutral checks cover both missing, receipt-only, helper-only, canonical/invalid
 metadata, invalid helper before engine launch and clean failed-preflight shutdown.
 No helper/engine fixture is executed by the new preflight checks.
 
-These changes require their own exact-source native compile/check result;
-the earlier668 result does not qualify them. The existing normal-push workflow
+Exact source `6a2103cfd0e2d263918039122990ac9492ec17f3`,
+tree `797e111744d180b345542380229d6fb9367e7e6b`, passed its own normal-push
+[run37226882643](https://github.com/dragoshont/xodus-macos-app/actions/runs/37226882643):
+Xcode27.0/27A266a, SDK27.0/macOS27.0, **674 checks**, zero failures
+(15 core +358 management +60 presentation +154 mock session +87 private host)
+and SVG reproducibility. Parent independently verified that evidence and SAME
+review turn17 closed the scoped43-to6a source correction. The earlier668 result
+was not reused to qualify6a. The existing normal-push workflow
 is GitHub-hosted: the prior exact43 run's job reports runner group `GitHub Actions`
 and `Hosted Compute Agent`, image `xcode-27-arm64`. Its checked-in steps run
 local Python/Swift neutral checks and SVG reproducibility, with no SSH, deployment

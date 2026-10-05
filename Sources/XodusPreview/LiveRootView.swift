@@ -42,8 +42,7 @@ struct LiveRootView: View {
                          searchFocused: Binding(get: { searchFocused }, set: { searchFocused = $0 }),
                          searchPlaceholder: searchPlaceholder, searchEnabled: searchEnabled,
                          accountLabel: session.accountLabel,
-                         accountSymbol: session.authentication?.state == .credentialPresent
-                             ? "person.crop.circle.fill" : "person.crop.circle") { state.showingAccount = true }
+                         accountSymbol: session.accountSymbol) { state.showingAccount = true }
         }
         .onAppear {
             PreviewExporter.startIfRequested(state: state)
@@ -112,9 +111,9 @@ struct LiveRootView: View {
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             ContentUnavailableView {
-                Label(libraryTitle, systemImage: session.isReady ? "square.stack" : "cable.connector")
+                Label(session.accountLibraryTitle, systemImage: session.isReady ? "square.stack" : "cable.connector")
             } description: {
-                Text(libraryExplanation).frame(maxWidth: 520)
+                Text(session.accountLibraryExplanation).frame(maxWidth: 520)
             } actions: {
                 if !session.isReady {
                     Button("Open Settings", action: openSettings.callAsFunction)
@@ -183,12 +182,6 @@ struct LiveRootView: View {
         }
     }
 
-    private var libraryTitle: String {
-        if !session.isReady { return "Connect your Xodus engine" }
-        if session.authentication?.state != .credentialPresent { return "Your library starts with sign-in" }
-        return "PC library access is not available yet"
-    }
-
     private var selectedFolderInspection: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
@@ -233,16 +226,6 @@ struct LiveRootView: View {
             }
         }
     }
-    private var libraryExplanation: String {
-        if !session.isReady {
-            return "Choose a trusted development engine once in Settings. Xodus keeps sign-in in your Mac's Keychain."
-        }
-        if session.authentication?.state != .credentialPresent {
-            return "Use the account control to check or connect Microsoft sign-in. This build cannot yet prove a complete owned-PC library."
-        }
-        return "Your Microsoft sign-in is saved, but this engine has not established authoritative PC ownership. No catalog result or play history is shown as an owned game."
-    }
-
     private func readiness(_ title: String, _ detail: String, symbol: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: symbol).font(.title3).foregroundStyle(.secondary)

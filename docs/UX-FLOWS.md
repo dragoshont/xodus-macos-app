@@ -65,6 +65,20 @@ errors; valid all-failure pages retain visible failures and continuation.
 
 ## Status copy and independent evidence
 
+The live toolbar, Account sheet, Settings and Library share freshness-aware
+account presentation. HELLO means the development engine is connected, not
+that account status was checked. A failed status read can retain the last safe
+snapshot for cancellation/recovery fences, but displays "Account status needs
+checking" without a saved-profile badge or current-expiry/disconnect advice.
+Only a fresh credential result restores "Microsoft sign-in saved"; PC ownership,
+installation and play remain separate unavailable evidence.
+
+A pending flow is labelled "Sign-in pending", not proof that a provider window
+opened or a particular MFA/passkey step is required. An unreadable pending
+outcome stays pending for cancellation/dismissal protection and explicitly
+requires a status check; it is never assumed completed or cancelled. Known
+failed/cancelled flow results retain their existing static diagnostics.
+
 "Purchased" means purchase entitlement evidence, not "found in catalog". "Included with subscription" carries checked time and expiry when available. "Access unverified" is not an error-free fallback. "Download unavailable" states the reason (PC package absent, market, architecture, access, API or unknown). "Verified on [OS/runtime]" must match current fingerprint. "Experimental" explains what is untested. "Unsupported" is not equivalent to "not owned".
 
 Detail presents access -> downloadability -> compatibility -> local install, then a disclosure of provenance/time/fingerprint. Installed state never bypasses revoked access policy. When multiple reasons block an action, present the most actionable primary reason and retain all facets.
