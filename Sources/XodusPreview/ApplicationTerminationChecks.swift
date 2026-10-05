@@ -22,6 +22,7 @@ enum ApplicationTerminationChecks {
             let runtime = owned[0]
             runtime.select(.gptk4)
             runtime.text(\.providerVersion).wrappedValue = "mock:timeout"
+            runtime.acknowledgeExperimental(true)
             runtime.makePlan(executable: executable)
             try await waitForOwnedChild(runtime)
             check(
@@ -56,6 +57,7 @@ enum ApplicationTerminationChecks {
             let cancelled = owned[1]
             cancelled.select(.gptk3)
             cancelled.text(\.providerVersion).wrappedValue = "mock:timeout"
+            cancelled.acknowledgeExperimental(true)
             cancelled.makePlan(executable: executable)
             try await waitForOwnedChild(cancelled)
             cancelled.cancel()
@@ -68,6 +70,7 @@ enum ApplicationTerminationChecks {
             let failed = owned[2]
             failed.select(.gptk3)
             failed.text(\.providerVersion).wrappedValue = "mock:old-engine"
+            failed.acknowledgeExperimental(true)
             failed.makePlan(executable: executable)
             let failedDeadline = ContinuousClock.now.advanced(by: .seconds(5))
             while failed.planning {

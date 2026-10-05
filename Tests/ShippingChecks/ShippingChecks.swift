@@ -25,6 +25,24 @@ final class ShippingChecks: XCTestCase {
                                                                         stateDirectory: URL(fileURLWithPath: "/invalid/state")))
         check(state.destination == .library && state.query.isEmpty && !state.showingAccount,
               "Shipping navigation starts without fixture state")
+        check(state.runtimeSettings.configuration == nil && state.runtimeSettings.crossOverDependency == .notChecked,
+              "Shipping dependency starts unchecked, without an invented CrossOver installation")
+        let official = CrossOverDependencyState.installed(.init(
+            location: URL(fileURLWithPath: "/Applications/CrossOver.app"),
+            version: "26.3", buildVersion: "26.3.0.39832"))
+        let runtime = RuntimeProviderSettings(detectCrossOver: { official })
+        await runtime.refreshCrossOverDependency()
+        check(runtime.configuration?.provider == .crossover && runtime.configuration?.providerVersion == "26.3"
+              && runtime.configuration?.engine.version == nil && runtime.configuration?.graphics.backend == nil
+              && runtime.plan == nil,
+              "Actual shipping configuration defaults only from a neutral verified CrossOver observation")
+        runtime.select(.gptk4)
+        check(runtime.requiresExperimentalAcknowledgement && runtime.planningBlocker != nil,
+              "Actual shipping alternatives are acknowledgement-gated Experimental configurations")
+        runtime.acknowledgeExperimental(true)
+        runtime.update { $0.engine.version = "changed" }
+        check(!runtime.experimentalAcknowledged && runtime.planningBlocker != nil,
+              "Actual shipping component edits reset experimental acknowledgement")
         check(session.authentication == nil && session.products.isEmpty && session.activity.jobs.isEmpty
               && session.installedSnapshot == nil && !session.canSignIn,
               "Shipping live account, products, activity and registry start without invented evidence")
@@ -40,6 +58,7 @@ final class ShippingChecks: XCTestCase {
               "Unpaired shipping connect fails actionably without an engine process")
         check(await session.disconnect(), "Unpaired shipping setup owns no child")
         state.runtimeSettings.select(.gptk4)
+        state.runtimeSettings.acknowledgeExperimental(true)
         state.runtimeSettings.makePlan(executable: URL(fileURLWithPath: session.backendPath))
         check(!state.runtimeSettings.planning && state.runtimeSettings.plan == nil
               && state.runtimeSettings.errorMessage == ManagementError.pairedEngineUnavailable.localizedDescription,

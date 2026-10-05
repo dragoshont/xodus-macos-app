@@ -20,7 +20,7 @@ An original Apple-native, standalone experience over the scoped Xodus management
 
 ## Operating context
 
-Develop and verify native code on the user's Mac over trusted SSH, using isolated public-app tooling. Public source must never include real library captures, account information or private runtime code. The eventual runtime must be Xbox-capable and exactly version-paired; ordinary Heroic Wine or CrossOver is not an equivalent.
+Develop and verify native code on the user's Mac over trusted SSH, using isolated public-app tooling. Public source must never include real library captures, account information or private runtime code. Official, separately installed CrossOver is the first-release dependency, not by itself certification of an Xbox-capable, exactly paired gameplay runtime.
 
 ## Capabilities and constraints
 
@@ -40,10 +40,15 @@ approved, compiled-pin-bound bundled engine/helper pair; an unpaired repository
 build fails closed. This source hardening is not shipping deployment or proven
 human authentication. See [controlled admission](docs/SHIPPING-ADMISSION.md).
 
-**User-directed runtime follow-up:** selectable Apple GPTK3, Apple GPTK4,
-legitimately user-installed/licensed CrossOver, and user-selected standalone or
-source-built Wine. GPTK4 is only the current external trial default, not a
-product-wide selection or compatibility rule. Engine provenance/version and
+**User-directed first-release runtime policy (RT-01..04):** official CrossOver
+is checked read-only using fixed standard locations and the approved
+Apple-anchored CodeWeavers identity. Only verified observation defaults a
+new/unset configuration; explicit decoded/selected profiles are preserved.
+Missing or unverified CrossOver shows a gameplay prerequisite, without blocking
+public browsing or sign-in. GPTK3/GPTK4, standalone/source-built Wine and custom
+graphics are Experimental, requiring acknowledgement that resets on relevant
+changes. Installation identity does not prove a license, ownership or gameplay.
+Engine provenance/version and
 graphics backend/provenance/version are independent: Wine 11 plus D3DMetal 4
 is a composition, not an older GPTK Wine version. Configuration, installation,
 device preflight and per-game verification remain distinct. Prefix generations

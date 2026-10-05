@@ -6,6 +6,41 @@ game download, install or gameplay.
 
 ## Shipping hardening candidate
 
+Hardening ancestor `00ba51fd5e48f6298d27a56e75f491f6f697696f` passed its
+own normal-push [run37314629896](https://github.com/dragoshont/xodus-macos-app/actions/runs/37314629896):
+15 core/358 management/61 presentation/176 native session/87 private host,
+23 shipping admission and22 portable packaging checks, zero failures, shipping
+release compilation/argument/resource checks and SVG reproduction.
+This is not qualification of the additive CrossOver-first successor.
+
+## CrossOver-first source acceptance
+
+`CrossOverDependencyChecks.run` exercises the actual detector/model and detached
+native dependency view, with explicitly neutral signature observations and
+an actually unsigned owned temporary bundle. No CrossOver process, license,
+prefix, game or provider/account interaction is performed.
+
+| Requirement | Named test coverage |
+| --- | --- |
+| RT-01 | `RT01 Apple Security parses the approved plain requirement`; fixed identifier/team/Apple anchor; distinct version/build; wrong signer/identifier; malformed/missing/oversized plist; actual static-code rejection; absent/linked app and metadata |
+| RT-02 | `RT02 Verified official CrossOver defaults only the new provider`; absent/unverified no default; unverified planner has no child; post-Quit observation cannot adopt a provider |
+| RT-03 | `RT03 A decoded explicit alternative survives startup and repeat refresh`; pre-ack planner has no child; unchanged observation preserves acceptance; engine/provider/custom graphics edits and changed/late evidence reset acknowledgement without rewriting explicit choices |
+| RT-04 | `RT04 Shared dependency copy distinguishes app identity from license and gameplay evidence`; actual shared native view at440/560pt; first-release choice first/all alternatives Experimental |
+
+`ShippingChecks.testShippingAdmission` additionally exercises unchecked initial
+dependency state, verified-only default and acknowledgement invalidation in the
+actual shipping compile. Existing planning cancellation/reap/Quit cases explicitly
+acknowledge their neutral Experimental profiles, retaining their original owned
+process lifecycle assertions. Fixture installation checks are disabled, and the
+new neutral check source is excluded from shipping.
+
+The successor requires its own isolated normal-push SDK27 qualification.
+Approved official publisher baseline and real engine pure-plan/public query
+observations are separate operator evidence, not synthetic test certification of
+a deployed app, license, successful human sign-in or playable game.
+
+## Shipping hardening scope
+
 The adversarial841 review required compile-time shipping/demo separation,
 removal of synthetic live heroes, paired-engine admission rather than helper-only
 trust, catalog-loading precedence and startup-query revision fencing.

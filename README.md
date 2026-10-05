@@ -63,16 +63,21 @@ separate approval. See [controlled pair admission](docs/SHIPPING-ADMISSION.md).
 
 The proposed deployment baseline is **macOS 14**, not a user-approved support commitment. The shared native toolbar groups Library / Discover / Downloads with compact stock `NSSearchField` search: real `.tabs` on macOS 27+, segmented fallback on 14-26. Search expands for editing, Command-F or a retained query; Account stays separate at the trailing edge. The Scene hides the visible title while retaining native traffic lights and app identity. Live screens use the native window background until rights-cleared real artwork exists. Account content scrolls independently of its adaptive action footer, and normal activation remains AppKit-owned. Source/headless evidence is **not deployed or visually confirmed**.
 
-Native Settings source now exposes **Apple GPTK3, Apple GPTK4, legitimately
-user-installed CrossOver, and standalone/source-built Wine**, with no initial
-selection. Wine and graphics versions, sources and hashes are independent
-declarations, not detected installations. The bounded `runtime-plan` client
-requests a fresh isolated configuration plan from an explicitly selected trusted
-engine; it does not inspect a runtime, create a prefix, migrate saves or enable
-Play. Older engines report planning unavailable, without an authentication or
-provider fallback. The fixture Settings share these choices but cannot start
-planning. This separate source revision is not deployed; runtime licensing,
-component verification and actual gameplay remain open gates.
+**Official CrossOver, installed separately, is the first-release dependency.**
+The app checks only standard app locations, bounded metadata and a fixed
+Apple-anchored CodeWeavers signature requirement. A verified installation
+defaults a new/unset profile; explicit choices are preserved. Missing/unverified
+CrossOver blocks first-release gameplay setup, not public browsing or Microsoft
+sign-in. Wine/GPTK and custom graphics remain **Experimental**, with explicit
+acknowledgement reset by configuration or observed installation changes.
+See [runtime policy and scoped trust source](docs/RUNTIME-PROVIDERS.md).
+
+Wine/graphics versions and hashes remain independent declarations. The separate
+bounded `runtime-plan` validates configuration only; it never executes CrossOver,
+checks a license, creates a prefix, migrates saves or enables Play. A verified
+app signature is not entitlement or game compatibility. The nonshipping fixture
+Settings cannot inspect CrossOver or start planning. This source is not a
+verified deployed release or successful human login.
 
 `XodusAuthHost` implements AppKit/WebKit window ownership and a strict private,
 anonymous-channel protocol. Its exact seven-string legacy handoff remains

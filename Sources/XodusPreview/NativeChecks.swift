@@ -47,6 +47,7 @@ enum NativeChecks {
             }
         }
         do {
+            try await CrossOverDependencyChecks.run(check: check)
             try await ApplicationTerminationChecks.run(check: check)
             let expired = session("expired")
             await expired.connect()

@@ -53,6 +53,9 @@ struct LiveRootView: View {
 #endif
         }
         .task {
+            if startupAllowed { await state.runtimeSettings.refreshCrossOverDependency() }
+        }
+        .task {
             if startupAllowed, session.phase == .disconnected, !session.connectionTransitioning,
                !session.backendPath.isEmpty { await session.connect() }
         }
@@ -150,6 +153,7 @@ struct LiveRootView: View {
                 readiness("PC access", "Not established by catalog or sign-in", symbol: "key")
                 readiness("Runtime", "Paired gameplay runtime not certified", symbol: "desktopcomputer")
             }
+            RuntimeDependencyStatus(settings: state.runtimeSettings, offersSettings: true)
         }
     }
 

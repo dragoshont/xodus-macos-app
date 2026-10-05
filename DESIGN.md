@@ -86,7 +86,13 @@ modern rendering and constrained-window toolbar placement remain live gates.
 
 Runtime Settings reuse the existing grouped native Form, standard Picker,
 TextField, DisclosureGroup and buttons; no new navigation, decorative material
-or custom control chrome. The four choices start unselected. Advanced component
+or custom control chrome. CrossOver is first-release supported; only a verified
+official app observation defaults an unset profile. All alternatives are
+Experimental with visible acknowledgement, outside the advanced disclosure.
+Shared dependency status/copy appears in Library, Account and Settings, with
+native check, official information and Settings actions. Controls adapt to
+constrained widths; checking/absent/unverified states do not fabricate readiness
+or disable unrelated catalog/account actions. Advanced component
 declarations remain separate from the primary provider choice, and configuration
 planning never advertises installation or verified gameplay. Fixture mode
 disables planning. Detached controls/layout checks are not a live visual,

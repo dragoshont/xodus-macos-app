@@ -10,13 +10,75 @@ final class RuntimeProviderSettings: ObservableObject {
     @Published private(set) var planning = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var applicationTerminating = false
+    @Published private(set) var crossOverDependency: CrossOverDependencyState = .notChecked
+    @Published private(set) var checkingDependency = false
+    @Published private(set) var experimentalAcknowledged = false
+    private var explicitSelection: Bool
+    private let detectCrossOver: @Sendable () async -> CrossOverDependencyState
     private let client = RuntimePlanClient()
     private var task: Task<Void, Never>?
     private var revision = UUID()
 
+    init(configuration: RuntimeProviderConfiguration? = nil,
+         detectCrossOver: @escaping @Sendable () async -> CrossOverDependencyState = {
+             await Task.detached(priority: .utility) { CrossOverDetector.detect() }.value
+         }) {
+        self.configuration = configuration
+        explicitSelection = configuration != nil
+        self.detectCrossOver = detectCrossOver
+    }
+
+    func refreshCrossOverDependency() async {
+        guard !checkingDependency, !applicationTerminating, !planning else { return }
+        let previous = crossOverDependency
+        checkingDependency = true
+        crossOverDependency = .checking
+        let observed = await detectCrossOver()
+        checkingDependency = false
+        guard !applicationTerminating else {
+            crossOverDependency = .notChecked
+            return
+        }
+        if observed != previous { invalidate() }
+        crossOverDependency = observed
+        if configuration == nil, !explicitSelection, case .installed(let app) = observed {
+            var value = RuntimeProviderConfiguration.preset(.crossover)
+            value.providerVersion = app.version
+            configuration = value
+        }
+    }
+
+    static let providerChoices: [RuntimeProviderKind] = [.crossover, .gptk4, .gptk3, .standaloneWine]
+    static func providerLabel(_ provider: RuntimeProviderKind) -> String {
+        provider == .crossover ? "Official CrossOver (first release)" : "\(provider.label) (Experimental)"
+    }
+
+    var requiresExperimentalAcknowledgement: Bool {
+        guard let configuration else { return false }
+        return configuration.provider != .crossover || configuration.graphics.backend != nil
+    }
+
+    var planningBlocker: String? {
+        guard let configuration else { return "Choose a runtime configuration first." }
+        if checkingDependency { return "Wait for the CrossOver app check before requesting a plan." }
+        if configuration.provider == .crossover && !crossOverDependency.isVerified {
+            return "Verify a separately installed official CrossOver app before planning this first-release configuration."
+        }
+        if requiresExperimentalAcknowledgement && !experimentalAcknowledged {
+            return "Confirm this Experimental configuration before requesting its pure plan. It is not first-release supported."
+        }
+        return nil
+    }
+
+    func acknowledgeExperimental(_ accepted: Bool) {
+        guard !planning, !applicationTerminating else { return }
+        experimentalAcknowledged = accepted && requiresExperimentalAcknowledgement
+    }
+
     func select(_ provider: RuntimeProviderKind?) {
         guard !applicationTerminating else { return }
         invalidate()
+        explicitSelection = true
         configuration = provider.map(RuntimeProviderConfiguration.preset)
     }
 
@@ -24,6 +86,7 @@ final class RuntimeProviderSettings: ObservableObject {
         guard !applicationTerminating else { return }
         guard var value = configuration else { return }
         invalidate()
+        explicitSelection = true
         change(&value)
         configuration = value
     }
@@ -39,6 +102,7 @@ final class RuntimeProviderSettings: ObservableObject {
         revision = UUID()
         plan = nil
         errorMessage = nil
+        experimentalAcknowledged = false
     }
 
     func makePlan(executable: URL) {
@@ -58,7 +122,13 @@ final class RuntimeProviderSettings: ObservableObject {
 #else
         engineIdentity = nil
 #endif
+        if let blocker = planningBlocker {
+            errorMessage = blocker
+            return
+        }
+        let acknowledged = experimentalAcknowledged
         invalidate()
+        experimentalAcknowledged = acknowledged
         let captured = revision
         planning = true
         task = Task {
@@ -113,14 +183,16 @@ final class RuntimeProviderSettings: ObservableObject {
 struct RuntimeProviderSection: View {
     @ObservedObject var settings: RuntimeProviderSettings
     let backendPath: String
+    var allowsInstallationCheck = true
 
     var body: some View {
         Section("Runtime configuration") {
+            RuntimeDependencyStatus(settings: settings, allowsCheck: allowsInstallationCheck)
             Picker("Runtime provider", selection: Binding(
                 get: { settings.configuration?.provider }, set: { settings.select($0) })) {
                 Text("Choose a provider").tag(Optional<RuntimeProviderKind>.none)
-                ForEach(RuntimeProviderKind.allCases, id: \.self) { provider in
-                    Text(provider.label).tag(Optional(provider))
+                ForEach(RuntimeProviderSettings.providerChoices, id: \.self) { provider in
+                    Text(RuntimeProviderSettings.providerLabel(provider)).tag(Optional(provider))
                 }
             }
             .disabled(settings.planning || settings.applicationTerminating)
@@ -157,7 +229,7 @@ struct RuntimeProviderSection: View {
                         })) {
                         Text("Not declared").tag(Optional<RuntimeGraphicsBackend>.none)
                         ForEach(RuntimeGraphicsBackend.allCases, id: \.self) { backend in
-                            Text(backend.label).tag(Optional(backend))
+                            Text("\(backend.label) (Experimental override)").tag(Optional(backend))
                         }
                     }
                     if configuration.graphics.backend != nil {
@@ -177,12 +249,21 @@ struct RuntimeProviderSection: View {
                 Text("Versions and hashes are your declarations, not installation or gameplay evidence. Engine and graphics identities are independent; changing either requires a fresh isolated plan.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            if settings.requiresExperimentalAcknowledgement {
+                Toggle("I understand this configuration is Experimental and not first-release supported",
+                       isOn: Binding(get: { settings.experimentalAcknowledged },
+                                     set: { settings.acknowledgeExperimental($0) }))
+                    .disabled(settings.planning || settings.applicationTerminating)
+            }
+            if let blocker = settings.planningBlocker {
+                Text(blocker).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
             HStack {
                 Button("Plan isolated configuration") {
                     settings.makePlan(executable: URL(fileURLWithPath: backendPath))
                 }
                 .disabled(settings.configuration == nil || backendPath.isEmpty || settings.planning
-                          || settings.applicationTerminating)
+                          || settings.applicationTerminating || settings.planningBlocker != nil)
                 if settings.planning {
                     ProgressView().controlSize(.small)
                     Button("Cancel planning") { settings.cancel() }
@@ -190,7 +271,7 @@ struct RuntimeProviderSection: View {
             }
             if let plan = settings.plan {
                 LabeledContent("Planned generation", value: plan.generationID)
-                Text("Installation not inspected. Device preflight not performed. No game verified; Play remains unavailable.")
+                Text("The plan did not inspect a runtime. The separate CrossOver app check is not device preflight or game verification; Play remains unavailable.")
                     .foregroundStyle(.secondary)
                 Text("No existing bottle, prefix or saves were reused, migrated or deleted. This plan creates no files.")
                     .font(.caption).foregroundStyle(.secondary)

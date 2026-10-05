@@ -1,10 +1,42 @@
 # Runtime provider configuration v1
 
-This separate source-only contract exposes all four provider choices: GPTK3,
-GPTK4, legitimate user-installed CrossOver and user-selected standalone or
-source-built Wine. Selection starts unconfigured. GPTK4 is an individual trial
-default, not a product-wide restriction. No runtime, game, device, existing
-bottle, save, credential or provider process is inspected or modified here.
+Official, separately installed CrossOver is the first-release dependency.
+GPTK3/GPTK4 and user-selected standalone/source-built Wine remain Experimental
+tracks; any explicit graphics override is also Experimental. The UI requires
+acknowledgement before their pure planning, reset by configuration or observed
+installation changes. No DXMT API/renderer is invented by this policy.
+
+`CrossOverDetector` checks `/Applications/CrossOver.app` and the current user's
+`Applications/CrossOver.app` only. It bounds Info.plist to64KiB, rejects linked,
+nonregular, multiply-linked, unsafe or unstable metadata, and verifies static
+code including nested code/all architectures against this fixed requirement:
+
+```text
+identifier "com.codeweavers.CrossOver" and anchor apple generic
+and certificate 1[field.1.2.840.113635.100.6.2.6] exists
+and certificate leaf[field.1.2.840.113635.100.6.1.13] exists
+and certificate leaf[subject.OU] = "9C6B7X7Z8E"
+```
+
+Trust source: the user-approved official vendor installation independently
+checked by existing operators, with strict/deep verification and Gatekeeper
+Notarized Developer ID acceptance. This is a scoped approved installation
+baseline, not a retrieved vendor-published team allowlist or live notarization
+lookup on each app check. Candidate metadata cannot supply the trust pin.
+Security's requirement parser takes the plain expression; only the `codesign
+-R` CLI needs `=` to distinguish inline requirements from filenames.
+
+Observed short version26.3 and build26.3.0.39832 are distinct. A verified
+observation defaults only an unset profile to CrossOver/providerVersion26.3;
+Wine and graphics identities remain unknown. Existing explicit decoded/selected
+configurations, including a deliberately cleared choice, are not rewritten.
+The current UI is memory-only; this does not introduce persistence/migration.
+Library/Account/Settings share checking/absent/unverified/verified presentation.
+Absent/unverified CrossOver blocks first-release gameplay setup, not public
+browsing or Microsoft sign-in. No license, game, device, existing bottle, save,
+credential or provider process is inspected/executed by this separate app check.
+
+The configuration-only backend contract remains unchanged.
 Management C95, its 25 operations/capabilities and null runtime fingerprint
 remain unchanged; install/play stay gated.
 

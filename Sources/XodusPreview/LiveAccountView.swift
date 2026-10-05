@@ -8,6 +8,7 @@ final class AccountInteraction: ObservableObject {
 }
 
 struct LiveAccountView: View {
+    @EnvironmentObject private var state: AppState
     @EnvironmentObject private var session: LiveSession
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openSettings) private var openSettings
@@ -32,6 +33,7 @@ struct LiveAccountView: View {
                 Text(session.accountExplanation)
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("xodus.account.statusExplanation")
+                RuntimeDependencyStatus(settings: state.runtimeSettings, offersSettings: true)
                 if let flow = session.authentication?.flow {
                     if flow.state == .cancelled {
                         Label("Sign-in cancelled. No new connection was assumed.", systemImage: "xmark.circle")
@@ -93,6 +95,7 @@ struct LiveAccountView: View {
             .controlSize(.regular)
         }
         .task { await session.refreshAccount() }
+        .task { await state.runtimeSettings.refreshCrossOverDependency() }
         .interactiveDismissDisabled(session.accountBusy || session.signInPending)
         .confirmationDialog("Sign out of Xodus on this Mac?", isPresented: $interaction.confirmingSignOut) {
             Button("Disconnect sign-in", role: .destructive) { Task { await session.signOut() } }
@@ -198,5 +201,6 @@ struct LiveSettingsView: View {
         }
         .formStyle(.grouped).padding()
         .frame(width: 560)
+        .task { await state.runtimeSettings.refreshCrossOverDependency() }
     }
 }

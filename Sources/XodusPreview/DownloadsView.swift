@@ -124,7 +124,7 @@ struct PreviewSettings: View {
                 Toggle("Simulate insufficient space", isOn: $state.lowSpace)
                 Button("Reset fixture state") { state.reset() }
             }
-            RuntimeProviderSection(settings: state.runtimeSettings, backendPath: "")
+            RuntimeProviderSection(settings: state.runtimeSettings, backendPath: "", allowsInstallationCheck: false)
             Section("Storage and runtime") {
                 Text("Demo storage / Games (not written)")
                 Text("Runtime pair: fixture-xodus-pair-1 (not downloaded)")
