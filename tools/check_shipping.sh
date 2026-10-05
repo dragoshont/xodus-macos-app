@@ -7,7 +7,7 @@ XODUS_SHIPPING=1 swift build --scratch-path .build/shipping -c release --product
 XODUS_SHIPPING=1 swift build --scratch-path .build/shipping -c release --product XodusAuthHost
 bin=$(XODUS_SHIPPING=1 swift build --scratch-path .build/shipping -c release --show-bin-path)
 XODUS_NEUTRAL_ENGINE="$neutral" XODUS_BACKEND_PATH=/invalid/override XODUS_SHIPPING=1 \
-    swift test --scratch-path .build/shipping -c release --filter ShippingChecks
+    swift test --scratch-path .build/shipping -c release -Xswiftc -enable-testing --filter ShippingChecks
 python3 - "$bin" <<'PY'
 import pathlib, subprocess, sys
 root = pathlib.Path(sys.argv[1])

@@ -69,13 +69,15 @@ struct XodusPreviewApp: App {
                 Button("Downloads") { state.navigate(.downloads) }.keyboardShortcut("3")
             }
             CommandMenu("Xodus") {
-                Button("Account") { state.showingAccount = true }
 #if !XODUS_SHIPPING
+                Button("Account") { state.showingAccount = true }
                     .disabled(state.fixtureMode)
                 Button("Return to live Xodus") {
                     state.fixtureMode = false
                     state.navigate(.library)
                 }.disabled(!state.fixtureMode)
+#else
+                Button("Account") { state.showingAccount = true }
 #endif
             }
         }
