@@ -141,6 +141,23 @@ enum AuthHostChecks {
             }
             check(HostPolicy.navigation(URL(string: "https://login.live.com:443/test")!),
                   "Explicit default HTTPS port retains Rust URL parity")
+            for domain in ["live.com", "microsoft.com", "microsoftonline.com", "msauth.net", "msftauth.net", "live.net"] {
+                check(HostPolicy.navigation(URL(string: "https://\(domain)/")!)
+                      && HostPolicy.navigation(URL(string: "https://login.accounts.\(domain)/")!),
+                      "Navigation permits exact \(domain) and proper dot-suffix HTTPS hosts")
+            }
+            for raw in ["https://evillive.com/", "https://live.com.evil/", "https://login.microsoft.com.evil/",
+                        "https://user:secret@microsoft.com/", "http://microsoft.com/",
+                        "https://xn--alias.microsoft.com/", "https://m\u{0456}crosoft.com/",
+                        "https://.live.com/", "https://login..live.com/", "https://login.live.com./"] {
+                check(URL(string: raw).map { !HostPolicy.navigation($0) } ?? true,
+                      "Top-level navigation rejects suffix deception, userinfo, HTTP, aliases and malformed DNS labels")
+            }
+            check(!HostPolicy.bridge(URL(string: "https://account.live.com/")!)
+                  && !HostPolicy.bridge(URL(string: "https://login.microsoft.com/")!)
+                  && !HostPolicy.bridge(URL(string: "https://login.accounts.live.com/")!)
+                  && HostPolicy.bridge(URL(string: "https://login.live.com/")!),
+                  "Wider navigation never grants another origin private bridge or DA authority")
             check(!HostPolicy.finish(URL(string: "https://login.live.com/ppsecure/post.srf/extra")!)
                   && !HostPolicy.finish(URL(string: "https://login.live.com/ppsecure/%70ost.srf")!)
                   && HostPolicy.finish(URL(string: "https://login.live.com/ppsecure/post.srf?fixture=1")!),
@@ -402,6 +419,28 @@ enum AuthHostChecks {
         var failure: HostFailure?
         let browser = NativeAuthBrowser(trust: trust, received: { result = $0 }, failed: { failure = $0 })
         defer { browser.close() }
+        for raw in ["about:blank", "data:text/html,neutral", "https://foreign.invalid/", "http://foreign.invalid/"] {
+            check(browser.navigationPolicy(for: URLRequest(url: URL(string: raw)!), isMainFrame: false) == .allow,
+                  "All subframe navigation is allowed independently of the main-frame origin policy")
+        }
+        check(browser.navigationPolicy(for: URLRequest(url: URL(string: "https://foreign.invalid/")!),
+                                       isMainFrame: true) == .cancel && failure == nil,
+              "Disallowed main-frame navigation cancels only the navigation, not the authentication flow")
+        check(browser.navigationPolicy(for: URLRequest(url: base), isMainFrame: true) == .allow
+              && browser.navigationPolicy(for: URLRequest(url: base), isMainFrame: nil) == .allow
+              && browser.popupDisposition(for: URLRequest(url: base)) == .sameView,
+              "Trusted target-blank navigation is routed to the existing native view")
+        let blank = URLRequest(url: URL(string: "about:blank")!)
+        let foreignPopup = URLRequest(url: URL(string: "https://foreign.invalid/")!)
+        browser.handlePopup(blank)
+        browser.handlePopup(foreignPopup)
+        check(browser.popupDisposition(for: blank) == .placeholder
+              && browser.navigationPolicy(for: blank, isMainFrame: nil) == .allow
+              && browser.navigationPolicy(for: blank, isMainFrame: true) == .cancel
+              && browser.popupDisposition(for: foreignPopup) == .blocked
+              && browser.navigationPolicy(for: foreignPopup, isMainFrame: nil) == .cancel
+              && browser.view.url == nil && failure == nil,
+              "Blank and blocked popups neither replace the current document nor terminate sign-in")
         let data = String(decoding: try synthetic.encoded(), as: UTF8.self)
         let html = """
         <!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'">
@@ -421,6 +460,30 @@ enum AuthHostChecks {
         check(failure == nil, "Closed browser fences stale renderer callbacks")
 
         let notificationBase = URL(string: "https://auth-host-fixture.invalid/notification")!
+        var subframeFailure: HostFailure?
+        var subframeResult: LegacyDA?
+        let subframeBrowser = NativeAuthBrowser(trust: trust,
+            received: { subframeResult = $0 }, failed: { subframeFailure = $0 })
+        defer { subframeBrowser.close() }
+        try subframeBrowser.loadSyntheticDocument(
+            "<!doctype html><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'unsafe-inline'; frame-src 'self'\"><p>Neutral subframe check.</p>",
+            baseURL: notificationBase)
+        let subframeDeadline = ContinuousClock.now.advanced(by: .seconds(8))
+        while subframeBrowser.view.isLoading && subframeFailure == nil && ContinuousClock.now < subframeDeadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        _ = try await subframeBrowser.view.callAsyncJavaScript("""
+            const frame = document.createElement('iframe');
+            frame.srcdoc = "<script>window.webkit.messageHandlers.xodusPrivateAuth.postMessage('synthetic');<\\/script>";
+            document.body.appendChild(frame);
+            return true;
+            """, arguments: [:], in: nil, contentWorld: .page)
+        while subframeFailure == nil && ContinuousClock.now < subframeDeadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        check(subframeResult == nil && subframeFailure == .bridgeInvalid,
+              "Allowed same-origin subframe still cannot invoke the private main-frame bridge")
+        subframeBrowser.close()
         var missing = try LegacyDA(synthetic).fields.mapValues(PrivateValue.string)
         missing.removeValue(forKey: "K")
         var mistyped = try LegacyDA(synthetic).fields.mapValues(PrivateValue.string)
@@ -461,9 +524,21 @@ enum AuthHostChecks {
             failed: { staticFailure = $0; failureCount += 1 })
         failing.webView(failing.view, didFailProvisionalNavigation: nil,
                         withError: NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled))
+        check(staticFailure == nil && failureCount == 0,
+              "Provisional cancellation without a superseded navigation keeps sign-in alive")
+        failing.webView(failing.view, didFailProvisionalNavigation: nil,
+                        withError: NSError(domain: "WebKitErrorDomain", code: 102))
+        check(staticFailure == nil && failureCount == 0,
+              "WebKit provisional policy interruption keeps sign-in alive")
+        failing.webView(failing.view, didFail: nil,
+                        withError: NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled))
+        check(staticFailure == nil && failureCount == 0,
+              "Completed-navigation cancellation is harmless without relying on a superseded set")
+        failing.webView(failing.view, didFailProvisionalNavigation: nil,
+                        withError: NSError(domain: NSURLErrorDomain, code: NSURLErrorCannotConnectToHost))
         failing.webViewWebContentProcessDidTerminate(failing.view)
         check(staticFailure == .navigationFailed && failureCount == 1,
-              "An unrelated cancellation is a typed failure, not silently ignored or repeated")
+              "A genuine navigation error still fails exactly once, without a retry or silent fallback")
         failing.close()
         var cancellation: HostFailure?
         let cancelled = NativeAuthBrowser(trust: trust, received: { _ in }, failed: { cancellation = $0 })

@@ -8,6 +8,10 @@ struct BrowserTrust {
     let finish: (URL) -> Bool
 }
 
+enum NativePopupDisposition: Equatable {
+    case sameView, placeholder, blocked
+}
+
 @MainActor
 final class NativeAuthBrowser: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
     let view: WKWebView
@@ -164,22 +168,24 @@ final class NativeAuthBrowser: NSObject, WKNavigationDelegate, WKUIDelegate, WKS
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void) {
-        guard !terminal else { decisionHandler(.cancel); return }
-        guard let target = navigationAction.targetFrame else {
-            decisionHandler(.cancel)
-            fail(.popupUnsupported)
-            return
+        guard webView === view else { decisionHandler(.cancel); return }
+        decisionHandler(navigationPolicy(for: navigationAction.request,
+                                         isMainFrame: navigationAction.targetFrame?.isMainFrame))
+    }
+
+    func navigationPolicy(for request: URLRequest, isMainFrame: Bool?) -> WKNavigationActionPolicy {
+        guard !terminal else { return .cancel }
+        if isMainFrame == false { return .allow }
+        if isMainFrame == nil {
+            return popupDisposition(for: request) == .blocked ? .cancel : .allow
         }
-        guard let url = navigationAction.request.url, trust.navigation(url) else {
-            decisionHandler(.cancel)
-            fail(.navigationFailed)
-            return
-        }
-        if !target.isMainFrame {
-            decisionHandler(.allow)
-            return
-        }
-        decisionHandler(.allow)
+        return request.url.map(trust.navigation) == true ? .allow : .cancel
+    }
+
+    func popupDisposition(for request: URLRequest) -> NativePopupDisposition {
+        guard !terminal, let url = request.url else { return .blocked }
+        if url.absoluteString == "about:blank" { return .placeholder }
+        return trust.navigation(url) ? .sameView : .blocked
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
@@ -227,20 +233,21 @@ final class NativeAuthBrowser: NSObject, WKNavigationDelegate, WKUIDelegate, WKS
         }
     }
 
-    private func navigationFailure(_ navigation: WKNavigation?, _ error: Error) {
-        if let navigation, superseded.removeValue(forKey: ObjectIdentifier(navigation)) != nil,
-           (error as NSError).domain == NSURLErrorDomain,
-           (error as NSError).code == NSURLErrorCancelled { return }
+    private func navigationFailure(_ navigation: WKNavigation?, _ error: Error, provisional: Bool) {
+        if let navigation { superseded.removeValue(forKey: ObjectIdentifier(navigation)) }
+        let error = error as NSError
+        if error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled { return }
+        if provisional && error.domain == "WebKitErrorDomain" && error.code == 102 { return }
         fail(.navigationFailed)
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        navigationFailure(navigation, error)
+        navigationFailure(navigation, error, provisional: false)
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!,
                  withError error: Error) {
-        navigationFailure(navigation, error)
+        navigationFailure(navigation, error, provisional: true)
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { fail(.rendererTerminated) }
@@ -252,7 +259,17 @@ final class NativeAuthBrowser: NSObject, WKNavigationDelegate, WKUIDelegate, WKS
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                  for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        fail(.popupUnsupported)
+        guard webView === view else { return nil }
+        handlePopup(navigationAction.request)
         return nil
+    }
+
+    func handlePopup(_ request: URLRequest) {
+        switch popupDisposition(for: request) {
+        case .blocked, .placeholder: return
+        case .sameView:
+            do { try load(request, userAgent: view.customUserAgent) }
+            catch { fail(.navigationFailed) }
+        }
     }
 }

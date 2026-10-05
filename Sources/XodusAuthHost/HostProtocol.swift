@@ -183,9 +183,18 @@ enum HostPolicy {
     }
 
     static func navigation(_ url: URL) -> Bool {
-        url.scheme?.lowercased() == "https" && url.user == nil && url.password == nil
-            && (url.port == nil || url.port == 443)
-            && ["login.live.com", "account.live.com", "login.microsoftonline.com"].contains(url.host?.lowercased() ?? "")
+        guard url.scheme?.lowercased() == "https", url.user == nil, url.password == nil,
+              url.port == nil || url.port == 443, let host = url.host?.lowercased(),
+              let encodedHost = URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedHost,
+              !encodedHost.contains("%") else { return false }
+        let labels = host.split(separator: ".", omittingEmptySubsequences: false)
+        guard labels.allSatisfy({ label in
+            !label.isEmpty && label.count <= 63 && !label.hasPrefix("xn--")
+                && label.first != "-" && label.last != "-"
+                && label.utf8.allSatisfy { (97...122).contains($0) || (48...57).contains($0) || $0 == 45 }
+        }) else { return false }
+        return ["live.com", "microsoft.com", "microsoftonline.com", "msauth.net", "msftauth.net", "live.net"]
+            .contains { host == $0 || host.hasSuffix("." + $0) }
     }
 
     static func initial(_ value: String) -> Bool {

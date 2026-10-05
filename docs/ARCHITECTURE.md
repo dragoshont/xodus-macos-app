@@ -100,8 +100,18 @@ nonsecret helper path/version/hash binding is explicit, reviewed and bundle
 relative before producing an absolute launch path, with no PATH fallback.
 Fresh nonpersistent WebKit data, exact trusted HTTPS origins/main frame,
 navigation generations/document nonce and one-shot result gates fence callbacks.
-Popup denial, renderer/navigation/checked-JavaScript failures are typed terminal
-outcomes. Known superseded navigation cancellation is distinct from real failure.
+Navigation and private-bridge trust are separate. Subframe loads are unrestricted;
+top-level navigation accepts only HTTPS/443 without userinfo on the exact or proper
+dot-suffix `live.com`, `microsoft.com`, `microsoftonline.com`, `msauth.net`,
+`msftauth.net` and `live.net` hosts, rejecting malformed/encoded/IDNA aliases.
+Rejected top-level requests cancel only that navigation. Allowed popup requests
+load in the same view; an initial `about:blank` popup leaves the current document
+and flow intact. There is no secondary browser window or external URL fallback.
+Cancellation and provisional WebKit policy interruption (102) are nonterminal;
+genuine navigation, renderer and checked-JavaScript errors remain typed failures.
+Bridge/DA delivery still requires the original trusted main-frame origin,
+generation/document nonce and seven-string shape; wider navigation does not widen
+bridge authorization.
 Swift ownership alone proves neither Microsoft passkey eligibility nor a fix
 for the user's unclassified authenticator obstacle.
 

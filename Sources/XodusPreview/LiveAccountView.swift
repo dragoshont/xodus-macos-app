@@ -38,11 +38,20 @@ struct LiveAccountView: View {
                     if flow.state == .cancelled {
                         Label("Sign-in cancelled. No new connection was assumed.", systemImage: "xmark.circle")
                     } else if flow.state == .failed {
-                        Label(session.accountFailureTitle, systemImage: "exclamationmark.circle")
-                        if let summary = session.accountFailureSummary {
-                            Text(summary).foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .accessibilityIdentifier("xodus.account.failureSummary")
+                        Label("Sign-in failed.", systemImage: "exclamationmark.circle")
+                        DisclosureGroup("Details") {
+                            VStack(alignment: .leading, spacing: 8) {
+                                if let summary = session.accountFailureSummary {
+                                    Text(summary).foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .accessibilityIdentifier("xodus.account.failureSummary")
+                                }
+                                if let observation = session.accountFailureObservation {
+                                    Text(observation).foregroundStyle(.secondary)
+                                        .accessibilityIdentifier("xodus.account.failureObservation")
+                                }
+                            }
+                            .textSelection(.enabled).padding(.top, 8)
                         }
                     }
                 }

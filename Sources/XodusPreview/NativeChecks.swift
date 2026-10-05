@@ -47,6 +47,35 @@ enum NativeChecks {
             }
         }
         do {
+            func observationFailure(_ message: String, code: String = "AUTH_INVALID",
+                                    reason: String = "pipelineFailed") throws -> WireFailure {
+                let value = JSONValue.object([
+                    "code": .string(code), "message": .string(message), "retryable": .bool(false),
+                    "details": .object(["category": .string("nativeConsentFailure"),
+                                       "stage": .string("nativeSignIn"), "reason": .string(reason)])
+                ])
+                return try JSONDecoder().decode(WireFailure.self, from: JSONEncoder().encode(value))
+            }
+            for reason in ["helper.invalidFrame", "helper.invalidNavigation", "helper.navigationFailed",
+                           "helper.popupUnsupported", "helper.contentTerminated", "helper.javaScriptFailed",
+                           "helper.bridgeInvalid", "helper.deadlineExpired", "helper.parentUnavailable",
+                           "channelEOF", "unclassified"] {
+                let message = "Native sign-in failed: \(reason)."
+                check(try LiveSession.validatedNativeSignInObservation(observationFailure(message)) == message,
+                      "Exact approved \(reason) observation is available under Account Details")
+            }
+            for message in ["Native sign-in failed: helper.unknown.", "Native sign-in failed: channelEOF. secret",
+                            " Native sign-in failed: helper.bridgeInvalid.", "Native sign-in failed: channelEOF.\n",
+                            "secret raw provider text", "Native sign-in failed: helper.navigationFailed",
+                            "Native sign-in failed: helper.navigationFailed. https://provider.invalid/?token=secret"] {
+                check(try LiveSession.validatedNativeSignInObservation(observationFailure(message)) == nil,
+                      "Unapproved or extended engine wording never enters the displayed native observation")
+            }
+            check(try LiveSession.validatedNativeSignInObservation(
+                observationFailure("Native sign-in failed: helper.bridgeInvalid.", code: "INTERNAL")) == nil
+                  && LiveSession.validatedNativeSignInObservation(
+                    observationFailure("Native sign-in failed: helper.bridgeInvalid.", reason: "unexpected")) == nil,
+                  "An exact observation is rejected without the agreed AUTH_INVALID/nativeSignIn/pipelineFailed tuple")
             try await CrossOverDependencyChecks.run(check: check)
             try await ApplicationTerminationChecks.run(check: check)
             let expired = session("expired")

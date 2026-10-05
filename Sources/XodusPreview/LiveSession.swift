@@ -232,6 +232,20 @@ final class LiveSession: ObservableObject {
         return Self.describeSignInFailure(code: failure.code)
     }
 
+    var accountFailureObservation: String? {
+        guard let flow = authentication?.flow, flow.state == .failed, let failure = flow.error else { return nil }
+        return Self.validatedNativeSignInObservation(failure)
+    }
+
+    static func validatedNativeSignInObservation(_ failure: WireFailure) -> String? {
+        guard failure.code == "AUTH_INVALID", failure.nativeConsentFailure == .pipelineFailed else { return nil }
+        let reasons = ["helper.invalidFrame", "helper.invalidNavigation", "helper.navigationFailed",
+                       "helper.popupUnsupported", "helper.contentTerminated", "helper.javaScriptFailed",
+                       "helper.bridgeInvalid", "helper.deadlineExpired", "helper.parentUnavailable",
+                       "channelEOF", "unclassified"]
+        return reasons.map { "Native sign-in failed: \($0)." }.first { $0 == failure.message }
+    }
+
     var accountFailureTitle: String {
         if authentication?.flow?.error?.nativeConsentFailure?.stage == "devicePreparation" {
             return "Microsoft sign-in could not start."

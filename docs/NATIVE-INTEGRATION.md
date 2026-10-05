@@ -313,9 +313,25 @@ fixture SHA256
 It uses an anonymous inherited socket, strict bounded correlated frames,
 the original remaining monotonic budget, a fresh nonpersistent WebKit store,
 trusted main-frame/origin/document-generation checks and one-shot exact
-seven-string legacy handoff. Native callback, navigation, renderer, checked-JS,
-popup denial, close, EOF and deadline failures are explicit static outcomes.
+seven-string legacy handoff. Native callback, genuine navigation, renderer,
+checked-JS, close, EOF and deadline failures are explicit static outcomes.
+The additive navigation correction permits all subframe loads, scoped HTTPS
+Microsoft top-level redirects and same-view popups without treating ordinary
+cancellation/policy interruptions as whole-flow failures. Blank popup initialization
+does not replace the current document. This fixes identified brittle handling,
+not a diagnosis of the previous brief-window failure.
 Rust retains SOAP/proof processing, helper reaping and atomic credential commit.
+
+The compatible producer observation uses the existing failure message only:
+`Native sign-in failed: helper.REASON.` with the closed reasons `invalidFrame`,
+`invalidNavigation`, `navigationFailed`, `popupUnsupported`, `contentTerminated`,
+`javaScriptFailed`, `bridgeInvalid`, `deadlineExpired`, `parentUnavailable`, or
+the exact `Native sign-in failed: channelEOF.` / `Native sign-in failed: unclassified.`.
+Account Details accepts these exact strings only with the existing
+`AUTH_INVALID / nativeSignIn / pipelineFailed` tuple; all other message text remains
+undisplayed. No new wire fields, logs, provider content or secret-bearing diagnostics
+are introduced. Qualification and a fresh signed producer/consumer pair precede any
+new live sign-in attempt.
 
 Configuration binds a fixed owned bundle executable, protocol version and
 SHA256 through nonsecret flags. A packaged `.app` missing both helper and receipt,

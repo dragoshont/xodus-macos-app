@@ -4,6 +4,26 @@ Foundation recorded 2026-10-03; subsequent native/read-only milestones are
 identified separately below. None establishes successful human authentication,
 game download, install or gameplay.
 
+## Native sign-in navigation correction: candidate
+
+The user's reported briefly opened Microsoft window and the captured
+`AUTH_INVALID / nativeSignIn / pipelineFailed` are actual failure evidence.
+Bounded sampling that found no remaining helper does not establish no spawn.
+The coarse tuple does not identify the failed internal step.
+
+One scoped source correction separates permissive subframe/navigation handling
+from unchanged private bridge/DA trust, routes trusted popups into the same view,
+and ignores only cancellation or provisional WebKit policy interruption (102).
+Neutral host checks cover each domain, deceptive suffixes/userinfo/HTTP/IDNA,
+subframe routing, harmless blank/blocked popups, cancellation and actual
+same-origin subframe bridge rejection. The consumer's compatible Details hook
+accepts eleven exact closed producer messages and rejects extensions, arbitrary
+text and mismatched failure tuples. UI redesign is paused separately.
+
+Fresh source-bound native CI, new producer provenance and a newly signed paired
+package are required. Historical `9be` qualification is not promotion of this
+candidate; no new provider attempt or successful login is claimed here.
+
 ## Shipping hardening candidate
 
 Hardening ancestor `00ba51fd5e48f6298d27a56e75f491f6f697696f` passed its
