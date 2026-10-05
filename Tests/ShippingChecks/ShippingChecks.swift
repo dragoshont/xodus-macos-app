@@ -23,8 +23,8 @@ final class ShippingChecks: XCTestCase {
         let session = LiveSession()
         let injected = LiveSession(configuration: BackendConfiguration(executable: URL(fileURLWithPath: "/invalid/injected"),
                                                                         stateDirectory: URL(fileURLWithPath: "/invalid/state")))
-        check(state.destination == .library && state.query.isEmpty && !state.showingAccount,
-              "Shipping navigation starts without fixture state")
+        check(state.destination == .discover && state.query.isEmpty && !state.showingAccount,
+              "Shipping navigation starts in Discover without fixture state")
         check(state.runtimeSettings.configuration == nil && state.runtimeSettings.crossOverDependency == .notChecked,
               "Shipping dependency starts unchecked, without an invented CrossOver installation")
         let official = CrossOverDependencyState.installed(.init(
@@ -99,8 +99,8 @@ final class ShippingChecks: XCTestCase {
             guard let bundle = Bundle(url: app) else { throw ManagementError.invalidPayload }
             let pins = ShippingPairIdentity(schemaVersion: 1, appSourceCommit: source,
                 appSourceTree: String(repeating: "b", count: 40),
-                producerCommit: "397dd0249c81414dae3d75b3562f696378fd6b11",
-                producerTree: "ae213b02eb5f01b8028d300dd85a17014ad05c24",
+                producerCommit: "c42e21aee18da893546cca94cbee09820bcbca95",
+                producerTree: "652c4b9e8b85e310ade62224c221991d89a97f80",
                 engineSHA256: hash(engineData), engineBytes: Int64(engineData.count),
                 helperSHA256: hash(helperData), helperBytes: Int64(helperData.count),
                 helperVersion: 1, helperSourceCommit: source)
@@ -131,7 +131,7 @@ final class ShippingChecks: XCTestCase {
                 } catch { check(error as? ManagementError == .pairedEngineUnavailable, name) }
             }
             func altered(engineBytes: Int64? = nil, helperVersion: Int = 1,
-                         producer: String = "397dd0249c81414dae3d75b3562f696378fd6b11") -> ShippingPairIdentity {
+                         producer: String = "c42e21aee18da893546cca94cbee09820bcbca95") -> ShippingPairIdentity {
                 ShippingPairIdentity(schemaVersion: 1, appSourceCommit: pins.appSourceCommit,
                     appSourceTree: pins.appSourceTree, producerCommit: producer, producerTree: pins.producerTree,
                     engineSHA256: pins.engineSHA256, engineBytes: engineBytes ?? pins.engineBytes,

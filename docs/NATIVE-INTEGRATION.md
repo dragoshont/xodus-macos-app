@@ -118,15 +118,22 @@ source remain unchanged. This integration is source/headless only, not deployed
 or a claim of any installed/runtime/game qualification.
 
 The current schema/fixture pin is public producer commit
-`e3129cee422305657b945d35daf2f780ffe98e2b` in `dragoshont/xodus-macos`,
-branch `dragoshont-xodus-launcher-management`: 79 positive, 20 negative and four
+`c42e21aee18da893546cca94cbee09820bcbca95` in `dragoshont/xodus-macos`,
+branch `dragoshont-xodus-launcher-management`: 88 positive, 47 negative and four
 independent evidence-edge frames. This additive contract includes public
-`catalog.query` and read-only `installed.inspect`; capabilities are negotiated from the running producer, not
+`catalog.query`, read-only `installed.inspect` and explicit `auth.verify`; capabilities are negotiated from the running producer, not
 copied from a fixture.
 
 Canonical committed schema SHA256:
 
-`c95c3fabdf114f89329d2361e76421e7b47be4c113f56c2381e64d437e44f749`
+`5b588ae7339a11850339e4979ebd14a577f37e2c8d94e02dab85969d3400c544`
+
+`auth.verify` accepts only a canonical content UUID, returns exactly
+`{"verified":true}`, or one of seven strictly matched safe failure stages. It
+performs no automatic retry, sign-in, account refresh or credential write.
+Success proves only an authenticated package read, not ownership, installation
+or a license. No authenticated live outcome is claimed until the matching pair
+is independently admitted and its single explicit probe completes.
 
 Committed LF bytes and all four sanitized fixture hashes were independently verified from immutable public Git objects. A transient GitHub network outage was handled with that exact public-only fallback, not mutable backend source or private data.
 

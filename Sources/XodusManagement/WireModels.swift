@@ -5,6 +5,7 @@ import XodusCore
 public enum ManagementCommand: String, CaseIterable, Codable, Sendable {
     case hello, authStatus = "auth.status", authBegin = "auth.begin", authCancel = "auth.cancel"
     case authLogout = "auth.logout", inventory = "inventory.snapshot", search = "catalog.search"
+    case authVerify = "auth.verify"
     case product = "product.detail", plan = "install.plan", enqueue = "jobs.enqueue"
     case discover = "catalog.discover", query = "catalog.query"
     case pause = "jobs.pause", resume = "jobs.resume", cancel = "jobs.cancel", retry = "jobs.retry"
@@ -17,6 +18,7 @@ public enum ManagementCommand: String, CaseIterable, Codable, Sendable {
         switch self {
         case .hello: "helloData"
         case .authStatus, .authLogout, .authBegin, .authCancel: "authData"
+        case .authVerify: "authVerifiedData"
         case .search: "searchData"
         case .discover: "discoveryData"
         case .query: "queryData"
@@ -71,6 +73,41 @@ public struct AuthenticationStatus: Codable, Equatable, Sendable {
     public let expiresAt: String?
     public let entitlementAuthorized: Bool
     public let flow: AuthenticationFlow?
+}
+
+public struct AuthenticationVerification: Codable, Equatable, Sendable {
+    public let verified: Bool
+}
+
+public enum AuthenticatedReadFailure: String, CaseIterable, Equatable, Sendable {
+    case credentialUnavailable, profileChanged, authExchangeFailed, authRejected
+    case transportFailed, responseInvalid, packageUnavailable
+
+    public var code: String {
+        switch self {
+        case .credentialUnavailable, .profileChanged, .authExchangeFailed: "AUTH_INVALID"
+        case .authRejected: "ACCESS_REVOKED"
+        case .transportFailed: "NETWORK_UNAVAILABLE"
+        case .responseInvalid: "INTEGRITY_FAILED"
+        case .packageUnavailable: "PACKAGE_UNAVAILABLE"
+        }
+    }
+
+    public var retryable: Bool { self == .authExchangeFailed || self == .transportFailed }
+    public var message: String { "Authenticated read failed: \(rawValue)." }
+    public var details: JSONValue {
+        .object(["category": .string("authenticatedReadFailure"), "stage": .string(rawValue)])
+    }
+
+    public init?(error: JSONValue) {
+        guard let object = error.object, Set(object.keys) == ["code", "message", "retryable", "details"],
+              let details = object["details"]?.object, Set(details.keys) == ["category", "stage"],
+              details["category"]?.string == "authenticatedReadFailure",
+              let stage = details["stage"]?.string, let failure = Self(rawValue: stage),
+              object["code"]?.string == failure.code, object["message"]?.string == failure.message,
+              object["retryable"]?.boolean == failure.retryable else { return nil }
+        self = failure
+    }
 }
 
 public enum AuthenticationFlowState: String, Codable, Sendable {

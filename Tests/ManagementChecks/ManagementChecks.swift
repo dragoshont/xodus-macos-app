@@ -63,7 +63,7 @@ actor Checks {
         try await hostBindingChecks()
         let validator = try ContractValidator()
         let positive = try fixture("positive").array ?? []
-        check(positive.count == 79, "Pinned producer corpus contains 79 positive frames")
+        check(positive.count == 88, "Pinned producer corpus contains 88 positive frames")
         for (index, frame) in positive.enumerated() {
             do { try validator.validate(frame); check(true, "Producer positive frame \(index + 1)") }
             catch { check(false, "Producer positive frame \(index + 1)") }
@@ -164,6 +164,60 @@ actor Checks {
             do { _ = try NativeAuthHostBinding.bundled(in: bundle); check(false, "FIFO metadata is rejected without blocking") }
             catch { check(error as? ManagementError == .nativeAuthHostUnavailable, "FIFO metadata is rejected without blocking") }
             try FileManager.default.removeItem(at: metadata)
+            let verificationValidator = try ContractValidator()
+            let verificationRequest: JSONValue = .object([
+                "kind": .string("request"), "protocol": .object(["major": .integer(1), "minor": .integer(0)]),
+                "requestID": .string("neutral-authenticated-read"), "command": .string("auth.verify"),
+                "params": .object(["contentID": .string("513710f5-ab8e-4d7c-9ed5-d0ba94dcfb33")])
+            ])
+            try verificationValidator.validate(verificationRequest)
+            check(ManagementCommand.authVerify.defaultTimeout == .seconds(30),
+                  "Authenticated read is an explicit negotiated operation with a 30-second deadline")
+            for params: JSONValue in [
+                .object([:]), .object(["contentID": .string("not-a-uuid")]),
+                .object(["contentID": .string("513710F5-AB8E-4D7C-9ED5-D0BA94DCFB33")]),
+                .object(["contentID": .string("513710f5-ab8e-4d7c-9ed5-d0ba94dcfb33"), "token": .string("synthetic")])
+            ] {
+                var request = verificationRequest.object ?? [:]; request["params"] = params
+                do { try verificationValidator.validate(.object(request)); check(false, "Invalid authenticated-read input is rejected") }
+                catch { check(true, "Invalid authenticated-read input is rejected") }
+            }
+            for data: JSONValue in [.object(["verified": .bool(false)]),
+                .object(["verified": .integer(1)]), .object(["verified": .bool(true), "extra": .null])] {
+                do { try verificationValidator.validate(data, definition: "authVerifiedData"); check(false, "Only exact verified:true is accepted") }
+                catch { check(true, "Only exact verified:true is accepted") }
+            }
+            for stage in AuthenticatedReadFailure.allCases {
+                let error: JSONValue = .object(["code": .string(stage.code), "retryable": .bool(stage.retryable),
+                                               "message": .string(stage.message), "details": stage.details])
+                check(AuthenticatedReadFailure(error: error) == stage, "Exact authenticated-read failure tuple decodes")
+                for key in ["code", "message", "retryable", "details"] {
+                    var wrong = error.object ?? [:]
+                    wrong[key] = key == "retryable" ? .bool(!stage.retryable) : .string("synthetic-invalid")
+                    check(AuthenticatedReadFailure(error: .object(wrong)) == nil,
+                          "Wrong authenticated-read tuple member is never promoted")
+                }
+            }
+            let verifier = try ManagementClient()
+            _ = try await verifier.connect(mockConfiguration("verify"))
+            let verified = try await verifier.request(.authVerify,
+                params: ["contentID": .string("513710f5-ab8e-4d7c-9ed5-d0ba94dcfb33")])
+                .decode(AuthenticationVerification.self)
+            check(verified.verified, "Negotiated neutral authenticated read preserves the exact success result")
+            check(await verifier.close(), "Neutral verification transport closes")
+            for stage in AuthenticatedReadFailure.allCases {
+                let verifier = try ManagementClient()
+                _ = try await verifier.connect(mockConfiguration("verify-" + stage.rawValue))
+                do {
+                    _ = try await verifier.request(.authVerify,
+                        params: ["contentID": .string("513710f5-ab8e-4d7c-9ed5-d0ba94dcfb33")])
+                    check(false, "Authenticated-read failures remain typed closed stages")
+                } catch {
+                    check(error as? ManagementError == .authenticatedReadFailed(stage),
+                          "Authenticated-read failures remain typed closed stages")
+                }
+                check(await verifier.close(), "Failed neutral verification transport closes")
+            }
             let client = try ManagementClient()
             do {
                 _ = try await client.connect(BackendConfiguration(
@@ -180,7 +234,7 @@ actor Checks {
                   "Helper recovery copy does not claim passkey support or diagnose a provider prompt")
         }
         let negative = try fixture("negative").array ?? []
-        check(negative.count == 20, "Pinned producer corpus contains twenty negative frames")
+        check(negative.count == 47, "Pinned producer corpus contains 47 negative frames")
         for item in negative {
             do {
                 guard let frame = item["frame"] else { throw ManagementError.invalidPayload }
@@ -810,6 +864,7 @@ enum MockBackend {
             }
             var hello = frames.first(where: { $0["data"]?["schema"] != nil })?["data"]?.object ?? [:]
             var supported: Set<ManagementCommand> = [.authStatus, .authLogout, .jobs]
+            if scenario == "verify" || scenario.hasPrefix("verify-") { supported.insert(.authVerify) }
             if scenario == "diagnostics" { supported.insert(.diagnostics) }
             if ["discoveryfail", "discoveryrecover"].contains(scenario) { supported.insert(.discover) }
             if ["queryfail", "badqueryfail", "queryempty", "queryslow", "querynodetails",
@@ -847,6 +902,21 @@ enum MockBackend {
                     if scenario == "mismatch" { result["protocol"] = .object(["major": .integer(2), "minor": .integer(0)]) }
                     try emit(.object(result))
                 } else {
+                    if command == "auth.verify", scenario == "verify" || scenario.hasPrefix("verify-") {
+                        if scenario == "verify" {
+                            try emit(.object(result(request, data: .object(["verified": .bool(true)]))))
+                        } else {
+                            guard let stage = AuthenticatedReadFailure(rawValue: String(scenario.dropFirst(7))) else { exit(3) }
+                            var response = result(request, data: .null)
+                            response["ok"] = .bool(false)
+                            response.removeValue(forKey: "data")
+                            response["error"] = .object(["code": .string(stage.code),
+                                "retryable": .bool(stage.retryable), "message": .string(stage.message),
+                                "details": stage.details])
+                            try emit(.object(response))
+                        }
+                        continue
+                    }
                     if ["savedpermission", "startupquery"].contains(scenario) { try trace(command) }
                     if scenario == "startupquery", command == "jobs.snapshot" {
                         let response = result(request, data: .object([

@@ -138,7 +138,7 @@ public actor ManagementClient {
         guard !stopped, let child = process, child.isRunning, let stdin else {
             throw ManagementError.disconnected
         }
-        if command == .authBegin || command == .authLogout,
+        if [.authBegin, .authLogout, .authVerify].contains(command),
            let admitted = admittedConfiguration, let identity = admitted.executableIdentity {
             do {
                 _ = try identity.validatedArguments()
@@ -249,7 +249,12 @@ public actor ManagementClient {
             guard let error = value["error"], let code = error["code"]?.string,
                   let retryable = error["retryable"]?.boolean else { throw ManagementError.invalidFrame }
             let failure: ManagementError
-            if waiter.command == .discover, code == "PACKAGE_UNAVAILABLE", let details = error["details"] {
+            if waiter.command == .authVerify {
+                guard let stage = AuthenticatedReadFailure(error: error) else {
+                    throw ManagementError.invalidPayload
+                }
+                failure = .authenticatedReadFailed(stage)
+            } else if waiter.command == .discover, code == "PACKAGE_UNAVAILABLE", let details = error["details"] {
                 try validator.validate(details, definition: "failedDiscoveryData")
                 failure = .discoveryFailed(try details.decode(CatalogDiscovery.self))
             } else if waiter.command == .query, code == "PACKAGE_UNAVAILABLE", let details = error["details"] {
