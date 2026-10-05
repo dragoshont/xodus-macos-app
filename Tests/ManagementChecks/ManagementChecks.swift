@@ -1144,7 +1144,17 @@ enum MockBackend {
             }
             if lifecycleScenario {
                 try trace("stdin.closed")
-                Thread.sleep(forTimeInterval: 1.4)
+                if scenario == "retirefailed" {
+                    try trace("retirement.held")
+                    let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+                    while !FileManager.default.fileExists(atPath:
+                        lifecycleDirectory.appendingPathComponent("retirement.release").path) {
+                        guard ContinuousClock.now < deadline else { throw ManagementError.requestTimedOut }
+                        Thread.sleep(forTimeInterval: 0.01)
+                    }
+                } else {
+                    Thread.sleep(forTimeInterval: 1.4)
+                }
                 try trace("exiting")
             }
             exit(0)

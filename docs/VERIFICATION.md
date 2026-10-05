@@ -55,6 +55,18 @@ rather than manually manufacturing its output. The failed stage is retained;
 protected old26 files remain unchanged. A new candidate/package needs its own
 qualification; no completed95af package, replacement or human sign-in is claimed.
 
+Successorbc429's first hosted run37319757608 passed portable generation,
+shipping/build/model checks and all new runtime acceptance cases, but failed
+the existing combined short-exit-observation assertion (215 native checks/1
+failure). That test raced caller admission against a200ms observation and a
+1.4s child-exit sleep. The additive neutral-only correction gates the short
+observation until all four actual disconnect waiters have entered, and holds
+the owned child after EOF until an explicit test release. Separate assertions
+retain every original result/coalescence/failure/ownership requirement.
+The waiter-count accessor is nonshipping only; production lifecycle, shutdown
+budgets and escalation behavior are unchanged. No retry qualifies the failed
+run; the corrected source needs a fresh normal-push result.
+
 ## Shipping hardening scope
 
 The adversarial841 review required compile-time shipping/demo separation,

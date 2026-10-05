@@ -306,6 +306,8 @@ final class LiveSession: ObservableObject {
     func supports(_ command: ManagementCommand) -> Bool { hello?.supports(command) == true }
 
 #if !XODUS_SHIPPING
+    var retiringDisconnectWaiterCount: Int { disconnectWaiters }
+
     func chooseBackend() {
         guard !connectionTransitioning else {
             errorMessage = "Wait for the current connection transition to finish before choosing another engine."

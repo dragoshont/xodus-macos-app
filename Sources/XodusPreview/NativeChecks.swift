@@ -504,16 +504,26 @@ enum NativeChecks {
             let quitCoordinator = ApplicationTerminationCoordinator()
             let failedQuit = Task { await quitCoordinator.shutdown(session: unobserved, runtime: quitRuntime) }
             await unobserved.connect()
+            try await wait { unobserved.retiringDisconnectWaiterCount == 4 }
+            await observer.beginShortObservation()
             let failedResults = await [failedA.value, failedB.value, failedFixture.value, failedQuit.value]
             let observedAttempts = await observer.attempts
-            check(try failedResults.allSatisfy { !$0 } && observedAttempts == 1 && unobserved.phase == .failed
-                  && unobserved.errorMessage != nil && !trace(failedConfiguration).contains("exiting"),
-                  "Actual failed short exit observation is shared and retains old ownership; fixture and quit remain blocked")
+            try await waitForTrace("retirement.held", failedConfiguration)
+            check(failedResults.allSatisfy { !$0 },
+                  "Actual short observation failure blocks every admitted disconnect, fixture and Quit caller")
+            check(observedAttempts == 1,
+                  "All four admitted callers share exactly one actual short exit observation")
+            check(unobserved.phase == .failed && unobserved.errorMessage != nil,
+                  "A failed actual exit observation retains an actionable failed lifecycle state")
+            check(try !trace(failedConfiguration).contains("exiting"),
+                  "The actual neutral child remains held until explicit release, not an arbitrary sleep")
             check(!quitRuntime.applicationTerminating && !unobserved.applicationTerminating,
                   "Refused normal termination restores interactions only after both cleanup attempts finish")
             await unobserved.connect()
             check(try !unobserved.isReady && trace(failedConfiguration).filter { $0 == "started" }.count == 1,
                   "A retry cannot overwrite an unobserved retiring child with a new engine")
+            try Data("Release only this owned neutral retirement child.\n".utf8)
+                .write(to: failedConfiguration.stateDirectory.appendingPathComponent("retirement.release"))
             await observer.useDefaultBudget()
             check(await quitCoordinator.shutdown(session: unobserved, runtime: quitRuntime),
                   "Retry through the normal termination coordinator reconciles the retained child's eventual exit")
@@ -595,10 +605,21 @@ enum NativeChecks {
 private actor ShutdownCheckObserver {
     private(set) var attempts = 0
     private var budget: Duration = .milliseconds(200)
+    private var shortObservationReleased = false
+    private var admission: CheckedContinuation<Void, Never>?
 
     func close(_ client: ManagementClient) async -> Bool {
         attempts += 1
+        if !shortObservationReleased {
+            await withCheckedContinuation { admission = $0 }
+        }
         return await client.close(observationTimeout: budget)
+    }
+
+    func beginShortObservation() {
+        shortObservationReleased = true
+        admission?.resume()
+        admission = nil
     }
 
     func useDefaultBudget() { budget = .seconds(6) }
