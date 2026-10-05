@@ -460,6 +460,44 @@ enum AuthHostChecks {
         check(failure == nil, "Closed browser fences stale renderer callbacks")
 
         let notificationBase = URL(string: "https://auth-host-fixture.invalid/notification")!
+        var popupResult: LegacyDA?
+        var popupFailure: HostFailure?
+        let popupBrowser = NativeAuthBrowser(trust: trust,
+            received: { popupResult = $0 }, failed: { popupFailure = $0 })
+        defer { popupBrowser.close() }
+        check(popupBrowser.view.configuration.preferences.javaScriptCanOpenWindowsAutomatically,
+              "Ordinary scripted popups reach the scoped same-view native policy")
+        try popupBrowser.loadSyntheticDocument(
+            "<!doctype html><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'unsafe-inline'\"><p>Neutral popup check.</p>",
+            baseURL: notificationBase)
+        let popupDeadline = ContinuousClock.now.advanced(by: .seconds(8))
+        while popupBrowser.view.isLoading && popupFailure == nil && ContinuousClock.now < popupDeadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        _ = try await popupBrowser.view.callAsyncJavaScript(
+            "window.open('about:blank', '_blank'); return true;",
+            arguments: [:], in: nil, contentWorld: .page)
+        check(popupBrowser.view.url == notificationBase && popupFailure == nil,
+              "Actual blank window.open preserves the current native document and live flow")
+        let popupURL = notificationBase.absoluteString + "#popup"
+        _ = try await popupBrowser.view.callAsyncJavaScript(
+            "window.open(url, '_blank'); return true;",
+            arguments: ["url": popupURL], in: nil, contentWorld: .page)
+        while (popupBrowser.view.url?.absoluteString != popupURL || popupBrowser.view.isLoading),
+              popupFailure == nil && ContinuousClock.now < popupDeadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        check(popupBrowser.view.url?.absoluteString == popupURL && popupFailure == nil,
+              "Actual allowed window.open navigates the same view without an external page request")
+        _ = try await popupBrowser.view.callAsyncJavaScript(
+            "window.external.notify(raw); return true;",
+            arguments: ["raw": data], in: nil, contentWorld: .page)
+        while popupResult == nil && popupFailure == nil && ContinuousClock.now < popupDeadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        check(popupResult?.value == synthetic && popupFailure == nil,
+              "Same-document popup retains the accepted control generation and exact DA handoff")
+        popupBrowser.close()
         var subframeFailure: HostFailure?
         var subframeResult: LegacyDA?
         let subframeBrowser = NativeAuthBrowser(trust: trust,

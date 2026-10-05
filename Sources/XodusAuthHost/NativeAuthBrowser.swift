@@ -34,6 +34,7 @@ final class NativeAuthBrowser: NSObject, WKNavigationDelegate, WKUIDelegate, WKS
         self.failed = failed
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         view = WKWebView(frame: .zero, configuration: configuration)
         super.init()
         configuration.userContentController.add(self, name: LegacyBridge.handler)
@@ -268,7 +269,11 @@ final class NativeAuthBrowser: NSObject, WKNavigationDelegate, WKUIDelegate, WKS
         switch popupDisposition(for: request) {
         case .blocked, .placeholder: return
         case .sameView:
-            do { try load(request, userAgent: view.customUserAgent) }
+            do {
+                if let navigation = activeNavigation { try supersede(navigation) }
+                activeNavigation = view.load(request)
+                guard activeNavigation != nil else { throw HostFailure.navigationFailed }
+            }
             catch { fail(.navigationFailed) }
         }
     }

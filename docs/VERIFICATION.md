@@ -24,6 +24,18 @@ Fresh source-bound native CI, new producer provenance and a newly signed paired
 package are required. Historical `9be` qualification is not promotion of this
 candidate; no new provider attempt or successful login is claimed here.
 
+The initial correction `519e29db71ef184d325c40114f8f033f28ca1dc8`, tree
+`5c71c4dc9ca16783400c5f06032c5eb820d979da`, passed exact normal-push
+[run37353741110](https://github.com/dragoshont/xodus-macos-app/actions/runs/37353741110):
+15 core / 358 management / 61 presentation / 237 native session / 115 private host /
+27 shipping / 29 POSIX packaging, zero failures, all steps including SVG
+reproduction. The tightly coupled popup follow-up additionally enables ordinary
+scripted popup routing and preserves the existing control generation/one-shot
+gate for provider-originated navigation. Actual neutral `window.open` blank and
+same-document fragment checks exercise this delegate path and subsequent exact
+DA handoff without a provider or external page request. That follow-up requires
+its own fresh CI, not promotion of the initial run.
+
 ## Shipping hardening candidate
 
 Hardening ancestor `00ba51fd5e48f6298d27a56e75f491f6f697696f` passed its
