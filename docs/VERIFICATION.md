@@ -4,6 +4,35 @@ Foundation recorded 2026-10-03; subsequent native/read-only milestones are
 identified separately below. None establishes successful human authentication,
 game download, install or gameplay.
 
+## Native finish-script compatibility: candidate
+
+The qualified notification-compatible app was installed with the unchanged
+producer `72d3000c82258c6aadbb4f72b90c75da861da802`. Its one authorized attempt
+produced a visibly stable owned Microsoft window. The user subsequently reported
+completing browser sign-in, but the app reported failure. One explicitly authorized
+idle-only account status refresh still showed no saved launcher sign-in and the
+exact observation `Native sign-in failed: helper.javaScriptFailed.` No additional
+sign-in, sign-out, credential deletion or human prompt action occurred.
+
+Static comparison identified two concrete JavaScript differences from the
+original handler: finish extraction required `ServerData.DAProperty` although
+the original handler forwards `ServerData` directly, and context dispatch detached
+the callback function from its original window receiver. Actual detached WebKit
+regressions reproduced three failures on the preceding scripts: flat finish data,
+flat finish data with extra provider fields, and a receiver-sensitive callback.
+With the two script corrections the identical suite passed 146 checks with zero
+failures, including malformed/missing-field/array finish negatives and the existing
+origin, document, generation, notification and one-shot checks. No provider request
+or visible test window occurred.
+
+This reproduces source compatibility defects that yield the observed closed
+failure, not proof of which JavaScript call failed in the real attempt. Only seven
+required strings are projected to the unchanged private validator; trusted finish
+path, callback arguments, origin/document gates and credential commit remain
+unchanged. Fresh exact CI, reviewed source and a new signed pair are still required
+before any further authorized live attempt. The installed app and user data remain
+untouched by these neutral checks; successful launcher authentication is unproven.
+
 ## Native bridge notification compatibility: candidate
 
 The qualified `5f7e408d297d4b9e1e09cb1dfaef603e9af0cb31` app paired with

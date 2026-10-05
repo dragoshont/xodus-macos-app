@@ -78,7 +78,7 @@ enum LegacyBridge {
     if (window.__xodusAuthDocument !== document) return false;
     const dispatch = window["CloudExperienceHost.Bridge.dispatchMessage"];
     if (typeof dispatch !== "function") throw new TypeError("Native bridge unavailable");
-    dispatch(callback);
+    window["CloudExperienceHost.Bridge.dispatchMessage"](callback);
     return true;
     """
     static let validateDocument = "return window.__xodusAuthDocument === document;"
@@ -87,10 +87,14 @@ enum LegacyBridge {
         && typeof window.external.notify === "function";
     """
     static let extract = """
-    const source = typeof ServerData === "object" && ServerData !== null ? ServerData.DAProperty : null;
-    if (!source || typeof source !== "object") throw new TypeError("Native result unavailable");
+    const container = typeof ServerData === "object" && ServerData !== null ? ServerData : null;
+    if (!container || Array.isArray(container)) throw new TypeError("Native result unavailable");
     const keys = ["sDAToken", "sDASessionKey", "sDAStartTime", "sDAExpires",
                   "sSTSInlineFlowToken", "sSigninName", "K"];
+    const source = keys.every(key => Object.prototype.hasOwnProperty.call(container, key))
+        ? container : container.DAProperty;
+    if (!source || typeof source !== "object" || Array.isArray(source))
+      throw new TypeError("Native result unavailable");
     const result = {};
     for (const key of keys) {
       if (typeof source[key] !== "string") throw new TypeError("Invalid native result");

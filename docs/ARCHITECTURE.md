@@ -120,6 +120,12 @@ untrusted-frame messages authorize no data and leave the flow alive. Claimed
 malformed DA, invalid private wrappers/control generations, document validation
 and duplicate handoffs remain failures. This is message tolerance, not broader
 origin, method, token or private-channel authority.
+The known context callback uses the original window-property call receiver and
+passes the same serialized callback string. Exact trusted finish-page extraction
+recognizes either flat `ServerData` or its `DAProperty` object, projects only the
+seven required strings and then uses the unchanged private `LegacyDA` validator.
+Missing or nonstring required values remain failures; no unrelated finish page,
+origin or provider method gains handoff authority.
 Swift ownership alone proves neither Microsoft passkey eligibility nor a fix
 for the user's unclassified authenticator obstacle.
 

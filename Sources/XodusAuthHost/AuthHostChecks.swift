@@ -499,6 +499,43 @@ enum AuthHostChecks {
         browser.webViewWebContentProcessDidTerminate(browser.view)
         check(failure == nil, "Closed browser fences stale renderer callbacks")
 
+        let finishFields = try synthetic.object(keys: LegacyDA.keys)
+        var extraFields = finishFields
+        extraFields["unusedProviderField"] = .bool(true)
+        var malformedFields = finishFields
+        malformedFields["sDAToken"] = .number("1")
+        var incompleteFields = finishFields
+        incompleteFields.removeValue(forKey: "K")
+        let finishCases: [(PrivateValue, Bool, String)] = [
+            (synthetic, true, "flat seven-string ServerData"),
+            (.object(extraFields), true, "flat ServerData with unused provider fields"),
+            (.object(["DAProperty": .object(extraFields)]), true, "wrapped ServerData with unused provider fields"),
+            (.object(malformedFields), false, "flat ServerData with a nonstring required field"),
+            (.object(["DAProperty": .object(malformedFields)]), false, "wrapped ServerData with a nonstring required field"),
+            (.object(incompleteFields), false, "incomplete flat ServerData"),
+            (.object(["unrelated": .bool(true)]), false, "unrelated ServerData"),
+            (.array([synthetic]), false, "array ServerData")
+        ]
+        for (serverData, valid, name) in finishCases {
+            var finishResult: LegacyDA?
+            var finishFailure: HostFailure?
+            let finishBrowser = NativeAuthBrowser(trust: trust,
+                received: { finishResult = $0 }, failed: { finishFailure = $0 })
+            defer { finishBrowser.close() }
+            let encoded = String(decoding: try serverData.encoded(), as: UTF8.self)
+            try finishBrowser.loadSyntheticDocument("""
+                <!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'">
+                <script>const ServerData = \(encoded);</script><p>Neutral finish shape check.</p>
+                """, baseURL: base)
+            let until = ContinuousClock.now.advanced(by: .seconds(8))
+            while finishResult == nil && finishFailure == nil && ContinuousClock.now < until {
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            check(valid ? finishResult?.value == synthetic && finishFailure == nil
+                        : finishResult == nil && finishFailure == .javaScriptFailed,
+                  "Detached WK finish \(valid ? "projects exact seven strings from" : "rejects") \(name)")
+        }
+
         let notificationBase = URL(string: "https://auth-host-fixture.invalid/notification")!
         var popupResult: LegacyDA?
         var popupFailure: HostFailure?
@@ -596,6 +633,40 @@ enum AuthHostChecks {
         check(noiseResult?.value == synthetic && noiseFailure == nil,
               "Ignored notification noise leaves the same native flow alive for a strict seven-string DA")
         noiseBrowser.close()
+
+        var receiverFailure: HostFailure?
+        var receiverResult: LegacyDA?
+        let receiverBrowser = NativeAuthBrowser(trust: trust,
+            received: { receiverResult = $0 },
+            failed: { receiverFailure = $0 })
+        defer { receiverBrowser.close() }
+        try receiverBrowser.loadSyntheticDocument(
+            "<!doctype html><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'unsafe-inline'\"><p>Neutral callback receiver check.</p>",
+            baseURL: notificationBase)
+        let receiverDeadline = ContinuousClock.now.advanced(by: .seconds(8))
+        while receiverBrowser.view.isLoading && receiverFailure == nil && ContinuousClock.now < receiverDeadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let receiverHandled = try await receiverBrowser.view.callAsyncJavaScript("""
+            return await new Promise(resolve => {
+              const timeout = setTimeout(() => resolve(false), 2000);
+              window["CloudExperienceHost.Bridge.dispatchMessage"] = function(raw) {
+                "use strict";
+                if (this !== window) throw new TypeError("Synthetic callback receiver mismatch");
+                const value = JSON.parse(raw);
+                clearTimeout(timeout);
+                resolve(value.type === "callback" && value.value.context === context
+                  && JSON.stringify(value.value.args) === JSON.stringify(args));
+              };
+              window.external.notify(request);
+            });
+            """, arguments: [
+                "context": providerContext,
+                "args": ["CloudExperienceHost", "TokenBroker", "TokenBroker", LegacyBridge.capabilities],
+                "request": contextRequest
+            ], in: nil, contentWorld: .page)
+        check(receiverHandled as? Bool == true && receiverFailure == nil && receiverResult == nil,
+              "Actual WK getContext preserves upstream window receiver and string callback arguments")
 
         var subframeFailure: HostFailure?
         var subframeResult: LegacyDA?

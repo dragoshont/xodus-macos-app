@@ -331,6 +331,12 @@ still fails. Untrusted frames/origins receive no callback or DA delivery and do
 not terminate the flow. Private wrapper shape, control generation, document nonce,
 one-shot delivery, frame limits and writer/commit gates remain unchanged.
 
+The finish-script compatibility correction also handles the original handler's
+flat `ServerData`, not only `ServerData.DAProperty`, while forwarding only the
+same seven string fields. Known context dispatch preserves the original window
+receiver and serialized string argument. These are script-shape and call-semantics
+corrections, not broader origin trust or a successful authentication claim.
+
 The compatible producer observation uses the existing failure message only:
 `Native sign-in failed: helper.REASON.` with the closed reasons `invalidFrame`,
 `invalidNavigation`, `navigationFailed`, `popupUnsupported`, `contentTerminated`,
