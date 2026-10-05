@@ -162,4 +162,39 @@ with tempfile.TemporaryDirectory(prefix="xodus-pair-portable-") as temporary:
             count += 1
         finally:
             target.write_bytes(original)
+    nested = management / "Contents/Resources"
+    nested.mkdir(parents=True)
+    for name in ("management-v1.schema.json", "runtime-providers-v1.schema.json"):
+        (management / name).rename(nested / name)
+    package_check()
+    final = json.loads((stage / "package-receipt.json").read_bytes())
+    assert str(Path("Contents/Resources") / management.name / "Contents/Resources/management-v1.schema.json") in final["finalPackageFiles"]
+    count += 1
+    (stage / "package-receipt.json").unlink()
+    duplicate = management / "management-v1.schema.json"
+    shutil.copyfile(nested / duplicate.name, duplicate)
+    try:
+        package_check()
+        raise AssertionError("Duplicate resource layouts accepted")
+    except ValueError:
+        count += 1
+    duplicate.unlink()
+    runtime_schema = nested / "runtime-providers-v1.schema.json"
+    runtime_schema.rename(management / runtime_schema.name)
+    try:
+        package_check()
+        raise AssertionError("Mixed resource layouts accepted")
+    except ValueError:
+        count += 1
+    (management / runtime_schema.name).rename(runtime_schema)
+    native_schema = nested / "management-v1.schema.json"
+    original = native_schema.read_bytes()
+    native_schema.write_bytes(b"Wrong hash in native layout")
+    try:
+        package_check()
+        raise AssertionError("Wrong native-layout resource hash accepted")
+    except ValueError:
+        count += 1
+    finally:
+        native_schema.write_bytes(original)
 print(f"{count} portable packaging admission checks, 0 failures. Neutral bytes only.")

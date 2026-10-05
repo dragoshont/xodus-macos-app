@@ -57,11 +57,19 @@ def main():
             and not (resources / "XodusAppFoundation_XodusAuthHost.bundle").exists(),
             "Shipping package contains preview/private check resources")
     management = resources / "XodusAppFoundation_XodusManagement.bundle"
+    layouts = [management, management / "Contents/Resources"]
+    schemas = ("management-v1.schema.json", "runtime-providers-v1.schema.json")
+    present = [layout for layout in layouts if (layout / schemas[0]).exists()]
+    require(len(present) == 1, "Expected exactly one SwiftPM management resource layout")
+    selected = present[0]
+    require(all(not (layout / name).exists() and not (layout / name).is_symlink()
+                for layout in layouts if layout != selected for name in schemas),
+            "Mixed or duplicate SwiftPM management resources")
     for name, expected in [
         ("management-v1.schema.json", "c95c3fabdf114f89329d2361e76421e7b47be4c113f56c2381e64d437e44f749"),
         ("runtime-providers-v1.schema.json", "90c094e4585af059b5ebcfc3201260362e88aa642b50ec0388a03427260d55e9"),
     ]:
-        owned_bytes(management / name, expected)
+        owned_bytes(selected / name, expected)
     archived_inputs = {}
     with tarfile.open(stage / "source.tar") as archive:
         for member in archive.getmembers():

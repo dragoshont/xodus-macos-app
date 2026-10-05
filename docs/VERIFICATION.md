@@ -67,6 +67,18 @@ The waiter-count accessor is nonshipping only; production lifecycle, shutdown
 budgets and escalation behavior are unchanged. No retry qualifies the failed
 run; the corrected source needs a fresh normal-push result.
 
+Source2aaba passed exact SDK27 run37321076993: 15/358/61/218/87 original
+and expanded suites,27 shipping and23 portable checks, zero failures/SVG.
+Its new isolated Mac package compiled both shipping release executables and
+passed signing/deep signature/plist, then correctly stopped final verification
+because that tool assumed flat SwiftPM resources. The Mac toolchain emits the
+native bundle's `Contents/Resources` layout. The additive verifier accepts exactly
+one of those two known layouts with the same required schema hashes/owned-file
+validation, rejects mixed/duplicate resources and tests native-layout tampering.
+It does not flatten resources or change the management/runtime contracts.
+The failed stage/old installed app remain preserved; no completed package or
+human login is inferred from a successful compile or signature check.
+
 ## Shipping hardening scope
 
 The adversarial841 review required compile-time shipping/demo separation,
