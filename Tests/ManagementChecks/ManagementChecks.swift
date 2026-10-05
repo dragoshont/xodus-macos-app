@@ -841,7 +841,7 @@ enum MockBackend {
         do {
             let lifecycleDirectory = URL(fileURLWithPath: CommandLine.arguments[index + 1])
             let lifecycleScenario = ["retireslow", "retirefailed", "retirehello", "retiresnapshot", "authgate",
-                                     "savedpermission", "startupquery"].contains(scenario)
+                                     "savedpermission", "startupquery", "uifailures"].contains(scenario)
             func trace(_ entry: String) throws {
                 guard lifecycleScenario else { return }
                 try FileManager.default.createDirectory(at: lifecycleDirectory, withIntermediateDirectories: true,
@@ -868,9 +868,9 @@ enum MockBackend {
             if scenario == "diagnostics" { supported.insert(.diagnostics) }
             if ["discoveryfail", "discoveryrecover"].contains(scenario) { supported.insert(.discover) }
             if ["queryfail", "badqueryfail", "queryempty", "queryslow", "querynodetails",
-                "querynulldetails", "querycoalesce", "startupquery", "publiccapture"].contains(scenario) { supported.insert(.query) }
+                "querynulldetails", "querycoalesce", "startupquery", "publiccapture", "uifailures"].contains(scenario) { supported.insert(.query) }
             if scenario == "startupquery" { supported.insert(.search) }
-            if ["publiccapture", "registryempty", "registryunavailable"].contains(scenario) {
+            if ["publiccapture", "registryempty", "registryunavailable", "uifailures"].contains(scenario) {
                 supported.insert(.installed)
             }
             if ["inspection", "inspectionmissing", "inspectionmismatch"].contains(scenario) {
@@ -882,6 +882,7 @@ enum MockBackend {
             }
             var loggedOut = false, flowStarted = false, cancelledLate = false
             var flowReads = 0, discoveryReads = 0, profileReads = 0
+            var activityReads = 0, registryReads = 0
             var gatedAttempts = 0
             hello["capabilities"] = .array(ManagementCommand.allCases.map { command in .object([
                 "command": .string(command.rawValue), "supported": .bool(supported.contains(command)),
@@ -917,7 +918,38 @@ enum MockBackend {
                         }
                         continue
                     }
-                    if ["savedpermission", "startupquery"].contains(scenario) { try trace(command) }
+                    if ["savedpermission", "startupquery", "uifailures"].contains(scenario) { try trace(command) }
+                    if scenario == "uifailures" {
+                        if command == "auth.status" {
+                            profileReads += 1
+                            if profileReads == 2 {
+                                try emitFailure(request, code: "AUTH_INVALID", category: "credentialStoreUnavailable")
+                            } else {
+                                let status = frames.first { $0["data"]?["state"]?.string == "credentialPresent" }?["data"]
+                                guard let status else { exit(3) }
+                                try emit(.object(result(request, data: status)))
+                            }
+                            continue
+                        }
+                        if command == "auth.logout" {
+                            try emitFailure(request, code: "INTERNAL")
+                            continue
+                        }
+                        if command == "catalog.query" {
+                            try emitFailure(request, code: "PACKAGE_UNAVAILABLE")
+                            continue
+                        }
+                        if command == "jobs.snapshot" {
+                            activityReads += 1
+                            if activityReads == 2 { try emitFailure(request, code: "NETWORK_UNAVAILABLE") }
+                            else {
+                                try emit(.object(result(request, data: .object([
+                                    "sessionID": .string("fixture-session"), "watermark": .integer(0), "jobs": .array([])
+                                ]))))
+                            }
+                            continue
+                        }
+                    }
                     if scenario == "startupquery", command == "jobs.snapshot" {
                         let response = result(request, data: .object([
                             "sessionID": .string("fixture-session"), "watermark": .integer(0), "jobs": .array([])
@@ -1025,27 +1057,15 @@ enum MockBackend {
                         continue
                     }
                     if command == "installed.snapshot",
-                       ["publiccapture", "registryempty", "registryunavailable"].contains(scenario) {
-                        if scenario == "registryunavailable" {
+                       ["publiccapture", "registryempty", "registryunavailable", "uifailures"].contains(scenario) {
+                        registryReads += 1
+                        if scenario == "registryunavailable" || scenario == "uifailures" && registryReads > 1 {
                             try emitFailure(request, code: "NETWORK_UNAVAILABLE")
                         } else {
                             guard var registry = frames.first(where: {
                                 $0["data"]?["installations"]?.array != nil
                             })?["data"]?.object else { exit(3) }
-                            if scenario == "registryempty" { registry["installations"] = .array([]) }
-                            else {
-                                registry["installations"] = .array([.object([
-                                    "installationID": .string("synthetic-local-installation"),
-                                    "revision": .integer(1), "productID": .string("synthetic-local-product"),
-                                    "editionID": .string("synthetic-local-edition"),
-                                    "packageID": .string("synthetic-local-package"),
-                                    "packageVersion": .string("synthetic-version"),
-                                    "packageDigest": .string("synthetic-digest"),
-                                    "runtimeFingerprint": .string("synthetic-runtime"),
-                                    "managedRoot": .string("/synthetic/never-inspected"),
-                                    "savePolicy": .string("preserve"), "health": .string("verified")
-                                ])])
-                            }
+                            registry["installations"] = .array([])
                             try emit(.object(result(request, data: .object(registry))))
                         }
                         continue

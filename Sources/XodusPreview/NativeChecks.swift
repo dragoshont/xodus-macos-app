@@ -426,35 +426,82 @@ enum NativeChecks {
             check(publicCatalog.authentication == nil && !publicCatalog.accountStatusCurrent
                   && publicCatalog.products.flatMap(\.editions).allSatisfy { $0.entitlement.kind == .unknown },
                   "Browsing and presenting games performs no credential read or ownership promotion")
-            guard let edition = publicCatalog.products.first?.editions.first,
-                  let registered = publicCatalog.installedSnapshot?.installations.first else {
+            guard let product = publicCatalog.products.first,
+                  let edition = product.editions.first else {
                 throw ManagementError.invalidPayload
             }
-            check(publicCatalog.installationStatus(edition) == "No managed installation found"
-                  && edition.installation.kind == "notInstalled",
-                  "Catalog notInstalled metadata never becomes a global filesystem or installed-state claim")
-            check(LiveSession().installationStatus(edition) == "Not checked",
-                  "Missing current registry evidence keeps installation status unknown")
-            check(publicCatalog.installationTitle(registered) == "Registered game"
-                  && !publicCatalog.installationTitle(registered).contains(registered.productID)
-                  && publicCatalog.installationMessage(registered) == "Added to Xodus - last verified",
-                  "Unknown local titles and last-verified health expose no internal IDs or current-play guarantee")
+            check(edition.installation.kind == "notInstalled"
+                  && publicCatalog.libraryTitle == "Your Library isn't available yet"
+                  && publicCatalog.installedSnapshot?.installations.isEmpty == true,
+                  "Catalog notInstalled and a constant-empty response never become a Mac inventory claim")
+            check(publicCatalog.productSummary(product) ==
+                  "Access and Mac compatibility haven't been checked. Install and Play aren't available yet.",
+                  "Multi-edition public detail has one truthful combined status without repeated unknown rows")
             NativeUIChecks.checkLiveLayouts(session: publicCatalog, check: check)
             await publicCatalog.disconnect()
 
             let localEmpty = session("registryempty")
             await localEmpty.connect()
             check(localEmpty.installedSnapshot?.installations.isEmpty == true
-                  && localEmpty.libraryTitle == "No games registered yet"
-                  && localEmpty.libraryMessage.contains("Microsoft library isn't available"),
-                  "Empty managed records are separate from an unimplemented owned library")
+                  && localEmpty.libraryTitle == "Your Library isn't available yet"
+                  && localEmpty.libraryMessage.contains("can't list your owned or installed games"),
+                  "A constant-empty registry response never advertises an implemented registry or an empty Mac")
             await localEmpty.disconnect()
             let localUnavailable = session("registryunavailable")
             await localUnavailable.connect()
             check(localUnavailable.installedSnapshot == nil && localUnavailable.installedError != nil
-                  && localUnavailable.libraryTitle == "Games couldn't be checked",
-                  "Failed local-record reads are actionable and never appear as an empty library")
+                  && localUnavailable.libraryTitle == "Your Library isn't available yet",
+                  "An unavailable registry response never changes the real unsupported-library boundary")
             await localUnavailable.disconnect()
+
+            let failureConfiguration = configuration("uifailures")
+            let visibleFailures = LiveSession(configuration: failureConfiguration)
+            await visibleFailures.connect()
+            await visibleFailures.refreshAccount()
+            await visibleFailures.refreshCatalog("Synthetic query")
+            let catalogFailure = visibleFailures.catalogError
+            check(catalogFailure != nil && visibleFailures.accountError == nil
+                  && visibleFailures.accountMessage.hasPrefix("You're signed in.")
+                  && visibleFailures.catalogNotice == "Games couldn't be loaded. Choose Refresh to try again.",
+                  "A catalog failure has visible catalog recovery and never contaminates Account")
+            await visibleFailures.refreshAccount()
+            check(visibleFailures.accountError != nil && !visibleFailures.accountStatusCurrent
+                  && visibleFailures.authentication?.state == .credentialPresent
+                  && visibleFailures.currentCredentialState == nil
+                  && visibleFailures.accountMessage == "Account status couldn't be checked. Choose Check status to try again."
+                  && !visibleFailures.canSignIn && !visibleFailures.canDisconnectAccount,
+                  "Failed Account read visibly names Check status while retaining only an unconfirmed saved snapshot")
+            await visibleFailures.refreshAccount()
+            check(visibleFailures.accountError == nil && visibleFailures.currentCredentialState == .credentialPresent
+                  && visibleFailures.catalogError == catalogFailure,
+                  "Account recovery restores only credential evidence and never erases a catalog failure")
+            await visibleFailures.signOut()
+            check(visibleFailures.authentication?.state == .credentialPresent
+                  && !visibleFailures.accountStatusCurrent && visibleFailures.currentCredentialState == nil
+                  && !visibleFailures.canSignIn && !visibleFailures.canDisconnectAccount
+                  && visibleFailures.accountMessage == "Sign-out couldn't be confirmed. Check status before trying again.",
+                  "Failed logout preserves the previous snapshot but never presents signed-out or current-saved success")
+            await visibleFailures.refreshAccount()
+            await visibleFailures.refreshActivity()
+            check(visibleFailures.activityError != nil && visibleFailures.activity.needsSnapshot
+                  && !visibleFailures.activity.isReconciling && visibleFailures.activityNotice != nil
+                  && visibleFailures.accountError == nil && visibleFailures.currentCredentialState == .credentialPresent,
+                  "Failed activity refresh exposes its retry and does not become an account failure or stranded spinner")
+            await visibleFailures.refreshActivity()
+            check(visibleFailures.activityError == nil && visibleFailures.activityNotice == nil
+                  && !visibleFailures.activity.needsSnapshot,
+                  "An explicit successful activity refresh clears only its own failure")
+            let previousSnapshot = visibleFailures.installedSnapshot
+            await visibleFailures.refreshInstalled()
+            check(visibleFailures.installedSnapshot == previousSnapshot && !visibleFailures.installedSnapshotCurrent
+                  && visibleFailures.installedError != nil
+                  && visibleFailures.libraryTitle == "Your Library isn't available yet",
+                  "Failed registry refresh retains a stale wire snapshot without claiming installation or a populated registry")
+            check(try trace(failureConfiguration).filter { $0.hasPrefix("auth.") } ==
+                  ["auth.status", "auth.status", "auth.status", "auth.logout", "auth.status"],
+                  "Error presentation adds no automatic auth read, sign-in, verification or logout retry")
+            check(await visibleFailures.disconnect(), "Visible-error regression retires its owned neutral child")
+            try cleanLifecycle(failureConfiguration)
 
             let empty = session("queryempty")
             await empty.connect()

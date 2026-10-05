@@ -174,7 +174,7 @@ enum NativeUIChecks {
                           !$0.hasHorizontalScroller
                               && ($0.documentView?.bounds.width ?? 0) <= host.bounds.width + 1
                       },
-                      "Replayed public \(destination.rawValue) and synthetic local records fit a bounded native viewport")
+                      "Replayed public \(destination.rawValue) and honest unavailable Library fit a bounded native viewport")
             }
         }
         if let product = session.products.first {

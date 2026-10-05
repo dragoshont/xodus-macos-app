@@ -25,8 +25,10 @@ struct LiveAccountView: View {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(spacing: 12) {
                     Image(systemName: "person.crop.circle").font(.largeTitle).foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 5) {
                         Text(session.accountNoticeTitle).font(.title2.bold())
+                            .accessibilityIdentifier("xodus.account.status")
                     }
                     Spacer()
                     if session.accountBusy || session.signInPending { ProgressView().controlSize(.small) }
@@ -37,7 +39,7 @@ struct LiveAccountView: View {
                 if session.isReady && !session.supports(.authBegin) {
                     Text("Sign-in isn't available in this build.").foregroundStyle(.secondary)
                 }
-                DisclosureGroup("Details") {
+                DisclosureGroup("Account info") {
                     VStack(alignment: .leading, spacing: 12) {
                         Text(session.accountExplanation)
                         Text("Credentials stay in the native Keychain.")
@@ -49,11 +51,13 @@ struct LiveAccountView: View {
                         if let observation = session.accountFailureObservation {
                             Text(observation).accessibilityIdentifier("xodus.account.failureObservation")
                         }
-                        if let error = session.errorMessage {
+                        if let error = session.accountError {
                             Text(error).fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("xodus.account.error")
                         }
                     }
                     .foregroundStyle(.secondary).textSelection(.enabled).padding(.top, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         } actions: {
@@ -155,7 +159,7 @@ struct LiveSettingsView: View {
             Section("Account") {
                 LabeledContent("Status", value: session.accountLabel)
                 Button("Open account") { state.showingAccount = true }
-                DisclosureGroup("Details") { Text(session.accountExplanation).foregroundStyle(.secondary) }
+                DisclosureGroup("Account info") { Text(session.accountExplanation).foregroundStyle(.secondary) }
             }
             Section("Advanced public catalog") {
                 Text(session.supports(.query)

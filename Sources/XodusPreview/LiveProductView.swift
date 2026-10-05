@@ -23,36 +23,27 @@ struct LiveProductView: View {
                     }
                     Spacer()
                 }
-                Divider()
-                ForEach(Array(product.editions.enumerated()), id: \.element.id) { index, edition in
-                    VStack(alignment: .leading, spacing: 15) {
-                        Text(product.editions.count == 1 ? "Game details" : "Edition \(index + 1)").font(.headline)
-                        Grid(alignment: .leading, horizontalSpacing: 28, verticalSpacing: 14) {
-                            facet("Access", edition.entitlement.kind.label)
-                            facet("PC package", edition.installability.kind.label)
-                            facet("Compatibility", edition.compatibility.kind.label)
-                            facet("This Mac", session.installationStatus(edition))
-                        }
-                        DisclosureGroup("Details") {
-                            VStack(alignment: .leading, spacing: 8) {
+                Text(session.productSummary(product))
+                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                DisclosureGroup("Catalog info") {
+                    VStack(alignment: .leading, spacing: 18) {
+                        ForEach(product.editions) { edition in
+                            VStack(alignment: .leading, spacing: 10) {
                                 Text("Edition \(edition.editionID)")
+                                    .font(.headline)
+                                Grid(alignment: .leading, horizontalSpacing: 28, verticalSpacing: 14) {
+                                    facet("Access", edition.entitlement.kind.label)
+                                    facet("PC package", edition.installability.kind.label)
+                                    facet("Compatibility", edition.compatibility.kind.label)
+                                    facet("This Mac", "Not checked")
+                                }
                                 Text("Access: \(edition.entitlement.source)")
                                 Text("PC package: \(edition.installability.reason ?? "No package authorization established.")")
                                 Text("Compatibility: \(edition.compatibility.source)")
-                                Text("This Mac: Xodus management registry only; other game folders haven't been checked.")
+                                Text("This Mac: installed-game listing isn't available. A selected-folder marker check doesn't identify this edition or prove installation.")
+                                Divider()
                             }
-                            .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                         }
-                        Divider()
-                    }
-                }
-                if product.editions.isEmpty {
-                    Label("No edition has been resolved. Installation is unavailable.", systemImage: "exclamationmark.circle")
-                }
-                Text("Install and Play aren't available in this build.")
-                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                DisclosureGroup("Catalog details") {
-                    VStack(alignment: .leading, spacing: 8) {
                         Text("Source: \(product.source)")
                         Text("Product \(product.productID)")
                         Text("\(product.market) / \(product.language) - \(product.freshness) metadata")
@@ -65,6 +56,8 @@ struct LiveProductView: View {
                     }
                     .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityLabel("Catalog info for \(product.title)")
                 HStack {
                     Spacer()
                     Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)

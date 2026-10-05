@@ -2,7 +2,7 @@
 
 A native Mac launcher in development for legitimately entitled Xbox PC games, integrating with the Xodus management engine.
 
-**Current status: native development app, not a complete game launcher.** The default SwiftUI/AppKit app has a real bounded management client, isolated Microsoft Store sign-in integration, source-backed PC Game Pass discovery and Microsoft Store network search, edition detail, activity and scoped installed-registry status. A native folder picker also supports a read-only marker check in one explicitly selected game folder; observed header identifiers never become retail identity, registration or permission to launch. A packaged development build includes its matching engine and connects without Terminal setup; negotiated capabilities determine which actions work. Search coverage is explicitly partial, and public results never establish ownership. A controlled development pair has completed human sign-in and retained saved-session status across a normal app restart. Authenticated provider reads, authoritative owned-PC inventory, authorized game installation and certified gameplay remain active verification/implementation gaps. Saved sign-in is **not** proof of PC ownership or package access.
+**Current status: native development app, not a complete game launcher.** The default SwiftUI/AppKit app has a real bounded management client, isolated Microsoft Store sign-in integration, source-backed PC Game Pass discovery and Microsoft Store network search, edition detail and activity. A native folder picker also supports a read-only marker check in one explicitly selected game folder; observed header identifiers never become retail identity, registration or permission to launch. A packaged development build includes its matching engine and connects without Terminal setup; negotiated capabilities determine which actions work. Search coverage is explicitly partial, and public results never establish ownership. An earlier controlled development pair completed human sign-in and retained saved-session status across a normal app restart; the newer pair's sole authenticated read returned `credentialUnavailable`, not verified provider access. Authoritative owned-PC inventory, a durable installed-game registry, authorized game installation and certified gameplay remain implementation gaps. Saved sign-in is **not** proof of PC ownership or package access.
 
 The original offline demonstration is **nonshipping only**. `XODUS_SHIPPING=1`
 compiles out its views, invented state, artwork, resources and check/export
@@ -11,9 +11,11 @@ actual public product data, not synthetic game illustrations. See
 [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
 Live startup opens Discover, with real public results and scoped search.
-Library shows only Xodus-managed records; neither registration nor last-verified
-health establishes current game integrity or permission to play. Technical
-metadata stays in Details. No Install or Play action is offered yet.
+Library remains unavailable: the current installed snapshot is a constant empty
+response, not a durable registry or scan of this Mac. It never proves that no
+games are installed. A selected-folder marker check is separate from ownership,
+game-file integrity and permission to play. Technical metadata stays in
+contextual information disclosures. No Install or Play action is offered yet.
 
 ![Original Library concept](design/previews/library.png)
 

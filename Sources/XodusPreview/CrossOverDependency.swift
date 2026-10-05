@@ -154,16 +154,16 @@ struct RuntimeDependencyStatus: View {
                   ? "shippingbox" : "exclamationmark.circle")
                 .font(.headline).accessibilityIdentifier("xodus.runtime.dependency")
             if settings.crossOverDependency == .checking { ProgressView("Checking app signature").controlSize(.small) }
-            DisclosureGroup("Details") {
+            ViewThatFits(in: .horizontal) {
+                HStack { actions }
+                VStack(alignment: .leading, spacing: 8) { actions }
+            }
+            DisclosureGroup("Runtime information") {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(settings.crossOverDependency.explanation)
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     Text("CrossOver is the first-release dependency. Wine/GPTK and custom graphics are Experimental, not release-supported alternatives.")
                         .font(.caption).foregroundStyle(.secondary)
-                    ViewThatFits(in: .horizontal) {
-                        HStack { actions }
-                        VStack(alignment: .leading, spacing: 8) { actions }
-                    }
                 }
                 .padding(.top, 8)
             }

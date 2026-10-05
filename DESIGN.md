@@ -30,10 +30,18 @@ enumeration is unavailable; the original fixture still starts in Library.
 The existing native toolbar, deployment target and repository tokens are
 unchanged. Discover shows real scoped public products and search, with one
 ownership caveat rather than repeated source/status labels on each row.
-Library shows only known managed records, or a scoped empty/error state;
-registration and last-verified health never assert current file integrity,
-ownership or playability. Product IDs, package metadata, provenance and
-selected-folder marker inspection remain available in Details. Account stays
+Library explicitly remains unavailable: the current engine's registry response
+is a constant empty vector, not an implemented durable registry or Mac scan.
+It must not become "no games registered" or an installed-game list; Library
+search is disabled. A real, read-only selected-folder marker check remains
+visible, separate from retail identity, entitlement, installation and launch.
+Product IDs, package metadata, provenance and
+selected-folder marker inspection remain available in contextual information
+disclosures. Operation-specific failures remain visible and actionable;
+retained account snapshots are explicitly unconfirmed, not current saved-state
+evidence. Product
+detail has one combined status line, with independent per-edition evidence in
+Catalog info. Account stays
 in the toolbar, and its cancellation, refresh and credential gates are
 unchanged. No Home shelves, invented installed games, new framework or
 speculative navigation API is introduced.
@@ -103,7 +111,8 @@ or custom control chrome. CrossOver is first-release supported; only a verified
 official app observation defaults an unset profile. All alternatives are
 Experimental with visible acknowledgement, outside the advanced disclosure.
 Dependency status and its native check/official information actions stay in
-Settings, rather than repeating a runtime wall in Library and Account. Controls adapt to
+Settings, rather than repeating a runtime wall in Library and Account. Dependency
+actions remain visible; only explanatory/experimental copy collapses. Controls adapt to
 constrained widths; checking/absent/unverified states do not fabricate readiness
 or disable unrelated catalog/account actions. Advanced component
 declarations remain separate from the primary provider choice, and configuration

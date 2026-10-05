@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 import XodusManagement
 
 enum ConnectionPhase { case disconnected, connecting, disconnecting, ready, failed }
+private enum AccountAction { case status, signIn, cancellation, signOut }
 
 @MainActor
 final class LiveSession: ObservableObject {
@@ -19,8 +20,11 @@ final class LiveSession: ObservableObject {
     @Published private(set) var catalogStopped = false
     @Published private(set) var accountBusy = false
     @Published private(set) var accountStatusCurrent = false
+    @Published private(set) var accountError: String?
+    @Published private(set) var activityError: String?
     @Published private(set) var lookupBusy = false
     @Published private(set) var installedSnapshot: InstalledSnapshot?
+    @Published private(set) var installedSnapshotCurrent = false
     @Published private(set) var installedRefreshing = false
     @Published private(set) var installedError: String?
     @Published private(set) var inspection: InstallationInspection?
@@ -43,6 +47,7 @@ final class LiveSession: ObservableObject {
     @Published private(set) var diagnosticSaved = false
     @Published private(set) var diagnosticExportError: String?
     private var client: ManagementClient?
+    private var failedAccountAction: AccountAction?
     private var lifecycleRevision = 0
     private var connectOperationID: UUID?
     private var disconnectWaiters = 0
@@ -128,6 +133,15 @@ final class LiveSession: ObservableObject {
     var accountMessage: String {
         if phase == .connecting { return "Connecting to Xodus." }
         guard isReady else { return "Xodus couldn't connect. Open Settings to reconnect." }
+        if accountError != nil {
+            switch failedAccountAction {
+            case .status: return "Account status couldn't be checked. Choose Check status to try again."
+            case .signIn: return "Sign-in couldn't be confirmed. Check status before trying again."
+            case .cancellation: return "Cancellation couldn't be confirmed. Check status before trying again."
+            case .signOut: return "Sign-out couldn't be confirmed. Check status before trying again."
+            case nil: return "The account action couldn't be confirmed. Check status before trying again."
+            }
+        }
         if signInPending {
             return accountStatusCurrent
                 ? "Continue in Microsoft's window if it opened, or cancel sign-in."
@@ -135,7 +149,7 @@ final class LiveSession: ObservableObject {
         }
         guard accountStatusCurrent else { return "Check status to see whether you're signed in." }
         if authentication?.flow?.state == .failed {
-            return "This sign-in didn't finish. Check Details or try again when you're ready. You can still browse games."
+            return "This sign-in didn't finish. Check Account info or try again when you're ready. You can still browse games."
         }
         if authentication?.flow?.state == .cancelled { return "You can sign in whenever you're ready." }
         switch currentCredentialState {
@@ -147,19 +161,30 @@ final class LiveSession: ObservableObject {
     }
     var libraryTitle: String {
         guard isReady else { return phase == .connecting ? "Connecting" : "Xodus couldn't connect" }
-        if installedRefreshing && installedSnapshot == nil { return "Checking games on this Mac" }
-        if installedError != nil { return "Games couldn't be checked" }
-        if installedSnapshot == nil { return "Local games haven't been checked" }
-        return "No games registered yet"
+        return "Your Library isn't available yet"
     }
     var libraryMessage: String {
         guard isReady else { return "You can reconnect in Settings." }
-        if installedError != nil { return "Refresh to try again. Your game files haven't been changed." }
-        return "Your Microsoft library isn't available in this build. Browse games in Discover, or check a game folder in Details."
+        return "Xodus can't list your owned or installed games yet. Browse Discover, or check a folder you choose."
+    }
+    var activityNotice: String? {
+        guard activityError != nil else { return nil }
+        return "Activity couldn't be updated. Choose Refresh activity to check the latest result."
+    }
+    func productSummary(_ product: CatalogProduct) -> String {
+        guard !product.editions.isEmpty else { return "Game information hasn't been resolved." }
+        let access = Set(product.editions.map(\.entitlement.kind))
+        let compatibility = Set(product.editions.map(\.compatibility.kind))
+        if access == [.unknown] && compatibility == [.unknown] {
+            return "Access and Mac compatibility haven't been checked. Install and Play aren't available yet."
+        }
+        let accessLabel = access.count == 1 ? product.editions[0].entitlement.kind.label : "Varies by edition"
+        let compatibilityLabel = compatibility.count == 1 ? product.editions[0].compatibility.kind.label : "Varies by edition"
+        return "Access: \(accessLabel). Mac compatibility: \(compatibilityLabel). Install and Play aren't available yet."
     }
     var catalogNotice: String? {
         if catalogStopped { return "Search stopped." }
-        if catalogError != nil { return "Games couldn't be loaded. Try again." }
+        if catalogError != nil { return "Games couldn't be loaded. Choose Refresh to try again." }
         if !discoveryFailures.isEmpty { return "Some results couldn't be checked." }
         return nil
     }
@@ -247,7 +272,7 @@ final class LiveSession: ObservableObject {
         }
         guard accountStatusCurrent else {
             return authentication == nil
-                ? "The engine is connected, but account status has not been checked. Checking status may require your Keychain permission. Public browsing does not read your Keychain."
+                ? "The engine is connected, but account status has not been checked. Status checks don't open Microsoft sign-in or approve Keychain access. Public browsing does not read your Keychain."
                 : "Current account status could not be confirmed. Check status before another sign-in or sign-out action; the earlier result is not current account evidence."
         }
         switch currentCredentialState {
@@ -507,8 +532,12 @@ final class LiveSession: ObservableObject {
         hello = nil
         authentication = nil
         accountStatusCurrent = false
+        accountError = nil
+        failedAccountAction = nil
+        activityError = nil
         signInDeadline = nil
         installedSnapshot = nil
+        installedSnapshotCurrent = false
         installedError = nil
         installedRefreshing = false
         inspection = nil
@@ -577,10 +606,14 @@ final class LiveSession: ObservableObject {
             let status = try await client.request(.authStatus).decode(AuthenticationStatus.self)
             guard token == generation, authToken == authenticationGeneration else { return }
             acceptAccountStatus(status)
+            accountError = nil
+            failedAccountAction = nil
             errorMessage = nil
         } catch {
             guard token == generation, authToken == authenticationGeneration else { return }
             accountStatusCurrent = false
+            accountError = Self.describe(error)
+            failedAccountAction = .status
             errorMessage = Self.describe(error)
         }
     }
@@ -597,6 +630,7 @@ final class LiveSession: ObservableObject {
         guard isReady, supports(.installed), let client, !installedRefreshing else { return }
         let token = generation
         installedRefreshing = true
+        installedSnapshotCurrent = false
         installedError = nil
         defer { if token == generation { installedRefreshing = false } }
         do {
@@ -608,32 +642,11 @@ final class LiveSession: ObservableObject {
                 throw ManagementError.invalidPayload
             }
             installedSnapshot = snapshot
+            installedSnapshotCurrent = true
         } catch {
             guard token == generation else { return }
-            installedSnapshot = nil
             installedError = Self.describe(error)
         }
-    }
-
-    func installationTitle(_ installation: RegisteredInstallation) -> String {
-        products.first { $0.id == installation.productID }?.title ?? "Registered game"
-    }
-
-    func installationMessage(_ installation: RegisteredInstallation) -> String {
-        switch installation.health {
-        case .verified: "Added to Xodus - last verified"
-        case .broken: "Needs repair"
-        case .recoveryRequired: "Recovery needed"
-        }
-    }
-
-    func installationStatus(_ edition: ProductEvidence) -> String {
-        guard isReady, let snapshot = installedSnapshot else { return "Not checked" }
-        let matches = snapshot.installations.filter {
-            $0.productID == edition.productID && $0.editionID == edition.editionID
-        }
-        return matches.isEmpty ? "No managed installation found"
-            : matches.map(installationMessage).joined(separator: ", ")
     }
 
     func activityTitle(_ job: CatalogJob) -> String {
@@ -689,6 +702,8 @@ final class LiveSession: ObservableObject {
         guard canSignIn, let client else { return }
         authenticationGeneration += 1
         accountBusy = true
+        accountError = nil
+        failedAccountAction = nil
         errorMessage = nil
         let token = generation
         do {
@@ -708,6 +723,8 @@ final class LiveSession: ObservableObject {
             if case let ManagementError.backendError(code, _) = error {
                 errorMessage = "Microsoft sign-in could not start. " + Self.describeSignInFailure(code: code)
             } else { errorMessage = Self.describe(error) }
+            accountError = errorMessage
+            failedAccountAction = .signIn
         }
     }
 
@@ -721,6 +738,8 @@ final class LiveSession: ObservableObject {
                     guard let self, token == self.generation, let client = self.client else { return }
                     guard ContinuousClock.now < deadline else {
                         self.errorMessage = "Sign-in is still pending. Check status before retrying or closing; no cancellation was assumed."
+                        self.accountError = self.errorMessage
+                        self.failedAccountAction = .status
                         return
                     }
                     let status: AuthenticationStatus
@@ -729,6 +748,8 @@ final class LiveSession: ObservableObject {
                         guard token == self.generation, !Task.isCancelled else { return }
                         self.accountStatusCurrent = false
                         self.errorMessage = Self.describe(error)
+                        self.accountError = self.errorMessage
+                        self.failedAccountAction = .status
                         if error as? ManagementError == .credentialStoreUnavailable { continue }
                         if case ManagementError.backendError(_, retryable: true) = error { continue }
                         return
@@ -738,6 +759,8 @@ final class LiveSession: ObservableObject {
                           self.authentication?.flow?.state == .pending else { return }
                     guard status.flow?.flowID == flowID else { throw ManagementError.invalidPayload }
                     self.acceptAccountStatus(status)
+                    self.accountError = nil
+                    self.failedAccountAction = nil
                     if status.flow?.state != .pending {
                         if status.flow?.state == .completed { self.errorMessage = nil }
                         return
@@ -748,6 +771,8 @@ final class LiveSession: ObservableObject {
             } catch {
                 guard let self, token == self.generation else { return }
                 self.errorMessage = Self.describe(error)
+                self.accountError = self.errorMessage
+                self.failedAccountAction = .status
             }
         }
     }
@@ -757,6 +782,8 @@ final class LiveSession: ObservableObject {
               supports(.authCancel), !accountBusy else { return }
         authenticationGeneration += 1
         accountBusy = true
+        accountError = nil
+        failedAccountAction = nil
         authTask?.cancel()
         let token = generation
         do {
@@ -776,6 +803,8 @@ final class LiveSession: ObservableObject {
             if case ManagementError.backendError("INVALID_TRANSITION", _) = error {
                 errorMessage = "Sign-in is finishing. Checking the saved result before closing."
             } else { errorMessage = Self.describe(error) }
+            accountError = errorMessage
+            failedAccountAction = .cancellation
             if authentication?.flow?.flowID == flow.flowID, signInPending {
                 pollSignIn(flowID: flow.flowID, generation: token)
             }
@@ -786,12 +815,15 @@ final class LiveSession: ObservableObject {
     func signOut() async {
         guard let client, canDisconnectAccount else {
             errorMessage = "Check the current saved sign-in before disconnecting. No credentials were removed."
+            accountError = errorMessage
+            failedAccountAction = .signOut
             return
         }
         authenticationGeneration += 1
         accountBusy = true
+        accountError = nil
+        failedAccountAction = nil
         authTask?.cancel()
-        authentication = nil
         accountStatusCurrent = false
         selectedProduct = nil
         products = []
@@ -808,6 +840,8 @@ final class LiveSession: ObservableObject {
         } catch {
             guard token == generation else { return }
             errorMessage = Self.describe(error)
+            accountError = errorMessage
+            failedAccountAction = .signOut
         }
         if token == generation { accountBusy = false }
     }
@@ -1050,6 +1084,7 @@ final class LiveSession: ObservableObject {
     func changeJob(_ job: CatalogJob, command: ManagementCommand) async {
         guard isReady, let client, supports(command), !activity.needsSnapshot, !activity.isReconciling else { return }
         let token = generation
+        activityError = nil
         do {
             _ = try await client.request(command, params: [
                 "jobID": .string(job.id), "expectedRevision": .unsigned(job.revision)
@@ -1059,6 +1094,18 @@ final class LiveSession: ObservableObject {
         } catch {
             guard token == generation else { return }
             errorMessage = Self.describe(error)
+            activityError = Self.describe(error)
+        }
+    }
+
+    func refreshActivity() async {
+        guard isReady, supports(.jobs), !activity.isReconciling else { return }
+        let token = generation
+        activityError = nil
+        do { try await reconcileActivity() }
+        catch {
+            guard token == generation else { return }
+            activityError = Self.describe(error)
         }
     }
 
