@@ -21,6 +21,8 @@ enum ManagementChecks {
                     discover: CommandLine.arguments.contains("--probe-discovery"),
                     query: CommandLine.arguments.contains("--probe-query"),
                     inspect: CommandLine.arguments.contains("--probe-inspect"))
+            } else if CommandLine.arguments.contains("--registry-development-checks") {
+                try await checks.registryDevelopmentChecks()
             } else { try await checks.run() }
         } catch { await checks.check(false, "Check harness: \(safeMessage(error))") }
         exit(await checks.finish() ? 0 : 1)
@@ -59,6 +61,7 @@ actor Checks {
     }
 
     func run() async throws {
+        try registryDevelopmentChecks()
         try await runtimePlanChecks()
         try await hostBindingChecks()
         try await artworkChecks()

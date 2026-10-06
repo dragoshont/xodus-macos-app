@@ -430,11 +430,12 @@ public struct ManagementVersion: Codable, Equatable, Sendable {
 }
 
 public enum InstallationHealth: String, Codable, Sendable {
-    case verified, broken, recoveryRequired
+    case verified, notVerified, broken, recoveryRequired
 
     public var label: String {
         switch self {
         case .verified: "Registered, last verified"
+        case .notVerified: "Registered, not verified"
         case .broken: "Needs repair"
         case .recoveryRequired: "Recovery required"
         }
@@ -449,11 +450,46 @@ public struct RegisteredInstallation: Codable, Equatable, Sendable, Identifiable
     public let packageID: String
     public let packageVersion: String
     public let packageDigest: String
-    public let runtimeFingerprint: String
+    public let runtimeFingerprint: String?
     public let managedRoot: String
     public let savePolicy: String
     public let health: InstallationHealth
     public var id: String { installationID }
+
+    private enum CodingKeys: String, CodingKey {
+        case installationID, revision, productID, editionID, packageID, packageVersion, packageDigest
+        case runtimeFingerprint, managedRoot, savePolicy, health
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        installationID = try container.decode(String.self, forKey: .installationID)
+        revision = try container.decode(UInt64.self, forKey: .revision)
+        productID = try container.decode(String.self, forKey: .productID)
+        editionID = try container.decode(String.self, forKey: .editionID)
+        packageID = try container.decode(String.self, forKey: .packageID)
+        packageVersion = try container.decode(String.self, forKey: .packageVersion)
+        packageDigest = try container.decode(String.self, forKey: .packageDigest)
+        runtimeFingerprint = try container.decode(String?.self, forKey: .runtimeFingerprint)
+        managedRoot = try container.decode(String.self, forKey: .managedRoot)
+        savePolicy = try container.decode(String.self, forKey: .savePolicy)
+        health = try container.decode(InstallationHealth.self, forKey: .health)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(installationID, forKey: .installationID)
+        try container.encode(revision, forKey: .revision)
+        try container.encode(productID, forKey: .productID)
+        try container.encode(editionID, forKey: .editionID)
+        try container.encode(packageID, forKey: .packageID)
+        try container.encode(packageVersion, forKey: .packageVersion)
+        try container.encode(packageDigest, forKey: .packageDigest)
+        try container.encode(runtimeFingerprint, forKey: .runtimeFingerprint)
+        try container.encode(managedRoot, forKey: .managedRoot)
+        try container.encode(savePolicy, forKey: .savePolicy)
+        try container.encode(health, forKey: .health)
+    }
 }
 
 public struct InstalledSnapshot: Codable, Equatable, Sendable {

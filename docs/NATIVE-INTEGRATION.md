@@ -2,6 +2,40 @@
 
 This is implementation work beyond the immutable foundation at `44d7338`. It is **not a consumer-ready game launcher**.
 
+## Development-only registry compatibility
+
+The typed registry record accepts a **required-but-nullable** `runtimeFingerprint`
+and the explicit `notVerified` health value. A null fingerprint means no runtime
+binding was established; a missing key or wrong type remains invalid. Encoding
+preserves the key and explicit null. Existing non-null records and health values
+remain valid. `notVerified` describes observed committed local metadata, not
+payload integrity, entitlement, runtime certification or launchability. A legacy
+package digest over a local serialized manifest is not authoritative provider
+payload evidence.
+
+This source-only preparation uses separately copied, sanitized test resources
+from producer `0aca761e820db5fee0f2e03e37ab09412054620b`, tree
+`82c82b67d7925b5512f72f3ad3273979dc7fcfb5`. Development schema SHA256 is
+`13354f71c32e558792a83c64a0920b4831128c455385309d3b036ae93efc4b94`;
+its exact corpus contains 102 positive and 99 negative frames. The development
+validator uses the existing alternate-schema initializer, not new transport or
+UI infrastructure. These resources are excluded from shipping.
+
+The production schema, c107 producer and signed engine admission pins below are
+unchanged. Production validation still rejects future nullable/notVerified
+records before typed decoding. This packet does not enable or prove deployed
+registry reads, installation, ownership or play.
+
+Data-only checks validate the complete development corpus, backward compatibility,
+null-preserving round trips, missing/type-invalid fingerprints and unknown health.
+The existing fixed busy/recovery/worker failure envelopes preserve their error
+code and retryability and cannot decode as successful empty snapshots. Corrupt or
+partial local state must remain a failure; only an absent entire staging scope
+can truthfully produce an empty registry. No operation-specific registry diagnostic
+category or new error mapping was added. The targeted check entry point is
+`XodusManagementChecks --registry-development-checks`; it starts no engine and
+makes no `installed.snapshot`, credential, provider or artwork request.
+
 ## Artwork and recently played source slice
 
 The current source pairs with producer
