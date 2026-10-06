@@ -51,8 +51,10 @@ detail has one availability line, with independent per-edition evidence in
 Catalog info, a compact preferred size and a separate native Done footer.
 Unchecked/empty/failed history has one clear state and explicit Account/load or
 refresh action. Retained results visibly say they are previously checked;
-account/connection changes clear personal memory, while fresh same-profile
-status leaves retained history unconfirmed rather than rereading it.
+account/connection changes and explicit Account checks clear personal memory.
+Credential-present status carries no user identity binding, so a fresh status
+cannot establish that earlier personal history belongs to the current account.
+No Account check automatically rereads history.
 Selected-folder inspection is secondary under Library details. Discover places
 results directly after one scoped heading and any actual partial/failure notice.
 Account stays
@@ -124,7 +126,7 @@ modern rendering and constrained-window toolbar placement remain live gates.
 | Controls | native system accent; real available Glass, older material fallback |
 | Typography | SF system fonts and symbols; large feature title, native body/section hierarchy |
 | Spacing | 4 pt base; 30 pt body inset; 12-24 pt groups; toolbar geometry owned by macOS |
-| Entries | real portrait Store covers / square history tiles; adaptive native grid |
+| Entries | real Store covers fitted without branding crop / square history tiles; adaptive native grid |
 | Detail | actual catalog hero/cover, followed by readable ordered evidence and a fixed Done footer |
 | Motion | no nonessential animation/autoplay; reduced motion loses no information |
 

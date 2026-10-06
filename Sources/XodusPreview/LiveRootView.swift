@@ -202,8 +202,8 @@ struct LiveRootView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 CatalogArtworkView(reference: CatalogArtworkReference.preferred(
                                     in: product.artwork, roles: [.boxArt, .poster, .tile, .hero]),
-                                    status: product.artworkStatus)
-                                    .aspectRatio(2.0 / 3.0, contentMode: .fit)
+                                    status: product.artworkStatus, contentMode: .fit)
+                                    .aspectRatio(1, contentMode: .fit)
                                     .clipShape(RoundedRectangle(cornerRadius: 10))
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(product.title).font(.headline).foregroundStyle(.primary)

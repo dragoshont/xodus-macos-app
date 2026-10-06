@@ -94,7 +94,7 @@ struct LiveRecentLibraryView: View {
                         Text("One partial window of played history, not ownership, installation or Mac compatibility. No Store product mapping is established.")
                         Text("Source: Xbox TitleHub. Checked \(snapshot.checkedAt).")
                         Text(session.recentLibraryCurrent ? "Live read." : "Retained, unconfirmed activity.")
-                        Text("Personal history stays in memory. Unconfirmed sign-in, sign-out and connection changes clear it.")
+                        Text("Personal history stays in memory. Account checks, sign-out and connection changes clear it.")
                     }
                     .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                 }

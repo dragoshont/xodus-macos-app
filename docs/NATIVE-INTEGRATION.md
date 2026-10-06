@@ -39,9 +39,10 @@ NOUI saved read and publication witness inside a 30-second operation; it does
 not invoke a helper, persist refreshed proofs, acquire a license or begin login.
 Six exact failure-stage tuples become safe local actionable errors.
 Personal data remains in memory, generation-fenced and separate from
-ProductEvidence/installed snapshots. Same-profile status may retain visibly
-unconfirmed history; failed/unconfirmed credentials, profile change, sign-out
-and disconnection clear it. PC filtering uses the reported platform
+ProductEvidence/installed snapshots. Explicit Account refresh clears personal
+history before reading: credential-present status exposes no user/profile
+binding, so "same profile" cannot be inferred. Failed/unconfirmed credentials,
+profile change, sign-out and disconnection also clear it. PC filtering uses the reported platform
 classification, not Xbox history as blanket PC compatibility.
 
 The nonshipping admitted exporter now performs one actual recent-history read

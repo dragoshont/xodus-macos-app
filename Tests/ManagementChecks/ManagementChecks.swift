@@ -915,11 +915,18 @@ enum MockBackend {
                     if scenario.hasPrefix("recent") {
                         try trace(command)
                         if command == "auth.status" {
-                            try emit(.object(result(request, data: .object([
+                            profileReads += 1
+                            let response = result(request, data: .object([
                                 "state": .string(loggedOut ? "signedOut" : "credentialPresent"),
                                 "credentialStore": .string("macOSKeychain"), "audience": .null,
                                 "expiresAt": .null, "entitlementAuthorized": .bool(false)
-                            ]))))
+                            ]))
+                            if scenario == "recentstatusslow", profileReads > 1 {
+                                DispatchQueue.global().async {
+                                    Thread.sleep(forTimeInterval: 0.5)
+                                    do { try emit(.object(response)) } catch { exit(3) }
+                                }
+                            } else { try emit(.object(response)) }
                             continue
                         }
                         if command == "auth.logout" { loggedOut = true }

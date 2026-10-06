@@ -22,8 +22,8 @@ struct LiveProductView: View {
                     HStack(alignment: .top, spacing: 18) {
                         CatalogArtworkView(reference: CatalogArtworkReference.preferred(
                             in: product.artwork, roles: [.boxArt, .poster, .tile, .hero]),
-                            status: product.artworkStatus)
-                            .frame(width: 80, height: 112)
+                            status: product.artworkStatus, contentMode: .fit)
+                            .frame(width: 96, height: 96)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                         VStack(alignment: .leading, spacing: 8) {
                             Text(product.title).font(.title.bold())

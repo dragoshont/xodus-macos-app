@@ -714,7 +714,7 @@ final class LiveSession: ObservableObject {
     func refreshAccount() async {
         guard isReady, supports(.authStatus), let client, !accountBusy else { return }
         let token = generation
-        recentLibraryCurrent = false
+        clearRecentLibrary()
         authenticationGeneration += 1
         let authToken = authenticationGeneration
         do {

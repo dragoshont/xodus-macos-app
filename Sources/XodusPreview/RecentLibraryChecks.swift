@@ -98,15 +98,34 @@ enum RecentLibraryChecks {
               "Real-shaped history publishes separately from public product and installed evidence")
         await session.refreshAccount()
         let clearedTrace = try trace("recentslow")
-        check(session.recentLibrary?.titles.count == 1 && !session.recentLibraryCurrent
+        check(session.recentLibrary == nil && !session.recentLibraryCurrent
               && clearedTrace.filter { $0 == "library.recent" }.count == 1,
-              "Fresh same-profile status retains explicitly stale history without rereading it")
+              "Explicit Account refresh clears identity-unbound personal history without rereading it")
         await session.refreshRecentLibrary()
         await session.signOut()
         check(session.recentLibrary == nil && !session.recentLibraryCurrent
               && session.currentCredentialState == .signedOut,
               "Sign-out clears personal history and does not reload it")
         check(await session.disconnect(), "Neutral history owner closes")
+
+        let uncertain = LiveSession(configuration: configuration("recentstatusslow"))
+        await uncertain.connect()
+        await uncertain.refreshAccount()
+        await uncertain.refreshRecentLibrary()
+        let statusRead = Task { await uncertain.refreshAccount() }
+        let statusDeadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while try trace("recentstatusslow").filter({ $0 == "auth.status" }).count < 2 {
+            guard ContinuousClock.now < statusDeadline else { throw ManagementError.requestTimedOut }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        check(uncertain.recentLibrary == nil && !uncertain.recentLibraryCurrent
+              && uncertain.accountStatusChecking && uncertain.accountBusy,
+              "Identity-unbound history disappears before a new foreground saved-status read returns")
+        await statusRead.value
+        check(try trace("recentstatusslow").filter { $0 == "library.recent" }.count == 1
+              && uncertain.recentLibrary == nil,
+              "Credential-present status never silently rereads or rebinds earlier personal history")
+        check(await uncertain.disconnect(), "Neutral foreground privacy-check owner closes")
 
         for scenario in ["recentstale", "recentprofilechanged", "recentzero"] {
             let value = LiveSession(configuration: configuration(scenario))
