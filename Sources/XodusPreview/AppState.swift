@@ -8,6 +8,10 @@ enum Destination: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum LiveLibraryScope {
+    case games, recentActivity
+}
+
 #if !XODUS_SHIPPING
 enum BrowseCategory: String, CaseIterable, Identifiable {
     case all = "All worlds", adventure = "Quiet adventures", space = "Space", puzzles = "Puzzles"
@@ -52,6 +56,11 @@ final class AppState: ObservableObject {
     @Published var showingAccount = false
     @Published var destination: Destination = .library
     @Published var query = ""
+    @Published private(set) var liveLibraryScope: LiveLibraryScope = .games
+
+    var showsRecentActivity: Bool {
+        destination == .library && liveLibraryScope == .recentActivity
+    }
 
     var navigationSelection: Binding<Destination> {
         Binding(get: { self.destination }, set: { self.navigate($0) })
@@ -60,11 +69,22 @@ final class AppState: ObservableObject {
     func navigate(_ value: Destination) {
         destination = value
         query = ""
+        liveLibraryScope = .games
 #if !XODUS_SHIPPING
         accessFilter = nil
         sortByTitle = false
         category = .all
 #endif
+    }
+
+    func openRecentActivity() {
+        navigate(.library)
+        liveLibraryScope = .recentActivity
+    }
+
+    func loadRecentActivityIfVisible(session: LiveSession) async {
+        guard showsRecentActivity else { return }
+        await session.loadRecentLibraryOnEntry()
     }
 
     func findInStore(_ titleName: String, session: LiveSession) {

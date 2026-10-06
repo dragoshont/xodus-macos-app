@@ -64,6 +64,30 @@ engine or making any management, credential, provider or artwork request.
 
 ## Artwork and recently played source slice
 
+### Current Library semantic correction
+
+The main PC Library no longer presents real TitleHub play history as owned
+games or a featured Library title. Its concise unavailable state explains that
+PC ownership cannot yet be verified, with native Browse games and Recent
+activity actions. The separate activity scope identifies cross-platform
+history prominently and has no owned-looking hero; reported PC/mixed tags do
+not establish Xbox PC Store applicability or entitlement. Console-only history
+can appear only in activity, never main PC Library.
+
+Main Library entry issues no saved-status or history read. Explicit activity
+entry owns the existing bounded deduplicated loader; returning or rebuilding
+reuses its already consumed connection attempt and retained memory. Search is
+disabled in main Library and limited to loaded history in activity. Account
+checks and connection retirement retain their existing clearing/fencing
+behavior. Find in Store remains a user-directed name query with explicit
+catalog candidate selection, never a history-to-product mapping.
+
+This correction is source-qualified separately before any admitted replacement.
+The shipping observations below remain historical evidence for the prior
+presentation, not authoritative owned-PC inventory. The frozen development-only
+registry/plan codecs do not change production resources or enable these missing
+capabilities.
+
 The current source pairs with producer
 `c1073100ce8936a751b962b1401ddb641c8be38a`, tree
 `7a808c0e6a8a909455d07eb463379ab55bdf138c`. Its exact generated management

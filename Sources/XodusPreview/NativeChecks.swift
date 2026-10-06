@@ -519,7 +519,7 @@ enum NativeChecks {
                 throw ManagementError.invalidPayload
             }
             check(edition.installation.kind == "notInstalled"
-                  && publicCatalog.libraryTitle == "Your Library isn't available yet"
+                  && publicCatalog.libraryTitle == "Your PC library isn't available yet"
                   && publicCatalog.installedSnapshot?.installations.isEmpty == true,
                   "Catalog notInstalled and a constant-empty response never become a Mac inventory claim")
             check(publicCatalog.productSummary(product) ==
@@ -531,14 +531,14 @@ enum NativeChecks {
             let localEmpty = session("registryempty")
             await localEmpty.connect()
             check(localEmpty.installedSnapshot?.installations.isEmpty == true
-                  && localEmpty.libraryTitle == "Your Library isn't available yet"
-                  && localEmpty.libraryMessage == "Your game library isn't available yet.",
+                  && localEmpty.libraryTitle == "Your PC library isn't available yet"
+                  && localEmpty.libraryMessage == "Xodus can't yet verify which PC games you own.",
                   "A constant-empty registry response never advertises an implemented registry or an empty Mac")
             await localEmpty.disconnect()
             let localUnavailable = session("registryunavailable")
             await localUnavailable.connect()
             check(localUnavailable.installedSnapshot == nil && localUnavailable.installedError != nil
-                  && localUnavailable.libraryTitle == "Your Library isn't available yet",
+                  && localUnavailable.libraryTitle == "Your PC library isn't available yet",
                   "An unavailable registry response never changes the real unsupported-library boundary")
             await localUnavailable.disconnect()
 
@@ -585,7 +585,7 @@ enum NativeChecks {
             await visibleFailures.refreshInstalled()
             check(visibleFailures.installedSnapshot == previousSnapshot && !visibleFailures.installedSnapshotCurrent
                   && visibleFailures.installedError != nil
-                  && visibleFailures.libraryTitle == "Your Library isn't available yet",
+                  && visibleFailures.libraryTitle == "Your PC library isn't available yet",
                   "Failed registry refresh retains a stale wire snapshot without claiming installation or a populated registry")
             check(try trace(failureConfiguration).filter { $0.hasPrefix("auth.") } ==
                   ["auth.status", "auth.status", "auth.status", "auth.logout", "auth.status"],

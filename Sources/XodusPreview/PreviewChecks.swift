@@ -16,7 +16,8 @@ enum PreviewChecks {
         }
 
         let state = AppState()
-        check(state.destination == .library, "Live startup opens Library without claiming owned inventory")
+        check(state.destination == .library && !state.showsRecentActivity,
+              "Live startup opens the PC Library without claiming ownership or selecting activity")
         state.navigate(.library)
         check(ArtAssets.images.count == 6, "Six original fixture image resources load")
         check(state.visibleGames.count == 4, "Library excludes catalog-only and unknown-access fixtures")

@@ -959,10 +959,16 @@ enum MockBackend {
                                 ])
                                 try emit(.object(response))
                             } else {
-                                guard let page = frames.first(where: {
+                                guard var page = frames.first(where: {
                                     $0["data"]?["scope"]?.string == "recentlyPlayed"
                                         && $0["data"]?["titles"]?.array?.isEmpty == ["recentzero", "recentbootstrapzero"].contains(scenario)
                                 })?["data"] else { exit(3) }
+                                if scenario.hasPrefix("recentsemantics"),
+                                   var data = page.object, var title = data["titles"]?.array?.first?.object {
+                                    title["platform"] = .string(String(scenario.dropFirst("recentsemantics".count)))
+                                    data["titles"] = .array([.object(title)])
+                                    page = .object(data)
+                                }
                                 let response = result(request, data: page)
                                 if ["recentslow", "recentbootstrapretire"].contains(scenario) {
                                     DispatchQueue.global().async {

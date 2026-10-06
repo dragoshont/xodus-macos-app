@@ -26,10 +26,10 @@ struct LiveRootView: View {
     }
     private var searchEnabled: Bool {
         state.destination == .discover
-            || (state.destination == .library && session.recentLibrary != nil)
+            || (state.showsRecentActivity && session.recentLibrary != nil)
     }
     private var searchPlaceholder: String {
-        state.destination == .library ? "Search recently played"
+        state.destination == .library ? (state.showsRecentActivity ? "Search recent activity" : "Search Library")
             : state.destination == .downloads ? "Search Library or Discover"
             : session.supports(.query) ? "Search Microsoft Store games" : "Search checked catalog"
     }
@@ -63,9 +63,9 @@ struct LiveRootView: View {
             if startupAllowed, session.phase == .disconnected, !session.connectionTransitioning,
                !session.backendPath.isEmpty { await session.connect() }
         }
-        .task(id: "\(state.destination.rawValue):\(scenePhase == .active):\(session.isReady):\(session.connectionTransitioning):\(session.accountBusy)") {
-            guard startupAllowed, scenePhase == .active, state.destination == .library else { return }
-            await session.loadRecentLibraryOnEntry()
+        .task(id: "\(state.destination.rawValue):\(state.showsRecentActivity):\(scenePhase == .active):\(session.isReady):\(session.connectionTransitioning):\(session.accountBusy)") {
+            guard startupAllowed, scenePhase == .active else { return }
+            await state.loadRecentActivityIfVisible(session: session)
         }
         .task(id: "\(state.destination.rawValue):\(state.query):\(session.market):\(session.language):\(session.isReady)") {
             guard startupAllowed, state.destination == .discover else { return }
@@ -88,41 +88,39 @@ struct LiveRootView: View {
 
     private var library: some View {
         VStack(alignment: .leading, spacing: 20) {
-            if session.isReady, session.supports(.libraryRecent) {
+            if state.showsRecentActivity {
+                Button("Back to Library", systemImage: "chevron.left") { state.navigate(.library) }
+                    .accessibilityIdentifier("xodus.library.back")
                 LiveRecentLibraryView(query: scopedQuery,
                                       openAccount: { state.showingAccount = true },
                                       findInStore: { state.findInStore($0, session: session) })
+                    .accessibilityIdentifier("xodus.library.recentActivity")
             } else {
                 ContentUnavailableView {
-                    Label(session.isReady ? "Your games" : session.libraryTitle,
-                          systemImage: session.isReady ? "gamecontroller" : "cable.connector")
+                    Label(session.libraryTitle, systemImage: "gamecontroller")
                 } description: {
                     Text(session.libraryMessage).frame(maxWidth: 520)
                 } actions: {
-                    if !session.isReady {
-                        Button("Settings", action: openSettings.callAsFunction)
-                        if !session.backendPath.isEmpty {
-                            Button("Reconnect") { Task { await session.connect() } }
-                                .disabled(session.connectionTransitioning)
-                        }
-                    } else {
-                        GlassAction(title: "Browse games") { state.navigate(.discover) }
-                            .disabled(!session.supports(.search) && !session.supports(.discover) && !session.supports(.query))
-                    }
+                    GlassAction(title: "Browse games") { state.navigate(.discover) }
+                    Button("Recent activity") { state.openRecentActivity() }
+                        .accessibilityIdentifier("xodus.library.openRecentActivity")
                 }
                 .frame(maxWidth: .infinity, minHeight: 220)
+                .accessibilityIdentifier("xodus.library.unavailable")
             }
-            DisclosureGroup("Library details") {
-                VStack(alignment: .leading, spacing: 18) {
-                    selectedFolderInspection
-                    Divider()
-                    Text(session.accountLibraryExplanation).foregroundStyle(.secondary)
-                    Text("Owned-game listing and a durable installed-game registry aren't implemented. The engine's empty registry response isn't a check of your Mac or evidence that no games are installed.")
-                    Text("The selected-folder check only reads an Xodus marker. It doesn't scan your Mac, register a game, verify its files, establish ownership, download or enable play.")
+            if !state.showsRecentActivity {
+                DisclosureGroup("Library details") {
+                    VStack(alignment: .leading, spacing: 18) {
+                        selectedFolderInspection
+                        Divider()
+                        Text(session.accountLibraryExplanation).foregroundStyle(.secondary)
+                        Text("Owned-game listing and a durable installed-game registry aren't implemented. The engine's empty registry response isn't a check of your Mac or evidence that no games are installed.")
+                        Text("The selected-folder check only reads an Xodus marker. It doesn't scan your Mac, register a game, verify its files, establish ownership, download or enable play.")
+                    }
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 12)
                 }
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 12)
             }
         }
     }

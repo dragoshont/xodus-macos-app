@@ -203,6 +203,26 @@ enum NativeUIChecks {
               "Lean Account and live-data layouts create no window or credential request")
     }
 
+    static func checkMainLibraryWithHistory(session: LiveSession, check: (Bool, String) -> Void) {
+        let windows = NSApplication.shared.windows.count
+        let state = AppState()
+        for size in [CGSize(width: 820, height: 600), CGSize(width: 1200, height: 860)] {
+            let host = NSHostingView(rootView: LiveRootView(allowsStartupTasks: false)
+                .environmentObject(state).environmentObject(session))
+            host.sizingOptions = []
+            host.frame = CGRect(origin: .zero, size: size)
+            host.layoutSubtreeIfNeeded()
+            let scrollViews = descendants(of: host).compactMap { $0 as? NSScrollView }
+            check(host.window == nil && host.bounds.size == size && !state.showsRecentActivity
+                  && !scrollViews.isEmpty && scrollViews.allSatisfy {
+                      !$0.hasHorizontalScroller && ($0.documentView?.bounds.width ?? 0) <= size.width + 1
+                  },
+                  "Main Library stays unavailable and fits native viewports even when history exists in memory")
+        }
+        check(NSApplication.shared.windows.count == windows && !session.accountBusy,
+              "Retained-history Library layout checks show no window and start no activity load")
+    }
+
     private static func ancestors(of view: NSView) -> [NSView] {
         guard let parent = view.superview else { return [] }
         return [parent] + ancestors(of: parent)

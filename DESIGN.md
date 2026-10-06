@@ -25,14 +25,33 @@ visually confirmed.
 
 ## Actual native implementation
 
-**Lean live-data slice:** live startup opens Discover while owned-library
-enumeration is unavailable; the original fixture still starts in Library.
+**User-directed Library semantic correction (current source):** Library is the
+default, but its owned-PC surface remains unavailable. It uses one stock native
+empty state, “Your PC library isn't available yet” / “Xodus can't yet verify
+which PC games you own,” with real Browse games and Recent activity routes.
+No TitleHub image feature, game count, owned shelf or fake install/play action
+appears here. The Figma Library's purchased/subscription fixture shelf and Apple
+Games Continue Playing composition require matching access/installation
+evidence; play history cannot fill them.
+
+Recent activity is a separate explicit content scope within Library, with a
+native Back to Library action and prominent cross-platform/not-owned-PC copy.
+It retains the existing accepted square artwork grid, title-name Store action,
+reported-platform filter and account fences, but has no featured history hero.
+All history platforms, including PC/mixed, remain outside main PC Library until
+ownership and PC Store applicability are independently evidenced. Console-only
+activity is shown only here. Search is disabled in main Library and scoped to
+the loaded activity window here; it never establishes ownership or Store
+mapping. Main Library entry makes no saved-status/history request. Explicit
+activity entry reuses the existing bounded deduplicated loader and retained
+memory. This source correction is not yet a deployed/visually confirmed pairing.
+
+**Lean live-data slice:** owned-library enumeration remains unavailable.
 The existing native toolbar, deployment target and repository tokens are
 unchanged. Discover shows scoped public products and search as artwork-led Store
 cards; catalog/access provenance stays in contextual info rather than repeated
-ownership caveats. Library has a separate "Your games" / "Recently played" scope:
-one explicit read of actual TitleHub history, a first-title image feature only
-when that title supplies accepted art, and an adaptive native tile grid.
+ownership caveats. The separate Recent activity scope uses one explicit read
+of actual TitleHub history and an adaptive native tile grid.
 Reported PC/console/mixed/unknown platform tags and a native platform filter do
 not establish Mac compatibility. Search in this scope filters only the loaded
 history window. History has no Store mapping, entitlement or installation
@@ -63,7 +82,7 @@ unchanged. No Home shelves, invented installed games, new framework or
 speculative navigation API is introduced.
 
 **Recent-title Store action:** a stock bordered "Find in Store" button accompanies
-the existing featured title and tile entries without changing artwork geometry
+the activity tile entries without changing their artwork geometry
 or tokens. The button has native keyboard focus/activation and a title-specific
 VoiceOver label; containing accessibility groups keep the action independently
 reachable. Only this explicit action routes the title name into the existing

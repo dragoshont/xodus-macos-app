@@ -23,8 +23,20 @@ final class ShippingChecks: XCTestCase {
         let session = LiveSession()
         let injected = LiveSession(configuration: BackendConfiguration(executable: URL(fileURLWithPath: "/invalid/injected"),
                                                                         stateDirectory: URL(fileURLWithPath: "/invalid/state")))
-        check(state.destination == .library && state.query.isEmpty && !state.showingAccount,
-              "Shipping navigation starts in Library without fixture state")
+        check(state.destination == .library && state.query.isEmpty && !state.showingAccount
+              && state.liveLibraryScope == .games && !state.showsRecentActivity,
+              "Shipping navigation starts in the unavailable PC Library, not activity or fixture state")
+        await state.loadRecentActivityIfVisible(session: session)
+        check(session.recentLibrary == nil && !session.recentLibraryBootstrapRunning
+              && session.authentication == nil && session.libraryTitle == "Your PC library isn't available yet"
+              && session.libraryMessage == "Xodus can't yet verify which PC games you own.",
+              "Shipping main Library cannot initiate saved-status or history loading")
+        state.openRecentActivity()
+        check(state.showsRecentActivity && state.query.isEmpty,
+              "Shipping recent activity is an explicitly selected separate Library scope")
+        state.navigate(.library)
+        check(!state.showsRecentActivity && state.liveLibraryScope == .games,
+              "Shipping toolbar Library returns to PC Library, not implicit personal activity")
         check(state.runtimeSettings.configuration == nil && state.runtimeSettings.crossOverDependency == .notChecked,
               "Shipping dependency starts unchecked, without an invented CrossOver installation")
         let official = CrossOverDependencyState.installed(.init(

@@ -216,12 +216,10 @@ final class LiveSession: ObservableObject {
         }
     }
     var libraryTitle: String {
-        guard isReady else { return phase == .connecting ? "Connecting" : "Xodus couldn't connect" }
-        return "Your Library isn't available yet"
+        "Your PC library isn't available yet"
     }
     var libraryMessage: String {
-        guard isReady else { return "You can reconnect in Settings." }
-        return "Your game library isn't available yet."
+        "Xodus can't yet verify which PC games you own."
     }
     var canRefreshRecentLibrary: Bool {
         recentLibraryReadAllowed && !recentLibraryBootstrapRunning
@@ -690,7 +688,7 @@ final class LiveSession: ObservableObject {
                     await self.connectionFailed(error)
                 }
             }
-            // Connection setup stays anonymous; foreground Library entry owns its separate saved-status read.
+            // Connection setup stays anonymous; explicit Recent activity entry owns its saved-status read.
             await refreshInstalled()
             guard token == generation, revision == lifecycleRevision, client === connection else { return }
             if queryGeneration == startupQueryRevision { await search("") }

@@ -10,16 +10,23 @@ entrypoints. Shipping screens use native setup/empty/loading/error states and
 actual public product data, not synthetic game illustrations. See
 [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
-Live startup opens Library. Foreground entry performs one saved-sign-in check
-only if access is unconfirmed, then one bounded recently-played read after a
-current credential-present result. View rebuilds and navigation do not repeat
-the attempt; failures require an explicit retry, and no login starts automatically.
-Discover remains available for real public results and scoped search.
-This source adds metadata-backed Store cover/hero images and a separate
-**Recently played** Library window. Personal history is not owned-game inventory,
-installation or PC/Mac compatibility. Its reported-platform filter and scoped
-search apply only to that partial in-memory window. No personal history is
-persisted, and no title-to-Store mapping is guessed. The earlier controlled
+**Current source correction:** startup opens an unavailable **PC Library**:
+Xodus cannot yet verify which PC games you own. It does not display TitleHub
+history as your games, a featured owned title or a PC Store shelf, and entering
+main Library makes no saved-status or history request. **Browse games** opens
+Discover; **Recent activity** explicitly opens a separate in-Library scope.
+That scope prominently identifies cross-platform play history, not your owned
+PC library. Even a reported PC/mixed tag does not establish Store availability
+or entitlement; console history appears only in activity. Activity search and
+the reported-platform filter apply only to its loaded partial window.
+
+Explicit activity entry uses the existing bounded saved-status-then-history
+loader: fresh credential-present status is reused, ordinary view rebuilds and
+return visits do not poll, and failures require manual retry. No automatic
+login, persisted history or title-to-Store mapping is introduced. This semantic
+correction is source work, not yet an admitted installed replacement. The
+historical deployment evidence below describes the earlier presentation.
+The earlier controlled
 113be57/c1073100 pair was admitted and installed: one foreground check confirmed
 saved sign-in, and one actual TitleHub read returned a partial 20-title window
 with 20 available artwork entries and none rejected. All 20 preload references

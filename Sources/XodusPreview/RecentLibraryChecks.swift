@@ -64,6 +64,59 @@ enum RecentLibraryChecks {
                 try await Task.sleep(for: .milliseconds(10))
             }
         }
+        for platform in ["pc", "console", "mixed", "unknown"] {
+            let scenario = "recentsemantics\(platform)"
+            let value = LiveSession(configuration: configuration(scenario))
+            let state = AppState()
+            await value.connect()
+            let connected = try trace(scenario)
+            await state.loadRecentActivityIfVisible(session: value)
+            check(try trace(scenario) == connected && value.authentication == nil
+                  && value.recentLibrary == nil && !state.showsRecentActivity,
+                  "Main PC Library does not check saved sign-in or collect TitleHub history")
+            state.query = "old Library search"
+            state.openRecentActivity()
+            check(state.showsRecentActivity && state.destination == .library && state.query.isEmpty,
+                  "Recent activity is an explicit separate scope, not an owned-game shelf")
+            await state.loadRecentActivityIfVisible(session: value)
+            guard let history = value.recentLibrary, let title = history.titles.first else {
+                throw ManagementError.invalidPayload
+            }
+            let loaded = try trace(scenario)
+            check(title.platform.rawValue == platform && title.productID == nil
+                  && value.libraryTitle == "Your PC library isn't available yet"
+                  && value.libraryMessage == "Xodus can't yet verify which PC games you own.",
+                  "Every reported activity platform, including PC, leaves owned-PC inventory unavailable")
+            check(loaded.filter { $0 == "auth.status" }.count == 1
+                  && loaded.filter { $0 == "library.recent" }.count == 1,
+                  "Explicit activity entry performs only the existing saved-status then bounded history read")
+            NativeUIChecks.checkMainLibraryWithHistory(session: value, check: check)
+            await state.loadRecentActivityIfVisible(session: value)
+            state.navigate(.library)
+            await state.loadRecentActivityIfVisible(session: value)
+            check(try !state.showsRecentActivity && state.query.isEmpty
+                  && value.recentLibrary == history && trace(scenario) == loaded,
+                  "Back to main Library hides all activity without clearing it or making another request")
+            state.openRecentActivity()
+            await state.loadRecentActivityIfVisible(session: value)
+            check(try trace(scenario) == loaded && value.recentLibrary == history,
+                  "Activity rebuild and return reuse retained history without polling")
+            state.query = title.name
+            state.findInStore(title.name, session: value)
+            await state.loadRecentActivityIfVisible(session: value)
+            check(try state.destination == .discover && !state.showsRecentActivity
+                  && state.query == title.name && value.selectedProduct == nil && trace(scenario) == loaded,
+                  "Explicit activity Store action remains only navigation until user-directed catalog searching")
+            for destination in Destination.allCases {
+                state.openRecentActivity()
+                state.query = "previous activity filter"
+                state.navigate(destination)
+                await state.loadRecentActivityIfVisible(session: value)
+                check(try !state.showsRecentActivity && state.query.isEmpty && trace(scenario) == loaded,
+                      "Toolbar navigation clears activity scope and search without granting Store or ownership evidence")
+            }
+            check(await value.disconnect(), "Neutral Library-semantics owner closes")
+        }
         for scenario in ["recentstorecandidates", "recentstoreempty", "recentstorefailure"] {
             let value = LiveSession(configuration: configuration(scenario))
             await value.connect()
@@ -99,8 +152,8 @@ enum RecentLibraryChecks {
                 check(value.selectedProduct == nil && state.query == title.name,
                       "Another explicit title-name route dismisses stale product selection")
                 state.navigate(.library)
-                check(state.query.isEmpty && value.recentLibrary == history,
-                      "Returning to Library restores its scoped search without clearing or rereading activity")
+                check(state.query.isEmpty && !state.showsRecentActivity && value.recentLibrary == history,
+                      "Returning to Library hides retained activity without clearing or rereading it")
             } else if scenario == "recentstoreempty" {
                 check(value.products.isEmpty && value.catalogError == nil && value.discoveryFailures.isEmpty
                       && value.catalogEmptyTitle == "No Store matches" && value.selectedProduct == nil,
@@ -114,8 +167,10 @@ enum RecentLibraryChecks {
         }
 
         let bootstrap = LiveSession(configuration: configuration("recentbootstrapstatusslow"))
+        let activityState = AppState()
+        activityState.openRecentActivity()
         await bootstrap.connect()
-        let entering = Task { await bootstrap.loadRecentLibraryOnEntry() }
+        let entering = Task { await activityState.loadRecentActivityIfVisible(session: bootstrap) }
         let bootstrapDeadline = ContinuousClock.now.advanced(by: .seconds(5))
         while try trace("recentbootstrapstatusslow").filter({ $0 == "auth.status" }).isEmpty {
             guard ContinuousClock.now < bootstrapDeadline else { throw ManagementError.requestTimedOut }
@@ -124,8 +179,8 @@ enum RecentLibraryChecks {
         check(bootstrap.recentLibraryBootstrapRunning && bootstrap.accountBusy
               && bootstrap.accountStatusChecking && !bootstrap.canLoadRecentLibrary
               && bootstrap.recentLibraryLoadingTitle == "Checking saved sign-in",
-              "Library bootstrap exposes the actual pending saved-status stage and leases account actions")
-        let rebuilt = Task { await bootstrap.loadRecentLibraryOnEntry() }
+              "Explicit recent-activity loading exposes pending saved-status and leases account actions")
+        let rebuilt = Task { await activityState.loadRecentActivityIfVisible(session: bootstrap) }
         entering.cancel()
         await bootstrap.refreshAccount()
         await rebuilt.value
@@ -135,15 +190,15 @@ enum RecentLibraryChecks {
               && bootstrapTrace.filter { $0 == "library.recent" }.count == 1
               && bootstrapTrace.firstIndex(of: "auth.status")! < bootstrapTrace.firstIndex(of: "library.recent")!
               && !bootstrapTrace.contains("auth.begin"),
-              "One owned Library load survives view cancellation and orders status before one history read")
+              "One explicit activity load survives view cancellation and orders status before one history read")
         check(bootstrap.recentLibraryCurrent && bootstrap.recentLibrary?.titles.count == 1
               && !bootstrap.recentLibraryBootstrapRunning && !bootstrap.accountBusy,
               "The same live session retains its published real-shaped list after bootstrap")
-        await bootstrap.loadRecentLibraryOnEntry()
+        await activityState.loadRecentActivityIfVisible(session: bootstrap)
         check(try trace("recentbootstrapstatusslow") == bootstrapTrace,
-              "View rebuild and repeated Library entry never poll a completed automatic load")
+              "View rebuild and repeated activity entry never poll a completed scoped load")
         await bootstrap.refreshAccount()
-        await bootstrap.loadRecentLibraryOnEntry()
+        await activityState.loadRecentActivityIfVisible(session: bootstrap)
         check(try bootstrap.recentLibrary == nil
               && trace("recentbootstrapstatusslow").filter { $0 == "library.recent" }.count == 1,
               "An explicit Account check still clears personal history without an automatic reread")

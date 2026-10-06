@@ -24,6 +24,7 @@ struct LiveRecentLibraryView: View {
     let openAccount: () -> Void
     let findInStore: (String) -> Void
     @EnvironmentObject private var session: LiveSession
+    @Environment(\.openSettings) private var openSettings
     @StateObject private var selection = RecentLibrarySelection()
 
     private var titles: [RecentLibraryTitle] {
@@ -36,15 +37,17 @@ struct LiveRecentLibraryView: View {
         VStack(alignment: .leading, spacing: 24) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Your games").font(.largeTitle.bold())
-                    Text("Recently played").foregroundStyle(.secondary)
+                    Text("Recent activity").font(.largeTitle.bold())
+                    Text("Played across Xbox and PC. Not your owned PC library.")
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
                 if session.recentLibraryLoading || session.recentLibraryBootstrapRunning {
                     ProgressView().controlSize(.small)
                 }
                 if session.recentLibrary != nil {
-                    Picker("Platform", selection: $selection.platform) {
+                    Picker("Reported platform", selection: $selection.platform) {
                         ForEach(RecentPlatformFilter.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.menu).fixedSize()
@@ -69,11 +72,6 @@ struct LiveRecentLibraryView: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 220)
                 } else {
-                    if query.isEmpty, selection.platform == .all, let first = snapshot.titles.first,
-                       let artwork = CatalogArtworkReference.preferred(
-                        in: first.artwork, roles: [.tile, .hero, .boxArt, .poster]) {
-                        featured(first, artwork: artwork)
-                    }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 170, maximum: 230), spacing: 24)],
                               alignment: .leading, spacing: 28) {
                         ForEach(titles) { title in
@@ -85,7 +83,7 @@ struct LiveRecentLibraryView: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 10))
                                 Text(title.name).font(.headline).lineLimit(2)
                                     .frame(minHeight: 40, alignment: .topLeading)
-                                Text(title.platform.label).font(.caption).foregroundStyle(.secondary)
+                                Text("Reported: \(title.platform.label)").font(.caption).foregroundStyle(.secondary)
                                 storeAction(for: title)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -111,11 +109,15 @@ struct LiveRecentLibraryView: View {
                 .frame(maxWidth: .infinity, minHeight: 220)
             } else {
                 ContentUnavailableView {
-                    Label("Recently played games", systemImage: "gamecontroller")
+                    Label("Recent activity", systemImage: "clock")
                 } description: {
-                    Text(session.recentLibraryMessage)
+                    Text(!session.isReady ? "Connect in Settings to load recent activity."
+                         : !session.supports(.libraryRecent) ? "This engine doesn't provide recent activity."
+                         : session.recentLibraryMessage)
                 } actions: {
-                    if session.canLoadRecentLibrary {
+                    if !session.isReady || !session.supports(.libraryRecent) {
+                        Button("Settings", action: openSettings.callAsFunction)
+                    } else if session.canLoadRecentLibrary {
                         Button(session.accountError != nil || session.recentLibraryError != nil ? "Try again" : "Load recently played") {
                             Task { await session.reloadRecentLibrary() }
                         }
@@ -125,36 +127,6 @@ struct LiveRecentLibraryView: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 220)
             }
-        }
-    }
-
-    private func featured(_ title: RecentLibraryTitle, artwork: CatalogArtworkReference) -> some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 28) {
-                CatalogArtworkView(reference: artwork, status: title.artworkStatus, contentMode: .fit)
-                    .frame(width: 280, height: 280)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                featuredText(title).frame(minWidth: 240, maxWidth: .infinity, alignment: .leading)
-            }
-            VStack(alignment: .leading, spacing: 18) {
-                CatalogArtworkView(reference: artwork, status: title.artworkStatus, contentMode: .fit)
-                    .frame(height: 220)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                featuredText(title)
-            }
-        }
-        .accessibilityElement(children: .contain)
-    }
-
-    private func featuredText(_ title: RecentLibraryTitle) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title.name).font(.system(size: 32, weight: .bold)).fixedSize(horizontal: false, vertical: true)
-            Text(title.platform.label).foregroundStyle(.secondary)
-            if let stamp = title.lastPlayedAt, let date = Self.playedDate(stamp) {
-                Text("Last played \(date.formatted(date: .abbreviated, time: .omitted))")
-                    .font(.callout).foregroundStyle(.secondary)
-            }
-            storeAction(for: title)
         }
     }
 
@@ -168,11 +140,4 @@ struct LiveRecentLibraryView: View {
             .accessibilityIdentifier("xodus.library.findInStore")
     }
 
-    private static func playedDate(_ value: String) -> Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: value) { return date }
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: value)
-    }
 }
