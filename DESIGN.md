@@ -44,7 +44,11 @@ activity is shown only here. Search is disabled in main Library and scoped to
 the loaded activity window here; it never establishes ownership or Store
 mapping. Main Library entry makes no saved-status/history request. Explicit
 activity entry reuses the existing bounded deduplicated loader and retained
-memory. This source correction is not yet a deployed/visually confirmed pairing.
+memory. This correction is independently admitted and installed at consumer
+`2d741a7` with the unchanged signed c107 engine. Normal-startup ownership and
+installed bytes were confirmed without invoking activity, Account or Store.
+The retained native composition has not been visually captured in this pairing;
+source/layout checks are not compositor or VoiceOver certification.
 
 **Lean live-data slice:** owned-library enumeration remains unavailable.
 The existing native toolbar, deployment target and repository tokens are

@@ -82,8 +82,32 @@ checks and connection retirement retain their existing clearing/fencing
 behavior. Find in Store remains a user-directed name query with explicit
 catalog candidate selection, never a history-to-product mapping.
 
-This correction is source-qualified separately before any admitted replacement.
-The shipping observations below remain historical evidence for the prior
+Consumer `2d741a745217f52330ad79208eb2e8374a708a0d`, tree
+`8f529988df80d2005371216cabf940453106cefc`, passed 481 native session and 75
+presentation checks with outbound networking denied, plus 28 portable checks.
+Exact-source CI
+[37522058333](https://github.com/dragoshont/xodus-macos-app/actions/runs/37522058333)
+completed successfully, including shipping checks. Root independently reviewed
+the semantic change and admitted all 21 package files, fixed app/CLI/helper
+signatures and sealed producer bindings. Receipt SHA256 is
+`60a9ca141a13f8ae2115095d42f2cc6fa07b0d02df7aed17bcc8cac22686f767`
+(13,163 bytes). The signed c107 CLI is unchanged byte-for-byte at
+`c8fe69a3bc2b6a84c5bad5ef0c1ae041f36466a87419c0f17d9567c6df3ed14d`,
+reused from the admitted 0a package rather than rebuilt or re-signed.
+
+Installation on 2026-10-06 used successful normal Quit and atomic replacement,
+preserving the entire working 0a bundle, previous rollbacks, profile and saved
+credentials. One ordinary startup left the same shipping process running in
+main Library. All installed files/signatures matched admission, with one
+parent-owned matching engine and no helper. No Recent activity, Account or
+Store action, personal/history read, exporter, image request or screenshot was
+initiated for proof. A bounded existing-log observation found zero recent-list
+publication and zero image-decode events for that exact app process. Event
+absence is neither an API trace nor visual evidence; existing anonymous startup
+catalog search is unchanged. Source and neutral checks, not absent logs,
+establish that main Library does not consume history or initiate its loader.
+
+Earlier shipping observations below remain historical evidence for the prior
 presentation, not authoritative owned-PC inventory. The frozen development-only
 registry/plan codecs do not change production resources or enable these missing
 capabilities.

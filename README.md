@@ -10,7 +10,7 @@ entrypoints. Shipping screens use native setup/empty/loading/error states and
 actual public product data, not synthetic game illustrations. See
 [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
-**Current source correction:** startup opens an unavailable **PC Library**:
+**Current admitted shipping correction:** startup opens an unavailable **PC Library**:
 Xodus cannot yet verify which PC games you own. It does not display TitleHub
 history as your games, a featured owned title or a PC Store shelf, and entering
 main Library makes no saved-status or history request. **Browse games** opens
@@ -23,9 +23,17 @@ the reported-platform filter apply only to its loaded partial window.
 Explicit activity entry uses the existing bounded saved-status-then-history
 loader: fresh credential-present status is reused, ordinary view rebuilds and
 return visits do not poll, and failures require manual retry. No automatic
-login, persisted history or title-to-Store mapping is introduced. This semantic
-correction is source work, not yet an admitted installed replacement. The
-historical deployment evidence below describes the earlier presentation.
+login, persisted history or title-to-Store mapping is introduced. Consumer
+`2d741a7` passed exact-source CI and independent source/package admission and was
+installed with the unchanged signed c107 engine. One ordinary startup left the
+same corrected shipping process running in main Library. All 21 installed files
+and its single parent-owned engine matched admission; no helper was running.
+No activity, Account or Store action was invoked for proof. Bounded aggregate
+observation found no recent-list publication or image-decode events; this is
+not API-trace or visual evidence, and anonymous startup catalog search remains
+unchanged. Source and neutral checks establish the main-Library data boundary.
+Normal Quit preserved the complete working 0a bundle, older rollbacks and profile.
+The historical deployment evidence below describes the earlier presentation.
 The earlier controlled
 113be57/c1073100 pair was admitted and installed: one foreground check confirmed
 saved sign-in, and one actual TitleHub read returned a partial 20-title window
@@ -38,7 +46,7 @@ Own-view evidence is not compositor or accessibility certification. The
 reopened shipping app had a separate session: the export did not persist or
 inject history. That historical export is not proof of the new startup flow.
 
-The current **0a6dca1/c1073100 shipping pair is admitted and installed**. Its
+The prior **0a6dca1/c1073100 shipping pair was admitted and installed**. Its
 ordinary foreground startup published one real 20-title recently-played window,
 and the same shipping process decoded 12 actual artwork images successfully.
 That populated app was left running, with one matching engine and no sign-in
