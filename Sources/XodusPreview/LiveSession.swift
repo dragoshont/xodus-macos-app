@@ -23,6 +23,10 @@ final class LiveSession: ObservableObject {
     @Published private(set) var accountStatusCurrent = false
     @Published private(set) var accountError: String?
     @Published private(set) var accountStatusError: ManagementError?
+    @Published private(set) var recentLibrary: RecentLibrarySnapshot?
+    @Published private(set) var recentLibraryCurrent = false
+    @Published private(set) var recentLibraryLoading = false
+    @Published private(set) var recentLibraryError: String?
     @Published private(set) var lastSignInFailure: SignInFailureSnapshot?
     @Published private(set) var activityError: String?
     @Published private(set) var lookupBusy = false
@@ -61,6 +65,7 @@ final class LiveSession: ObservableObject {
     private var generation = 0
     private var queryGeneration = 0
     private var authenticationGeneration = 0
+    private var recentLibraryGeneration = 0
     private var currentQuery = ""
     private var cacheRevision: UInt64?
     private var discoveryRevision: String?
@@ -191,7 +196,9 @@ final class LiveSession: ObservableObject {
         }
         if authentication?.flow?.state == .cancelled { return "You can sign in whenever you're ready." }
         switch currentCredentialState {
-        case .credentialPresent: return "Your game library isn't available yet."
+        case .credentialPresent: return supports(.libraryRecent)
+            ? "Your saved sign-in is available."
+            : "Your game library isn't available yet."
         case .expired, .invalid: return "Disconnect this sign-in, then sign in again."
         case .signedOut: return "Connect your Microsoft account. You can browse games without signing in."
         case nil: return "Check status to see whether you're signed in."
@@ -204,6 +211,73 @@ final class LiveSession: ObservableObject {
     var libraryMessage: String {
         guard isReady else { return "You can reconnect in Settings." }
         return "Your game library isn't available yet."
+    }
+    var canRefreshRecentLibrary: Bool {
+        isReady && supports(.libraryRecent) && accountStatusCurrent
+            && currentCredentialState == .credentialPresent && !signInPending && !accountBusy
+            && !recentLibraryLoading
+    }
+    var recentLibraryNotice: String? {
+        if let error = recentLibraryError {
+            return recentLibrary == nil ? error : error + " Showing previously checked activity."
+        }
+        if recentLibrary != nil, !recentLibraryCurrent {
+            return recentLibraryLoading ? "Showing previously checked activity while updating."
+                : "Previously checked activity. Refresh for the latest result."
+        }
+        return nil
+    }
+
+    func refreshRecentLibrary() async {
+        guard canRefreshRecentLibrary, let client else { return }
+        let token = generation
+        let authToken = authenticationGeneration
+        recentLibraryGeneration += 1
+        let recentToken = recentLibraryGeneration
+        recentLibraryLoading = true
+        recentLibraryCurrent = false
+        recentLibraryError = nil
+        accountBusy = true
+        defer {
+            if token == generation, recentToken == recentLibraryGeneration {
+                recentLibraryLoading = false
+                accountBusy = false
+            }
+        }
+        do {
+            let result = try await client.request(.libraryRecent, params: ["limit": .integer(20)])
+                .decode(RecentLibrarySnapshot.self)
+            guard token == generation, authToken == authenticationGeneration,
+                  recentToken == recentLibraryGeneration else { return }
+            try result.validate(limit: 20)
+            recentLibrary = result
+            recentLibraryCurrent = true
+        } catch {
+            guard token == generation, authToken == authenticationGeneration,
+                  recentToken == recentLibraryGeneration else { return }
+            if case let ManagementError.recentLibraryFailed(stage) = error {
+                switch stage {
+                case .credentialUnavailable, .profileChanged, .authRejected:
+                    recentLibrary = nil
+                    accountStatusCurrent = false
+                    recentLibraryError = "Check Account status before loading recently played games."
+                case .authExchangeFailed:
+                    recentLibraryError = "Microsoft couldn't authorize recent activity. Choose Refresh to try again."
+                case .transportFailed:
+                    recentLibraryError = "Recent activity couldn't connect. Choose Refresh to try again."
+                case .responseInvalid:
+                    recentLibraryError = "Microsoft's recent activity couldn't be read safely. No empty result was assumed."
+                }
+            } else { recentLibraryError = Self.describe(error) }
+        }
+    }
+
+    private func clearRecentLibrary() {
+        recentLibraryGeneration += 1
+        recentLibrary = nil
+        recentLibraryCurrent = false
+        recentLibraryError = nil
+        recentLibraryLoading = false
     }
     var activityNotice: String? {
         guard activityError != nil else { return nil }
@@ -558,6 +632,7 @@ final class LiveSession: ObservableObject {
         generation += 1
         authenticationGeneration += 1
         queryGeneration += 1
+        clearRecentLibrary()
         eventTask?.cancel()
         authTask?.cancel()
         catalogTask?.cancel()
@@ -639,6 +714,7 @@ final class LiveSession: ObservableObject {
     func refreshAccount() async {
         guard isReady, supports(.authStatus), let client, !accountBusy else { return }
         let token = generation
+        recentLibraryCurrent = false
         authenticationGeneration += 1
         let authToken = authenticationGeneration
         do {
@@ -650,6 +726,7 @@ final class LiveSession: ObservableObject {
             errorMessage = nil
         } catch {
             guard token == generation, authToken == authenticationGeneration else { return }
+            clearRecentLibrary()
             accountStatusCurrent = false
             accountStatusError = error as? ManagementError
             accountError = Self.describe(error)
@@ -675,6 +752,7 @@ final class LiveSession: ObservableObject {
         if let currentFlow = authentication?.flow, let incomingFlow = status.flow,
            currentFlow.flowID == incomingFlow.flowID,
            currentFlow.state != .pending, incomingFlow.state == .pending { return }
+        if status.state != .credentialPresent { clearRecentLibrary() }
         if let flow = status.flow, flow.state == .failed {
             lastSignInFailure = SignInFailureSnapshot(flow.error)
         } else if status.flow?.state == .completed {
@@ -759,6 +837,7 @@ final class LiveSession: ObservableObject {
 
     func beginSignIn() async {
         guard canSignIn, let client else { return }
+        clearRecentLibrary()
         authenticationGeneration += 1
         accountBusy = true
         accountError = nil
@@ -884,6 +963,7 @@ final class LiveSession: ObservableObject {
             failedAccountAction = .signOut
             return
         }
+        clearRecentLibrary()
         authenticationGeneration += 1
         accountBusy = true
         accountError = nil

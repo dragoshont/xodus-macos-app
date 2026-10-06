@@ -6,6 +6,7 @@ public enum ManagementCommand: String, CaseIterable, Codable, Sendable {
     case hello, authStatus = "auth.status", authBegin = "auth.begin", authCancel = "auth.cancel"
     case authLogout = "auth.logout", inventory = "inventory.snapshot", search = "catalog.search"
     case authVerify = "auth.verify"
+    case libraryRecent = "library.recent"
     case product = "product.detail", plan = "install.plan", enqueue = "jobs.enqueue"
     case discover = "catalog.discover", query = "catalog.query"
     case pause = "jobs.pause", resume = "jobs.resume", cancel = "jobs.cancel", retry = "jobs.retry"
@@ -19,6 +20,7 @@ public enum ManagementCommand: String, CaseIterable, Codable, Sendable {
         case .hello: "helloData"
         case .authStatus, .authLogout, .authBegin, .authCancel: "authData"
         case .authVerify: "authVerifiedData"
+        case .libraryRecent: "recentLibraryData"
         case .search: "searchData"
         case .discover: "discoveryData"
         case .query: "queryData"
@@ -174,9 +176,15 @@ public struct CatalogProduct: Codable, Equatable, Sendable, Identifiable {
     public let editions: [ProductEvidence]
     public let pcCatalogCandidate: Bool
     public let resolvedLanguage: String?
+    public let artwork: [CatalogArtworkReference]
+    public let artworkStatus: CatalogArtworkStatus
     public var id: String { productID }
 
     public func validatePublicScope(market: String, language: String) throws {
+        try CatalogArtworkReference.validate(artwork, status: artworkStatus)
+        guard artwork.allSatisfy({ $0.source == .displayCatalog && $0.role != .tile }) else {
+            throw ManagementError.invalidPayload
+        }
         guard self.market == market, self.language.caseInsensitiveCompare(language) == .orderedSame,
               pcCatalogCandidate, source != "fixture",
               Set(editions.map(\.id)).count == editions.count,

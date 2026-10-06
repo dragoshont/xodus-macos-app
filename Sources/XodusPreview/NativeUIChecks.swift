@@ -6,6 +6,8 @@ import XodusCore
 @MainActor
 enum NativeUIChecks {
     static func run(check: (Bool, String) -> Void) {
+        do { try RecentLibraryChecks.imageChecks(check: check) }
+        catch { check(false, "Native image threshold/thumbnail checks complete without network access") }
         let application = NSApplication.shared
         let windows = application.windows.count
         let runtime = RuntimeProviderSettings()

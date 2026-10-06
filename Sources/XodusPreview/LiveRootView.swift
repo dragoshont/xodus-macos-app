@@ -25,9 +25,10 @@ struct LiveRootView: View {
     }
     private var searchEnabled: Bool {
         state.destination == .discover
+            || (state.destination == .library && session.recentLibrary != nil)
     }
     private var searchPlaceholder: String {
-        state.destination == .library ? "Search your Library"
+        state.destination == .library ? "Search recently played"
             : state.destination == .downloads ? "Search Library or Discover"
             : session.supports(.query) ? "Search Microsoft Store games" : "Search checked catalog"
     }
@@ -82,24 +83,28 @@ struct LiveRootView: View {
 
     private var library: some View {
         VStack(alignment: .leading, spacing: 20) {
-            ContentUnavailableView {
-                Label(session.isReady ? "Your Library" : session.libraryTitle,
-                      systemImage: session.isReady ? "gamecontroller" : "cable.connector")
-            } description: {
-                Text(session.libraryMessage).frame(maxWidth: 520)
-            } actions: {
-                if !session.isReady {
-                    Button("Settings", action: openSettings.callAsFunction)
-                    if !session.backendPath.isEmpty {
-                        Button("Reconnect") { Task { await session.connect() } }
-                            .disabled(session.connectionTransitioning)
+            if session.isReady, session.supports(.libraryRecent) {
+                LiveRecentLibraryView(query: scopedQuery) { state.showingAccount = true }
+            } else {
+                ContentUnavailableView {
+                    Label(session.isReady ? "Your games" : session.libraryTitle,
+                          systemImage: session.isReady ? "gamecontroller" : "cable.connector")
+                } description: {
+                    Text(session.libraryMessage).frame(maxWidth: 520)
+                } actions: {
+                    if !session.isReady {
+                        Button("Settings", action: openSettings.callAsFunction)
+                        if !session.backendPath.isEmpty {
+                            Button("Reconnect") { Task { await session.connect() } }
+                                .disabled(session.connectionTransitioning)
+                        }
+                    } else {
+                        GlassAction(title: "Browse games") { state.navigate(.discover) }
+                            .disabled(!session.supports(.search) && !session.supports(.discover) && !session.supports(.query))
                     }
-                } else {
-                    GlassAction(title: "Browse games") { state.navigate(.discover) }
-                        .disabled(!session.supports(.search) && !session.supports(.discover) && !session.supports(.query))
                 }
+                .frame(maxWidth: .infinity, minHeight: 220)
             }
-            .frame(maxWidth: .infinity, minHeight: 220)
             DisclosureGroup("Library details") {
                 VStack(alignment: .leading, spacing: 18) {
                     selectedFolderInspection
@@ -162,10 +167,9 @@ struct LiveRootView: View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(scopedQuery.isEmpty ? "Discover" : session.catalogTitle).font(.largeTitle.bold())
-                    Text(scopedQuery.isEmpty ? "Public PC games. Ownership not checked."
-                         : session.supports(.query) ? "Microsoft Store games. Ownership not checked."
-                         : "Checked public games. Coverage is partial; ownership not checked.")
+                    Text(scopedQuery.isEmpty ? "Store games" : session.catalogTitle).font(.largeTitle.bold())
+                    Text(scopedQuery.isEmpty ? "Find your next PC game."
+                         : "Results for \"\(scopedQuery)\"")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -192,25 +196,22 @@ struct LiveRootView: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 220)
             } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 340), spacing: 24)], spacing: 26) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 180, maximum: 240), spacing: 24)], spacing: 28) {
                     ForEach(session.products) { product in
                         Button { session.selectedProduct = product } label: {
-                            HStack(spacing: 14) {
-                                Image(systemName: "gamecontroller")
-                                    .font(.title2).foregroundStyle(.secondary)
-                                    .frame(width: 64, height: 64)
-                                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
-                                    .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 12) {
+                                CatalogArtworkView(reference: CatalogArtworkReference.preferred(
+                                    in: product.artwork, roles: [.boxArt, .poster, .tile, .hero]),
+                                    status: product.artworkStatus)
+                                    .aspectRatio(2.0 / 3.0, contentMode: .fit)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(product.title).font(.headline).foregroundStyle(.primary)
-                                        .fixedSize(horizontal: false, vertical: true)
+                                        .lineLimit(2).frame(minHeight: 40, alignment: .topLeading)
                                     if product.freshness == "cached" {
                                         Text("Offline details").font(.caption).foregroundStyle(.secondary)
                                     }
                                 }
-                                Spacer(minLength: 0)
-                                Image(systemName: "chevron.right").foregroundStyle(.tertiary)
-                                    .accessibilityHidden(true)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())

@@ -2,7 +2,7 @@
 
 A native Mac launcher in development for legitimately entitled Xbox PC games, integrating with the Xodus management engine.
 
-**Current status: native development app, not a complete game launcher.** The default SwiftUI/AppKit app has a real bounded management client, isolated Microsoft Store sign-in integration, source-backed PC Game Pass discovery and Microsoft Store network search, edition detail and activity. A native folder picker also supports a read-only marker check in one explicitly selected game folder; observed header identifiers never become retail identity, registration or permission to launch. A packaged development build includes its matching engine and connects without Terminal setup; negotiated capabilities determine which actions work. Search coverage is explicitly partial, and public results never establish ownership. An earlier controlled development pair completed human sign-in and retained saved-session status across a normal app restart; the newer pair's sole authenticated read returned `credentialUnavailable`, not verified provider access. Authoritative owned-PC inventory, a durable installed-game registry, authorized game installation and certified gameplay remain implementation gaps. Saved sign-in is **not** proof of PC ownership or package access.
+**Current status: native development app, not a complete game launcher.** The default SwiftUI/AppKit app has a real bounded management client, isolated Microsoft Store sign-in integration, source-backed PC Game Pass discovery and Microsoft Store network search, edition detail and activity. A native folder picker also supports a read-only marker check in one explicitly selected game folder; observed header identifiers never become retail identity, registration or permission to launch. A packaged development build includes its matching engine and connects without Terminal setup; negotiated capabilities determine which actions work. Search coverage is explicitly partial, and public results never establish ownership. The admitted f30/d00 pair confirmed saved credentials after the user's native Keychain approval and completed one Halo authenticated read with `verified: true`; no repeat verification or ownership inference was made. Authoritative owned-PC inventory, a durable installed-game registry, authorized game installation and certified gameplay remain implementation gaps. Saved sign-in is **not** proof of PC ownership or package access.
 
 The original offline demonstration is **nonshipping only**. `XODUS_SHIPPING=1`
 compiles out its views, invented state, artwork, resources and check/export
@@ -11,7 +11,15 @@ actual public product data, not synthetic game illustrations. See
 [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
 Live startup opens Discover, with real public results and scoped search.
-Library remains unavailable: the current installed snapshot is a constant empty
+This source adds metadata-backed Store cover/hero images and a separate
+**Recently played** Library window. Personal history loads only after an explicit
+saved-status check and explicit history action; it is not owned-game inventory,
+installation or PC/Mac compatibility. Its reported-platform filter and scoped
+search apply only to that partial in-memory window. No personal history is
+persisted, and no title-to-Store mapping is guessed. The new producer pair and
+actual four-view artwork/history confirmation are not yet admitted or deployed.
+
+Owned/installed Library enumeration remains unavailable: the installed snapshot is a constant empty
 response, not a durable registry or scan of this Mac. It never proves that no
 games are installed. A selected-folder marker check is separate from ownership,
 game-file integrity and permission to play. Technical metadata stays in
@@ -68,7 +76,9 @@ or replaced. This source tooling is not an executed package, notarization,
 distribution attestation or successful human login; deployment/launch require
 separate approval. See [controlled pair admission](docs/SHIPPING-ADMISSION.md).
 
-The proposed deployment baseline is **macOS 14**, not a user-approved support commitment. The shared native toolbar groups Library / Discover / Downloads with compact stock `NSSearchField` search: real `.tabs` on macOS 27+, segmented fallback on 14-26. Search expands for editing, Command-F or a retained query; Account stays separate at the trailing edge. The Scene hides the visible title while retaining native traffic lights and app identity. Live screens use the native window background until rights-cleared real artwork exists. Account content scrolls independently of its adaptive action footer, and normal activation remains AppKit-owned. Source/headless evidence is **not deployed or visually confirmed**.
+The proposed deployment baseline is **macOS 14**, not a user-approved support commitment. The shared native toolbar groups Library / Discover / Downloads with compact stock `NSSearchField` search: real `.tabs` on macOS 27+, segmented fallback on 14-26. Search expands for editing, Command-F or a retained query; Account stays separate at the trailing edge. The Scene hides the visible title while retaining native traffic lights and app identity. Live title art uses only actual normalized Microsoft metadata URLs through a
+bounded memory-only native loader; proprietary covers are not bundled or
+committed. Empty/error states keep semantic native backgrounds. Account content scrolls independently of its adaptive action footer, and normal activation remains AppKit-owned. Source/headless evidence is **not deployed or visually confirmed**.
 
 **Official CrossOver, installed separately, is the first-release dependency.**
 The app checks only standard app locations, bounded metadata and a fixed

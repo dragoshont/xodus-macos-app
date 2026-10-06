@@ -123,6 +123,7 @@ enum NativeChecks {
             }
             try await CrossOverDependencyChecks.run(check: check)
             try await ApplicationTerminationChecks.run(check: check)
+            try await RecentLibraryChecks.run(check: check)
             let expired = session("expired")
             await expired.connect()
             check(expired.isReady && !expired.canSignIn, "Unchecked account cannot blindly retry a mutation")

@@ -50,7 +50,9 @@
         "productID": "9PP5G1F0C2B6",
         "resolvedLanguage": "en",
         "source": "MicrosoftDisplayCatalog:v7.0",
-        "title": "Halo Infinite"
+        "title": "Halo Infinite",
+        "artwork": [],
+        "artworkStatus": "notQueried"
       }
     ],
     "query": "Halo",

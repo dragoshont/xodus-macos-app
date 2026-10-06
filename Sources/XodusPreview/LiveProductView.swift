@@ -6,16 +6,25 @@ struct LiveProductView: View {
     let product: CatalogProduct
     @EnvironmentObject private var session: LiveSession
     @Environment(\.dismiss) private var dismiss
+    private var hero: CatalogArtworkReference? {
+        CatalogArtworkReference.preferred(in: product.artwork, roles: [.hero])
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
+                    if let hero {
+                        CatalogArtworkView(reference: hero, status: product.artworkStatus)
+                            .frame(height: 210)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
                     HStack(alignment: .top, spacing: 18) {
-                        Image(systemName: "gamecontroller").font(.largeTitle)
-                            .frame(width: 80, height: 80)
-                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 16))
-                            .accessibilityHidden(true)
+                        CatalogArtworkView(reference: CatalogArtworkReference.preferred(
+                            in: product.artwork, roles: [.boxArt, .poster, .tile, .hero]),
+                            status: product.artworkStatus)
+                            .frame(width: 80, height: 112)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
                         VStack(alignment: .leading, spacing: 8) {
                             Text(product.title).font(.title.bold())
                             if product.freshness == "cached" {
@@ -53,7 +62,8 @@ struct LiveProductView: View {
                                resolved.caseInsensitiveCompare(product.language) != .orderedSame {
                                 Text("Source metadata language: \(resolved). Requested scope: \(product.language).")
                             }
-                            Text("Public catalog presence doesn't establish access. Installation requires verified access, a package plan and a paired gameplay runtime. Artwork isn't supplied by this catalog.")
+                            Text("Public catalog presence doesn't establish access. Installation requires verified access, a package plan and a paired gameplay runtime.")
+                            Text("Artwork: \(product.artworkStatus.rawValue). Image download failures don't change catalog metadata.")
                         }
                         .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                     }
@@ -71,7 +81,7 @@ struct LiveProductView: View {
             .padding(20)
         }
         .frame(minWidth: 480, idealWidth: 600, maxWidth: 680,
-               minHeight: 280, idealHeight: 300, maxHeight: 620)
+               minHeight: 300, idealHeight: hero == nil ? 340 : 560, maxHeight: 680)
     }
 
     private func facet(_ title: String, _ value: String) -> some View {

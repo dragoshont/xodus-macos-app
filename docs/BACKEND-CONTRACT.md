@@ -84,6 +84,7 @@ The exact implemented parameter/result shapes are in the canonical schema, not i
 | `jobs.snapshot` / `events.replay` | session ID, after sequence | durable snapshot with watermark, or ordered replay; retention miss requires snapshot. |
 | `installed.snapshot` | managed registry scope | stable installation IDs with package, paths, version, paired runtime, save policy and health. |
 | `installed.inspect` | one explicitly selected absolute local directory | Live but partial external-marker observation only: fixed 196 non-key metadata bytes, unknown retail identity/entitlement/compatibility, unregistered and not launchable. No scan, adoption or file writes. |
+| `library.recent` | `limit` 1-100 | Separate TitleHub recently-played window: live/partial, no cursor or Store mapping; never ProductEvidence, ownership, installation or compatibility. Explicit bounded read only. |
 | `game.launch` | installation ID, expected revision | supervised launch job, explicit access/runtime/file validation and eventual process outcome. |
 | `game.update/rollback/remove` | installation ID + pinned plan/revision; consent | failure-safe jobs; default preserve saves; deletion limited to validated manifest-owned content. |
 | `diagnostics.export` | bounded scope, redaction policy | previewable sanitized report, never raw tokens, signed URLs or account identity. |

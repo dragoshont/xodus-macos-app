@@ -39,11 +39,28 @@ enum PreviewExporter {
                     await session.refreshAccount()
                     guard session.accountStatusCurrent, session.currentCredentialState == .credentialPresent,
                           !session.signInPending else { fail("Fresh saved sign-in was not confirmed; no account image exported") }
+                    guard session.supports(.libraryRecent) else { fail("Admitted engine has no recent-history provider") }
+                    await session.refreshRecentLibrary()
+                    guard session.recentLibraryCurrent, let recent = session.recentLibrary else {
+                        fail(session.recentLibraryError ?? "Actual recent-history read did not produce a confirmed snapshot")
+                    }
                     await session.refreshCatalog("Halo")
                     guard !session.searching, session.catalogError == nil, !session.products.isEmpty,
                           session.catalogCorpus == "publicMicrosoftStoreSearch" else {
                         fail("Actual public Store search did not return exportable results")
                     }
+                    let recentArt = recent.titles.prefix(10).compactMap {
+                        CatalogArtworkReference.preferred(in: $0.artwork, roles: [.tile])
+                    }
+                    let catalogArt = session.products.prefix(8).compactMap {
+                        CatalogArtworkReference.preferred(in: $0.artwork, roles: [.boxArt, .poster, .hero])
+                    }
+                    let hero = session.products.first.flatMap {
+                        CatalogArtworkReference.preferred(in: $0.artwork, roles: [.hero])
+                    }
+                    let failedImages = await CatalogArtworkStore.shared.preload(
+                        recentArt + catalogArt + (hero.map { [$0] } ?? []))
+                    print("Actual metadata artwork fetch failures: \(failedImages). No metadata absence inferred.")
                     try await exportLiveViews(state: state, session: session, directory: directory)
                     guard await session.disconnect() else { fail("Live export owner did not close") }
                     print("Exported 4 actual live own-view renders. No fixtures, desktop capture or account identifiers. Compositor/a11y not certified.")

@@ -2,6 +2,57 @@
 
 This is implementation work beyond the immutable foundation at `44d7338`. It is **not a consumer-ready game launcher**.
 
+## Artwork and recently played source slice
+
+The current source pairs with producer
+`680593de3d32390fe2105780b9a21b09fd302337`, tree
+`4b6fda27f9cf8aa546dfff6693b4270eabfee230`. Its exact generated management
+schema SHA256 is
+`6945db01df88eeaf80f495f6b9d7240e270a879851c2c830fc5548ba20d32192`,
+with 100 positive and 96 negative sanitized producer frames. Earlier pins below
+record historical stages, not authorization to pair this consumer with d00.
+
+Every product and recent title requires the same max-four unique-role artwork
+array and explicit available/absent/rejected/notQueried status. Positive,
+paired dimensions are bounded to 8192 on each axis and 16,777,216 pixels;
+all-null dimensions remain unknown. The native client enforces the pixel
+product as well as the schema. An archived pre-artwork public test capture is
+explicitly version-migrated to empty/notQueried; the live decoder never silently
+adds missing fields.
+
+The shared Foundation/ImageIO loader admits only
+`https://store-images.s-microsoft.com/image/<single approved ASCII asset>`.
+Redirects, URL credentials, HTTP authentication and cookies are disabled.
+Each transfer is bounded to 10 seconds and 8 MiB; actual dimensions are checked
+before a maximum-2400-pixel thumbnail is decoded off the main actor. Rejected
+transfers are cancelled. The shared decoded cache is memory-only and bounded
+to 40 images / 64 MiB. No covers, account identifiers or personal history are
+saved to disk or sent to a third-party art service. Fetch failures are visible
+placeholders, not mutations of metadata status.
+
+`library.recent` is a separate negotiated read: limit 1-100, TitleHub v2,
+recentlyPlayed/live/partial, null cursor and null Store product mapping.
+The UI requests one 20-title window only after explicit saved-status confirmation
+and a user history action. Startup, successful status refresh and sign-out
+never automatically query history. The producer performs its bounded 2-second
+NOUI saved read and publication witness inside a 30-second operation; it does
+not invoke a helper, persist refreshed proofs, acquire a license or begin login.
+Six exact failure-stage tuples become safe local actionable errors.
+Personal data remains in memory, generation-fenced and separate from
+ProductEvidence/installed snapshots. Same-profile status may retain visibly
+unconfirmed history; failed/unconfirmed credentials, profile change, sign-out
+and disconnection clear it. PC filtering uses the reported platform
+classification, not Xbox history as blanket PC compatibility.
+
+The nonshipping admitted exporter now performs one actual recent-history read
+after foreground Account confirmation, preloads only accepted metadata art and
+renders the same Library/Discover/Product/Account components. A valid zero-title
+result renders an honest empty recent scope. Its four private PNGs never contain
+XUID, email, raw responses or secrets. It still renders only its own NSView
+hierarchy, not the compositor or a VoiceOver certification. The new matching
+package and this actual-data confirmation remain pending; neutral checks are
+not live account/history evidence.
+
 ## Implemented client and native surfaces
 
 `Sources/XodusManagement` implements exact protocol 1.0, request IDs, schema validation against the producer's pinned schema, typed capability objects, bounded UTF-8 JSONL and a supervised native `Process`. It never scrapes interactive output or uses runtime-service IPC as management.

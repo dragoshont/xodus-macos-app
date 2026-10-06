@@ -69,6 +69,11 @@ public struct ContractValidator: Sendable {
             if let min = rules["minItems"]?.uint64, UInt64(array.count) < min { return false }
             if let items = rules["items"],
                !array.allSatisfy({ matches($0, schema: items, depth: depth + 1) }) { return false }
+            if let contains = rules["contains"] {
+                let count = UInt64(array.filter { matches($0, schema: contains, depth: depth + 1) }.count)
+                if count < (rules["minContains"]?.uint64 ?? 1) { return false }
+                if let maximum = rules["maxContains"]?.uint64, count > maximum { return false }
+            }
         }
         if let string = value.string {
             let length = UInt64(string.unicodeScalars.count)

@@ -61,9 +61,10 @@ actor Checks {
     func run() async throws {
         try await runtimePlanChecks()
         try await hostBindingChecks()
+        try await artworkChecks()
         let validator = try ContractValidator()
         let positive = try fixture("positive").array ?? []
-        check(positive.count == 88, "Pinned producer corpus contains 88 positive frames")
+        check(positive.count == 100, "Pinned producer corpus contains 100 positive frames")
         for (index, frame) in positive.enumerated() {
             do { try validator.validate(frame); check(true, "Producer positive frame \(index + 1)") }
             catch { check(false, "Producer positive frame \(index + 1)") }
@@ -234,7 +235,7 @@ actor Checks {
                   "Helper recovery copy does not claim passkey support or diagnose a provider prompt")
         }
         let negative = try fixture("negative").array ?? []
-        check(negative.count == 47, "Pinned producer corpus contains 47 negative frames")
+        check(negative.count == 96, "Pinned producer corpus contains 96 negative frames")
         for item in negative {
             do {
                 guard let frame = item["frame"] else { throw ManagementError.invalidPayload }
@@ -846,7 +847,7 @@ enum MockBackend {
             let lifecycleDirectory = URL(fileURLWithPath: CommandLine.arguments[index + 1])
             let lifecycleScenario = ["retireslow", "retirefailed", "retirehello", "retiresnapshot", "authgate",
                                      "savedpermission", "startupquery", "uifailures",
-                                     "statuspermission", "deadlinecompleted"].contains(scenario)
+                                     "statuspermission", "deadlinecompleted"].contains(scenario) || scenario.hasPrefix("recent")
             func trace(_ entry: String) throws {
                 guard lifecycleScenario else { return }
                 try FileManager.default.createDirectory(at: lifecycleDirectory, withIntermediateDirectories: true,
@@ -869,6 +870,7 @@ enum MockBackend {
             }
             var hello = frames.first(where: { $0["data"]?["schema"] != nil })?["data"]?.object ?? [:]
             var supported: Set<ManagementCommand> = [.authStatus, .authLogout, .jobs]
+            if scenario.hasPrefix("recent") { supported.formUnion([.libraryRecent, .query]) }
             if scenario == "verify" || scenario.hasPrefix("verify-") { supported.insert(.authVerify) }
             if scenario == "diagnostics" { supported.insert(.diagnostics) }
             if ["discoveryfail", "discoveryrecover"].contains(scenario) { supported.insert(.discover) }
@@ -888,10 +890,12 @@ enum MockBackend {
             var loggedOut = false, flowStarted = false, cancelledLate = false
             var flowReads = 0, discoveryReads = 0, profileReads = 0
             var activityReads = 0, registryReads = 0
+            var recentReads = 0
             var gatedAttempts = 0
             hello["capabilities"] = .array(ManagementCommand.allCases.map { command in .object([
                 "command": .string(command.rawValue), "supported": .bool(supported.contains(command)),
-                "audience": .null, "reason": supported.contains(command) ? .null : .string("Fixture gate.")
+                "audience": command == .libraryRecent ? .string("http://xboxlive.com") : .null,
+                "reason": supported.contains(command) ? .null : .string("Fixture gate.")
             ]) })
             while let line = readLine() {
                 let request = try JSONDecoder().decode(JSONValue.self, from: Data(line.utf8))
@@ -908,6 +912,57 @@ enum MockBackend {
                     if scenario == "mismatch" { result["protocol"] = .object(["major": .integer(2), "minor": .integer(0)]) }
                     try emit(.object(result))
                 } else {
+                    if scenario.hasPrefix("recent") {
+                        try trace(command)
+                        if command == "auth.status" {
+                            try emit(.object(result(request, data: .object([
+                                "state": .string(loggedOut ? "signedOut" : "credentialPresent"),
+                                "credentialStore": .string("macOSKeychain"), "audience": .null,
+                                "expiresAt": .null, "entitlementAuthorized": .bool(false)
+                            ]))))
+                            continue
+                        }
+                        if command == "auth.logout" { loggedOut = true }
+                        if command == "library.recent" {
+                            recentReads += 1
+                            if recentReads > 1, ["recentstale", "recentprofilechanged"].contains(scenario) {
+                                let stage: RecentLibraryFailure = scenario == "recentstale" ? .transportFailed : .profileChanged
+                                var response = result(request, data: .null)
+                                response["ok"] = .bool(false)
+                                response.removeValue(forKey: "data")
+                                response["error"] = .object([
+                                    "code": .string(stage.code), "message": .string(stage.message),
+                                    "retryable": .bool(stage.retryable), "details": stage.details
+                                ])
+                                try emit(.object(response))
+                            } else {
+                                guard let page = frames.first(where: {
+                                    $0["data"]?["scope"]?.string == "recentlyPlayed"
+                                        && $0["data"]?["titles"]?.array?.isEmpty == (scenario == "recentzero")
+                                })?["data"] else { exit(3) }
+                                let response = result(request, data: page)
+                                if scenario == "recentslow" {
+                                    DispatchQueue.global().async {
+                                        Thread.sleep(forTimeInterval: 0.6)
+                                        do { try emit(.object(response)) } catch { exit(3) }
+                                    }
+                                } else { try emit(.object(response)) }
+                            }
+                            continue
+                        }
+                        if command == "catalog.query" {
+                            guard var page = frames.first(where: {
+                                $0["data"]?["corpus"]?.string == "publicMicrosoftStoreSearch"
+                                    && $0["data"]?["products"]?.array?.isEmpty == false
+                            })?["data"]?.object, var product = page["products"]?.array?.first?.object else { exit(3) }
+                            page["query"] = request["params"]?["query"]
+                            product["source"] = .string("syntheticPublicSource")
+                            page["products"] = .array([.object(product)])
+                            page["failures"] = .array([])
+                            try emit(.object(result(request, data: .object(page))))
+                            continue
+                        }
+                    }
                     if command == "auth.verify", scenario == "verify" || scenario.hasPrefix("verify-") {
                         if scenario == "verify" {
                             try emit(.object(result(request, data: .object(["verified": .bool(true)]))))

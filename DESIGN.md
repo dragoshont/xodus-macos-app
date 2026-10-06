@@ -28,9 +28,16 @@ visually confirmed.
 **Lean live-data slice:** live startup opens Discover while owned-library
 enumeration is unavailable; the original fixture still starts in Library.
 The existing native toolbar, deployment target and repository tokens are
-unchanged. Discover shows real scoped public products and search, with one
-ownership caveat rather than repeated source/status labels on each row.
-Library explicitly remains unavailable: the current engine's registry response
+unchanged. Discover shows scoped public products and search as artwork-led Store
+cards; catalog/access provenance stays in contextual info rather than repeated
+ownership caveats. Library has a separate "Your games" / "Recently played" scope:
+one explicit read of actual TitleHub history, a first-title image feature only
+when that title supplies accepted art, and an adaptive native tile grid.
+Reported PC/console/mixed/unknown platform tags and a native platform filter do
+not establish Mac compatibility. Search in this scope filters only the loaded
+history window. History has no Store mapping, entitlement or installation
+evidence; its tiles do not fabricate product-detail or Play actions.
+Owned/installed Library enumeration still remains unavailable: the engine's registry response
 is a constant empty vector, not an implemented durable registry or Mac scan.
 It must not become "no games registered" or an installed-game list; Library
 search is disabled. A real, read-only selected-folder marker check remains
@@ -42,20 +49,29 @@ retained account snapshots are explicitly unconfirmed, not current saved-state
 evidence. Product
 detail has one availability line, with independent per-edition evidence in
 Catalog info, a compact preferred size and a separate native Done footer.
-Library has one unavailable state and Browse games action; selected-folder
-inspection is secondary under Library details. Discover places results directly
-after one source/ownership subtitle and any actual partial/failure notice.
+Unchecked/empty/failed history has one clear state and explicit Account/load or
+refresh action. Retained results visibly say they are previously checked;
+account/connection changes clear personal memory, while fresh same-profile
+status leaves retained history unconfirmed rather than rereading it.
+Selected-folder inspection is secondary under Library details. Discover places
+results directly after one scoped heading and any actual partial/failure notice.
 Account stays
 in the toolbar, and its cancellation, refresh and credential gates are
 unchanged. No Home shelves, invented installed games, new framework or
 speculative navigation API is introduced.
 
 **Production hardening:** the shipping/live path no longer uses the invented
-harbor/orbit promotional hero or game poster in Account. No rights-cleared real
-artwork is available, so real setup/empty/loading/error/data views use semantic
-native window backgrounds. Fixture illustrations remain only in the nonshipping
-preview source/resource set. This user-directed truth boundary preserves the
-system header/navigation/search/no-visible-title contract, not the demo hero.
+harbor/orbit promotional hero or game poster in Account. Title-specific artwork
+comes only from normalized real Microsoft metadata, not bundled covers, invented
+illustrations or an image-generation service. The shared native loader admits
+only the exact Store CDN, disables redirects/auth/cookies and bounds each fetch
+to 10 seconds, 8 MiB and 16 megapixels before decoding. Its decoded thumbnail
+cache is memory-only. Missing/rejected/unqueried metadata and fetch failures
+remain distinct; a failed fetch never changes metadata to "absent."
+Setup/empty/error views keep semantic native window backgrounds. Fixture
+illustrations remain only in the nonshipping preview source/resource set.
+Remote metadata references are not a general redistribution/license grant;
+distribution rights remain a separate release question.
 
 `XodusToolbar` uses a principal `ToolbarItemGroup`, a real `.tabs` `Picker` on
 macOS 27+ with a `.segmented` fallback on 14-26, stock `NSSearchField` and an
@@ -75,7 +91,10 @@ content surfaces, not for repainting toolbar controls. Reduced transparency and
 body light/dark treatment remain native. There is no fake CSS glass or private
 SDK import.
 
-The live development shell inherits this world without copying fixture game names or covers. It uses a labelled original landscape, a separate native account sheet and centered unavailable/empty states. The same scoped `NSSearchField` supplies toolbar search in live and fixture views: system bezel, search/cancel controls, semantic appearance and the existing field editor/focus binding. Empty unfocused search occupies 32 pt; editing, Command-F or nonempty text expands it to 220 pt. Downloads retains disabled search, and live Library eligibility rules remain unchanged. There is no duplicate hero search, wrapper icon, forced dark scheme or custom capsule. Fixture/development notices remain inside content rather than an opaque strip above the hero. Checked real public products use honest native icon placeholders until rights-cleared title artwork exists. Four-facet detail does not turn catalog presence or saved sign-in into ownership. The original orbital-doorway app icon is reproducible with `tools/RenderAppIcon.swift`.
+The live development shell inherits this world without copying fixture game names or covers. It uses a labelled original landscape, a separate native account sheet and centered unavailable/empty states. The same scoped `NSSearchField` supplies toolbar search in live and fixture views: system bezel, search/cancel controls, semantic appearance and the existing field editor/focus binding. Empty unfocused search occupies 32 pt; editing, Command-F or nonempty text expands it to 220 pt. Downloads retains disabled search, and live Library eligibility rules remain unchanged. There is no duplicate hero search, wrapper icon, forced dark scheme or custom capsule. Fixture/development notices remain inside content rather than an opaque strip above the hero. Checked products use real BoxArt/poster references, with SF-symbol fallbacks only
+for actual missing/rejected/unqueried or failed images. Product detail uses an
+actual hero-role image when supplied, plus its real cover. TitleHub tile art
+keeps its own aspect rather than being relabelled as SuperHeroArt. Four-facet detail does not turn catalog presence or saved sign-in into ownership. The original orbital-doorway app icon is reproducible with `tools/RenderAppIcon.swift`.
 
 Account uses a bounded width/height range, a scrollable explanation/status body
 and a separate adaptive native-action footer. Decoration contracts first at
@@ -105,8 +124,8 @@ modern rendering and constrained-window toolbar placement remain live gates.
 | Controls | native system accent; real available Glass, older material fallback |
 | Typography | SF system fonts and symbols; large feature title, native body/section hierarchy |
 | Spacing | 4 pt base; 30 pt body inset; 12-24 pt groups; toolbar geometry owned by macOS |
-| Entries | 64 pt original icon crops; adaptive 340 pt minimum width |
-| Detail | edge-to-edge original imagery, followed by readable ordered evidence |
+| Entries | real portrait Store covers / square history tiles; adaptive native grid |
+| Detail | actual catalog hero/cover, followed by readable ordered evidence and a fixed Done footer |
 | Motion | no nonessential animation/autoplay; reduced motion loses no information |
 
 ## Original imagery and licensing

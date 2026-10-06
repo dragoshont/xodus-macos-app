@@ -6,7 +6,8 @@ import Foundation
 let shipping = ProcessInfo.processInfo.environment["XODUS_SHIPPING"] == "1"
 let previewOnly = ["Artwork.swift", "RootView.swift", "DetailView.swift", "DownloadsView.swift",
                    "PreviewExporter.swift", "PreviewChecks.swift", "NativeChecks.swift",
-                   "NativeUIChecks.swift", "ApplicationTerminationChecks.swift", "CrossOverDependencyChecks.swift", "Resources"]
+                   "NativeUIChecks.swift", "ApplicationTerminationChecks.swift", "CrossOverDependencyChecks.swift",
+                   "RecentLibraryChecks.swift", "Resources"]
 let shippingSettings: [SwiftSetting] = shipping ? [.define("XODUS_SHIPPING")] : []
 
 let package = Package(
