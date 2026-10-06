@@ -39,19 +39,21 @@ struct LiveRecentLibraryView: View {
                     Text("Recently played").foregroundStyle(.secondary)
                 }
                 Spacer()
-                if session.recentLibraryLoading { ProgressView().controlSize(.small) }
+                if session.recentLibraryLoading || session.recentLibraryBootstrapRunning {
+                    ProgressView().controlSize(.small)
+                }
                 if session.recentLibrary != nil {
                     Picker("Platform", selection: $selection.platform) {
                         ForEach(RecentPlatformFilter.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.menu).fixedSize()
                 }
-                Button(session.recentLibrary == nil ? "Load recently played" : "Refresh") {
-                    Task { await session.refreshRecentLibrary() }
+                if session.recentLibrary != nil {
+                    Button("Refresh") { Task { await session.reloadRecentLibrary() } }
+                        .disabled(!session.canLoadRecentLibrary)
                 }
-                .disabled(!session.canRefreshRecentLibrary)
             }
-            if let notice = session.recentLibraryNotice {
+            if session.recentLibrary != nil, let notice = session.recentLibraryNotice {
                 Label(notice, systemImage: session.recentLibraryError == nil ? "clock" : "exclamationmark.circle")
                     .foregroundStyle(.secondary)
             }
@@ -98,15 +100,24 @@ struct LiveRecentLibraryView: View {
                     }
                     .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                 }
-            } else if !session.recentLibraryLoading {
+            } else if session.recentLibraryBootstrapRunning || session.accountStatusChecking || session.recentLibraryLoading {
+                VStack(spacing: 12) {
+                    ProgressView(session.recentLibraryLoadingTitle)
+                    Text(session.recentLibraryMessage).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, minHeight: 220)
+            } else {
                 ContentUnavailableView {
                     Label("Recently played games", systemImage: "gamecontroller")
                 } description: {
-                    Text(session.canRefreshRecentLibrary
-                         ? "Load your recent activity from Microsoft."
-                         : "Check your saved sign-in in Account to load recent activity.")
+                    Text(session.recentLibraryMessage)
                 } actions: {
-                    if !session.canRefreshRecentLibrary {
+                    if session.canLoadRecentLibrary {
+                        Button(session.accountError != nil || session.recentLibraryError != nil ? "Try again" : "Load recently played") {
+                            Task { await session.reloadRecentLibrary() }
+                        }
+                    } else {
                         Button("Open Account", action: openAccount).disabled(session.accountBusy)
                     }
                 }

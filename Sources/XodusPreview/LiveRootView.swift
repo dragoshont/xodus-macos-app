@@ -6,6 +6,7 @@ struct LiveRootView: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var session: LiveSession
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.scenePhase) private var scenePhase
     @FocusState private var searchFocused: Bool
 #if !XODUS_SHIPPING
     var allowsStartupTasks = true
@@ -61,6 +62,10 @@ struct LiveRootView: View {
         .task {
             if startupAllowed, session.phase == .disconnected, !session.connectionTransitioning,
                !session.backendPath.isEmpty { await session.connect() }
+        }
+        .task(id: "\(state.destination.rawValue):\(scenePhase == .active):\(session.isReady):\(session.connectionTransitioning):\(session.accountBusy)") {
+            guard startupAllowed, scenePhase == .active, state.destination == .library else { return }
+            await session.loadRecentLibraryOnEntry()
         }
         .task(id: "\(state.destination.rawValue):\(state.query):\(session.market):\(session.language):\(session.isReady)") {
             guard startupAllowed, state.destination == .discover else { return }

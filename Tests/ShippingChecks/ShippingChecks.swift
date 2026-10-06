@@ -23,8 +23,8 @@ final class ShippingChecks: XCTestCase {
         let session = LiveSession()
         let injected = LiveSession(configuration: BackendConfiguration(executable: URL(fileURLWithPath: "/invalid/injected"),
                                                                         stateDirectory: URL(fileURLWithPath: "/invalid/state")))
-        check(state.destination == .discover && state.query.isEmpty && !state.showingAccount,
-              "Shipping navigation starts in Discover without fixture state")
+        check(state.destination == .library && state.query.isEmpty && !state.showingAccount,
+              "Shipping navigation starts in Library without fixture state")
         check(state.runtimeSettings.configuration == nil && state.runtimeSettings.crossOverDependency == .notChecked,
               "Shipping dependency starts unchecked, without an invented CrossOver installation")
         let official = CrossOverDependencyState.installed(.init(

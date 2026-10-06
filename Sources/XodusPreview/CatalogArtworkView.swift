@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import AppKit
 import ImageIO
+import OSLog
 import SwiftUI
 import XodusManagement
 
@@ -57,6 +58,7 @@ final class CatalogArtworkStore {
     private let cache = NSCache<NSURL, NSImage>()
     private var pending: [URL: Task<NSImage, Error>] = [:]
     private let session: URLSession
+    private let logger = Logger(subsystem: "io.github.dragoshont.xodus", category: "catalog-artwork")
 
     init() {
         let configuration = URLSessionConfiguration.ephemeral
@@ -106,6 +108,7 @@ final class CatalogArtworkStore {
         let image = try await task.value
         cache.setObject(image, forKey: url as NSURL,
                         cost: Int(image.size.width * image.size.height) * 4)
+        logger.notice("stage=imageDecoded count=1")
         return image
     }
 

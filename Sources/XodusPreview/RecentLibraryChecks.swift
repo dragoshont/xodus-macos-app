@@ -64,6 +64,108 @@ enum RecentLibraryChecks {
                 try await Task.sleep(for: .milliseconds(10))
             }
         }
+        let bootstrap = LiveSession(configuration: configuration("recentbootstrapstatusslow"))
+        await bootstrap.connect()
+        let entering = Task { await bootstrap.loadRecentLibraryOnEntry() }
+        let bootstrapDeadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while try trace("recentbootstrapstatusslow").filter({ $0 == "auth.status" }).isEmpty {
+            guard ContinuousClock.now < bootstrapDeadline else { throw ManagementError.requestTimedOut }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        check(bootstrap.recentLibraryBootstrapRunning && bootstrap.accountBusy
+              && bootstrap.accountStatusChecking && !bootstrap.canLoadRecentLibrary
+              && bootstrap.recentLibraryLoadingTitle == "Checking saved sign-in",
+              "Library bootstrap exposes the actual pending saved-status stage and leases account actions")
+        let rebuilt = Task { await bootstrap.loadRecentLibraryOnEntry() }
+        entering.cancel()
+        await bootstrap.refreshAccount()
+        await rebuilt.value
+        await entering.value
+        let bootstrapTrace = try trace("recentbootstrapstatusslow")
+        check(bootstrapTrace.filter { $0 == "auth.status" }.count == 1
+              && bootstrapTrace.filter { $0 == "library.recent" }.count == 1
+              && bootstrapTrace.firstIndex(of: "auth.status")! < bootstrapTrace.firstIndex(of: "library.recent")!
+              && !bootstrapTrace.contains("auth.begin"),
+              "One owned Library load survives view cancellation and orders status before one history read")
+        check(bootstrap.recentLibraryCurrent && bootstrap.recentLibrary?.titles.count == 1
+              && !bootstrap.recentLibraryBootstrapRunning && !bootstrap.accountBusy,
+              "The same live session retains its published real-shaped list after bootstrap")
+        await bootstrap.loadRecentLibraryOnEntry()
+        check(try trace("recentbootstrapstatusslow") == bootstrapTrace,
+              "View rebuild and repeated Library entry never poll a completed automatic load")
+        await bootstrap.refreshAccount()
+        await bootstrap.loadRecentLibraryOnEntry()
+        check(try bootstrap.recentLibrary == nil
+              && trace("recentbootstrapstatusslow").filter { $0 == "library.recent" }.count == 1,
+              "An explicit Account check still clears personal history without an automatic reread")
+        await bootstrap.reloadRecentLibrary()
+        check((try trace("recentbootstrapstatusslow")).filter { $0 == "auth.status" }.count == 2
+              && bootstrap.recentLibraryCurrent,
+              "Manual Library loading reuses the already fresh credential-present status")
+        check(await bootstrap.disconnect(), "Neutral automatic Library owner closes")
+
+        for scenario in ["recentbootstrapstatusfailure", "recentbootstraptransport", "recentbootstrapsignedout",
+                         "recentbootstrapexpired", "recentbootstrapinvalid"] {
+            let value = LiveSession(configuration: configuration(scenario))
+            await value.connect()
+            await value.loadRecentLibraryOnEntry()
+            let failedTrace = try trace(scenario)
+            await value.loadRecentLibraryOnEntry()
+            check(try trace(scenario) == failedTrace && !value.recentLibraryBootstrapRunning,
+                  "A failed or signed-out automatic load stops once with no appearance-triggered retry")
+            if scenario == "recentbootstrapstatusfailure" {
+                check(value.accountStatusError == .credentialStoreUnavailable
+                      && value.recentLibraryMessage == ManagementError.credentialStoreUnavailable.localizedDescription
+                      && !failedTrace.contains("library.recent") && value.canLoadRecentLibrary,
+                      "Saved-access failure stays specific and retryable without requesting personal history")
+            } else if ["recentbootstrapsignedout", "recentbootstrapexpired", "recentbootstrapinvalid"].contains(scenario) {
+                let expected: CredentialState = scenario == "recentbootstrapsignedout" ? .signedOut
+                    : scenario == "recentbootstrapexpired" ? .expired : .invalid
+                check(value.currentCredentialState == expected && value.recentLibrary == nil
+                      && !value.canLoadRecentLibrary && !failedTrace.contains("library.recent")
+                      && !failedTrace.contains("auth.begin") && !value.recentLibraryMessage.isEmpty,
+                      "A confirmed unavailable sign-in offers Account without starting login or history")
+            } else {
+                check(value.recentLibraryError?.contains("couldn't connect") == true && value.canLoadRecentLibrary,
+                      "History transport failure remains a visible safe product error with explicit retry")
+            }
+            if ["recentbootstrapstatusfailure", "recentbootstraptransport"].contains(scenario) {
+                await value.reloadRecentLibrary()
+                let retried = try trace(scenario)
+                check(value.recentLibraryCurrent && value.recentLibrary?.titles.count == 1
+                      && retried.filter { $0 == "auth.status" }.count == (scenario == "recentbootstrapstatusfailure" ? 2 : 1),
+                      "Explicit retry checks status only if access is unconfirmed, never when it is already fresh")
+            }
+            check(await value.disconnect(), "Neutral failed-bootstrap owner closes")
+        }
+
+        let freshBootstrap = LiveSession(configuration: configuration("recentbootstrapfresh"))
+        await freshBootstrap.connect()
+        await freshBootstrap.refreshAccount()
+        await freshBootstrap.loadRecentLibraryOnEntry()
+        check((try trace("recentbootstrapfresh")).filter { $0 == "auth.status" }.count == 1
+              && freshBootstrap.recentLibraryCurrent,
+              "Automatic foreground Library entry reuses an existing fresh saved-status result")
+        check(await freshBootstrap.disconnect(), "Neutral fresh-status bootstrap owner closes")
+
+        let zeroBootstrap = LiveSession(configuration: configuration("recentbootstrapzero"))
+        await zeroBootstrap.connect()
+        await zeroBootstrap.loadRecentLibraryOnEntry()
+        check(zeroBootstrap.recentLibraryCurrent && zeroBootstrap.recentLibrary?.titles.isEmpty == true
+              && zeroBootstrap.recentLibraryError == nil,
+              "Automatic loading keeps a valid empty personal window empty without fixture filling")
+        check(await zeroBootstrap.disconnect(), "Neutral zero-history bootstrap owner closes")
+
+        let retiringBootstrap = LiveSession(configuration: configuration("recentbootstrapretire"))
+        await retiringBootstrap.connect()
+        let retiringLoad = Task { await retiringBootstrap.loadRecentLibraryOnEntry() }
+        try await waitForRead("recentbootstrapretire")
+        check(await retiringBootstrap.disconnect(), "A connection change retires its owned Library bootstrap")
+        await retiringLoad.value
+        check(retiringBootstrap.recentLibrary == nil && !retiringBootstrap.recentLibraryBootstrapRunning
+              && !retiringBootstrap.accountBusy,
+              "A retired bootstrap cannot publish into the next connection generation")
+
         let session = LiveSession(configuration: configuration("recentslow"))
         await session.connect()
         await session.refreshRecentLibrary()

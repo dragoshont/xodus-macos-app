@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import AppKit
 import Foundation
+import OSLog
 import UniformTypeIdentifiers
 import XodusManagement
 
@@ -18,7 +19,8 @@ final class LiveSession: ObservableObject {
     @Published private(set) var activity = ActivityStore()
     @Published private(set) var searching = false
     @Published private(set) var catalogStopped = false
-    @Published private(set) var accountBusy = false
+    @Published private var accountOperationBusy = false
+    @Published private(set) var recentLibraryBootstrapRunning = false
     @Published private(set) var accountStatusChecking = false
     @Published private(set) var accountStatusCurrent = false
     @Published private(set) var accountError: String?
@@ -66,6 +68,9 @@ final class LiveSession: ObservableObject {
     private var queryGeneration = 0
     private var authenticationGeneration = 0
     private var recentLibraryGeneration = 0
+    private var recentLibraryEntryGeneration: Int?
+    private var recentLibraryBootstrap: RecentLibraryBootstrap?
+    private let recentLibraryLogger = Logger(subsystem: "io.github.dragoshont.xodus", category: "recent-library")
     private var currentQuery = ""
     private var cacheRevision: UInt64?
     private var discoveryRevision: String?
@@ -118,6 +123,11 @@ final class LiveSession: ObservableObject {
         let task: Task<Bool, Never>
     }
 
+    private struct RecentLibraryBootstrap {
+        let id: UUID
+        let task: Task<Void, Never>
+    }
+
     init(configuration: BackendConfiguration? = nil,
          signInPollingBudget: Duration = .seconds(600),
          shutdownClient: @escaping @Sendable (ManagementClient) async -> Bool = { await $0.close() }) {
@@ -155,6 +165,7 @@ final class LiveSession: ObservableObject {
     }
 
     var isReady: Bool { phase == .ready }
+    var accountBusy: Bool { accountOperationBusy || recentLibraryBootstrapRunning }
     var signInPending: Bool { authentication?.flow?.state == .pending }
     var canSignIn: Bool {
         isReady && supports(.authBegin) && supports(.authCancel) && supports(.authStatus)
@@ -213,9 +224,37 @@ final class LiveSession: ObservableObject {
         return "Your game library isn't available yet."
     }
     var canRefreshRecentLibrary: Bool {
+        recentLibraryReadAllowed && !recentLibraryBootstrapRunning
+    }
+    private var recentLibraryReadAllowed: Bool {
         isReady && supports(.libraryRecent) && accountStatusCurrent
-            && currentCredentialState == .credentialPresent && !signInPending && !accountBusy
+            && currentCredentialState == .credentialPresent && !signInPending && !accountOperationBusy
             && !recentLibraryLoading
+    }
+    var canLoadRecentLibrary: Bool {
+        isReady && !connectionTransitioning && supports(.libraryRecent)
+            && (accountStatusCurrent || supports(.authStatus))
+            && (!accountStatusCurrent || currentCredentialState == .credentialPresent)
+            && !signInPending && !accountBusy && !recentLibraryLoading
+    }
+    var recentLibraryLoadingTitle: String {
+        accountStatusChecking || (recentLibraryBootstrapRunning && !accountStatusCurrent)
+            ? "Checking saved sign-in" : "Loading recently played"
+    }
+    var recentLibraryMessage: String {
+        if let error = recentLibraryError ?? accountError { return error }
+        if accountStatusChecking || (recentLibraryBootstrapRunning && !accountStatusCurrent) {
+            return "Respond in macOS's Keychain permission window if it appears."
+        }
+        if recentLibraryLoading || recentLibraryBootstrapRunning { return "Getting your recent activity from Microsoft." }
+        guard accountStatusCurrent else { return "Your saved sign-in hasn't been confirmed. Try loading again." }
+        switch currentCredentialState {
+        case .credentialPresent: return "Load your recent activity from Microsoft."
+        case .signedOut: return "Sign in with Microsoft in Account to see recently played games."
+        case .expired: return "Your saved Microsoft sign-in has expired. Open Account to review it."
+        case .invalid: return "Your saved Microsoft sign-in couldn't be validated. Open Account to review it."
+        case nil: return "Open Account to check your saved Microsoft sign-in."
+        }
     }
     var recentLibraryNotice: String? {
         if let error = recentLibraryError {
@@ -229,7 +268,50 @@ final class LiveSession: ObservableObject {
     }
 
     func refreshRecentLibrary() async {
-        guard canRefreshRecentLibrary, let client else { return }
+        guard !recentLibraryBootstrapRunning else { return }
+        await readRecentLibrary()
+    }
+
+    func loadRecentLibraryOnEntry() async {
+        await loadRecentLibrary(automatically: true)
+    }
+
+    func reloadRecentLibrary() async {
+        await loadRecentLibrary(automatically: false)
+    }
+
+    private func loadRecentLibrary(automatically: Bool) async {
+        if let operation = recentLibraryBootstrap {
+            await operation.task.value
+            return
+        }
+        guard !applicationTerminating, canLoadRecentLibrary,
+              !automatically || recentLibraryEntryGeneration != generation else { return }
+        let token = generation
+        let id = UUID()
+        recentLibraryEntryGeneration = token
+        recentLibraryBootstrapRunning = true
+        let task = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                if self.recentLibraryBootstrap?.id == id {
+                    self.recentLibraryBootstrap = nil
+                    self.recentLibraryBootstrapRunning = false
+                }
+            }
+            if !self.accountStatusCurrent { await self.refreshAccountState() }
+            guard !Task.isCancelled, token == self.generation, self.isReady,
+                  !self.connectionTransitioning, !self.applicationTerminating,
+                  self.accountStatusCurrent, self.currentCredentialState == .credentialPresent,
+                  !self.signInPending else { return }
+            await self.readRecentLibrary()
+        }
+        recentLibraryBootstrap = RecentLibraryBootstrap(id: id, task: task)
+        await task.value
+    }
+
+    private func readRecentLibrary() async {
+        guard recentLibraryReadAllowed, let client else { return }
         let token = generation
         let authToken = authenticationGeneration
         recentLibraryGeneration += 1
@@ -237,11 +319,11 @@ final class LiveSession: ObservableObject {
         recentLibraryLoading = true
         recentLibraryCurrent = false
         recentLibraryError = nil
-        accountBusy = true
+        accountOperationBusy = true
         defer {
             if token == generation, recentToken == recentLibraryGeneration {
                 recentLibraryLoading = false
-                accountBusy = false
+                accountOperationBusy = false
             }
         }
         do {
@@ -252,19 +334,26 @@ final class LiveSession: ObservableObject {
             try result.validate(limit: 20)
             recentLibrary = result
             recentLibraryCurrent = true
+            recentLibraryLogger.notice("stage=recentlyPlayed count=\(result.titles.count, privacy: .public)")
         } catch {
             guard token == generation, authToken == authenticationGeneration,
                   recentToken == recentLibraryGeneration else { return }
             if case let ManagementError.recentLibraryFailed(stage) = error {
-                switch stage {
-                case .credentialUnavailable, .profileChanged, .authRejected:
+                if [.credentialUnavailable, .profileChanged, .authRejected].contains(stage) {
                     recentLibrary = nil
                     accountStatusCurrent = false
-                    recentLibraryError = "Check Account status before loading recently played games."
+                }
+                switch stage {
+                case .credentialUnavailable:
+                    recentLibraryError = "Saved sign-in couldn't be read for recent activity. Try loading again or review Account."
+                case .profileChanged:
+                    recentLibraryError = "The account changed while recent activity was checked. Try loading again."
+                case .authRejected:
+                    recentLibraryError = "Microsoft rejected access to recent activity. Review your saved sign-in in Account."
                 case .authExchangeFailed:
-                    recentLibraryError = "Microsoft couldn't authorize recent activity. Choose Refresh to try again."
+                    recentLibraryError = "Microsoft couldn't authorize recent activity. Try again."
                 case .transportFailed:
-                    recentLibraryError = "Recent activity couldn't connect. Choose Refresh to try again."
+                    recentLibraryError = "Recent activity couldn't connect. Try again."
                 case .responseInvalid:
                     recentLibraryError = "Microsoft's recent activity couldn't be read safely. No empty result was assumed."
                 }
@@ -601,7 +690,7 @@ final class LiveSession: ObservableObject {
                     await self.connectionFailed(error)
                 }
             }
-            // Credential-store authorization belongs to explicit Account actions, not anonymous startup.
+            // Connection setup stays anonymous; foreground Library entry owns its separate saved-status read.
             await refreshInstalled()
             guard token == generation, revision == lifecycleRevision, client === connection else { return }
             if queryGeneration == startupQueryRevision { await search("") }
@@ -630,6 +719,10 @@ final class LiveSession: ObservableObject {
     private func retireClient() async -> Bool {
         if let operation = closingOperation { return await finishRetirement(operation) }
         generation += 1
+        recentLibraryBootstrap?.task.cancel()
+        recentLibraryBootstrap = nil
+        recentLibraryBootstrapRunning = false
+        recentLibraryEntryGeneration = nil
         authenticationGeneration += 1
         queryGeneration += 1
         clearRecentLibrary()
@@ -673,7 +766,7 @@ final class LiveSession: ObservableObject {
         searching = false
         catalogStopped = false
         lookupBusy = false
-        accountBusy = false
+        accountOperationBusy = false
         accountStatusChecking = false
         guard let previous = client else {
             phase = .disconnected
@@ -712,7 +805,12 @@ final class LiveSession: ObservableObject {
     }
 
     func refreshAccount() async {
-        guard isReady, supports(.authStatus), let client, !accountBusy else { return }
+        guard !recentLibraryBootstrapRunning else { return }
+        await refreshAccountState()
+    }
+
+    private func refreshAccountState() async {
+        guard isReady, supports(.authStatus), let client, !accountOperationBusy else { return }
         let token = generation
         clearRecentLibrary()
         authenticationGeneration += 1
@@ -736,12 +834,12 @@ final class LiveSession: ObservableObject {
     }
 
     private func readAccountStatus(using client: ManagementClient, generation token: Int) async throws -> AuthenticationStatus {
-        accountBusy = true
+        accountOperationBusy = true
         accountStatusChecking = true
         accountStatusCurrent = false
         defer {
             if token == generation {
-                accountBusy = false
+                accountOperationBusy = false
                 accountStatusChecking = false
             }
         }
@@ -839,7 +937,7 @@ final class LiveSession: ObservableObject {
         guard canSignIn, let client else { return }
         clearRecentLibrary()
         authenticationGeneration += 1
-        accountBusy = true
+        accountOperationBusy = true
         accountError = nil
         failedAccountAction = nil
         errorMessage = nil
@@ -851,12 +949,12 @@ final class LiveSession: ObservableObject {
             guard let flow = status.flow else { throw ManagementError.invalidPayload }
             acceptAccountStatus(status)
             signInDeadline = ContinuousClock.now.advanced(by: signInPollingBudget)
-            accountBusy = false
+            accountOperationBusy = false
             if flow.state == .pending { pollSignIn(flowID: flow.flowID, generation: token) }
         } catch {
             guard token == generation else { return }
             lastSignInFailure = SignInFailureSnapshot(requestError: error)
-            accountBusy = false
+            accountOperationBusy = false
             accountStatusCurrent = false
             if case let ManagementError.backendError(code, _) = error {
                 errorMessage = "Microsoft sign-in could not start. " + Self.describeSignInFailure(code: code)
@@ -926,7 +1024,7 @@ final class LiveSession: ObservableObject {
         guard let flow = authentication?.flow, flow.state == .pending, let client,
               supports(.authCancel), !accountBusy else { return }
         authenticationGeneration += 1
-        accountBusy = true
+        accountOperationBusy = true
         accountError = nil
         failedAccountAction = nil
         authTask?.cancel()
@@ -953,7 +1051,7 @@ final class LiveSession: ObservableObject {
                 pollSignIn(flowID: flow.flowID, generation: token)
             }
         }
-        if token == generation { accountBusy = false }
+        if token == generation { accountOperationBusy = false }
     }
 
     func signOut() async {
@@ -965,7 +1063,7 @@ final class LiveSession: ObservableObject {
         }
         clearRecentLibrary()
         authenticationGeneration += 1
-        accountBusy = true
+        accountOperationBusy = true
         accountError = nil
         failedAccountAction = nil
         authTask?.cancel()
@@ -988,7 +1086,7 @@ final class LiveSession: ObservableObject {
             accountError = errorMessage
             failedAccountAction = .signOut
         }
-        if token == generation { accountBusy = false }
+        if token == generation { accountOperationBusy = false }
     }
 
     func search(_ query: String, more: Bool = false) async {

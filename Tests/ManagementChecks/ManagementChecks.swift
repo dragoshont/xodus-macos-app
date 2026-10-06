@@ -916,12 +916,20 @@ enum MockBackend {
                         try trace(command)
                         if command == "auth.status" {
                             profileReads += 1
+                            if scenario == "recentbootstrapstatusfailure", profileReads == 1 {
+                                try emitFailure(request, code: "AUTH_INVALID", category: "credentialStoreUnavailable")
+                                continue
+                            }
                             let response = result(request, data: .object([
-                                "state": .string(loggedOut ? "signedOut" : "credentialPresent"),
+                                "state": .string(loggedOut ? "signedOut"
+                                    : scenario == "recentbootstrapsignedout" ? "signedOut"
+                                    : scenario == "recentbootstrapexpired" ? "expired"
+                                    : scenario == "recentbootstrapinvalid" ? "invalid" : "credentialPresent"),
                                 "credentialStore": .string("macOSKeychain"), "audience": .null,
                                 "expiresAt": .null, "entitlementAuthorized": .bool(false)
                             ]))
-                            if scenario == "recentstatusslow", profileReads > 1 {
+                            if (scenario == "recentstatusslow" && profileReads > 1)
+                                || scenario == "recentbootstrapstatusslow" {
                                 DispatchQueue.global().async {
                                     Thread.sleep(forTimeInterval: 0.5)
                                     do { try emit(.object(response)) } catch { exit(3) }
@@ -932,8 +940,9 @@ enum MockBackend {
                         if command == "auth.logout" { loggedOut = true }
                         if command == "library.recent" {
                             recentReads += 1
-                            if recentReads > 1, ["recentstale", "recentprofilechanged"].contains(scenario) {
-                                let stage: RecentLibraryFailure = scenario == "recentstale" ? .transportFailed : .profileChanged
+                            if (recentReads > 1 && ["recentstale", "recentprofilechanged"].contains(scenario))
+                                || (recentReads == 1 && scenario == "recentbootstraptransport") {
+                                let stage: RecentLibraryFailure = scenario == "recentprofilechanged" ? .profileChanged : .transportFailed
                                 var response = result(request, data: .null)
                                 response["ok"] = .bool(false)
                                 response.removeValue(forKey: "data")
@@ -945,10 +954,10 @@ enum MockBackend {
                             } else {
                                 guard let page = frames.first(where: {
                                     $0["data"]?["scope"]?.string == "recentlyPlayed"
-                                        && $0["data"]?["titles"]?.array?.isEmpty == (scenario == "recentzero")
+                                        && $0["data"]?["titles"]?.array?.isEmpty == ["recentzero", "recentbootstrapzero"].contains(scenario)
                                 })?["data"] else { exit(3) }
                                 let response = result(request, data: page)
-                                if scenario == "recentslow" {
+                                if ["recentslow", "recentbootstrapretire"].contains(scenario) {
                                     DispatchQueue.global().async {
                                         Thread.sleep(forTimeInterval: 0.6)
                                         do { try emit(.object(response)) } catch { exit(3) }

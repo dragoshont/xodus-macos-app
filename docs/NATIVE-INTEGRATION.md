@@ -55,6 +55,34 @@ app matched all 21 admitted files and owned one matching engine with no helper.
 Personal history remains memory-only: the private export never populates the
 newly reopened shipping session.
 
+### Foreground Library loading
+
+The new consumer source defaults to Library and owns one automatic load per
+management connection, admitted only while the app's Library is active and the
+connection is ready and no longer transitioning. It checks saved status once
+only when unconfirmed, reuses a fresh credential-present result, and conditionally
+requests `library.recent` with limit 20. It never begins login. The session-owned
+task survives ordinary view-task cancellation and navigation; repeated entry
+joins an existing attempt or stops after the consumed generation.
+
+A single account busy lease spans status and history. Connection retirement
+cancels the owned task and prevents late publication. An explicit Account check
+still clears identity-unbound history and does not silently reload it. Library
+shows the actual checking/loading stage, distinct safe failure copy, and an
+explicit retry that rechecks access only when it is unconfirmed. Signed-out,
+expired and invalid results offer Account without requesting history.
+
+Successful list publication emits only `stage=recentlyPlayed` and its public
+numeric count through native OSLog. Successful network image decoding emits
+only `stage=imageDecoded count=1`; cache hits are not additional decode events.
+Neither event contains titles, identifiers, URLs, profile information or wire
+frames. These aggregate events can be bound to the exact installed app PID
+without a debug/export API or another personal request. Production engine stderr
+remains discarded. The signed c107 engine, schema, artwork policy and saved
+profile are unchanged. Deployment and same-shipping-process evidence for this
+new source remain pending; the earlier private-export evidence is not reused
+as proof of this startup flow.
+
 ### Earlier saved-status and history confirmation
 
 The earlier controlled 4e20427/2b31d199 pair was independently admitted and

@@ -10,10 +10,13 @@ entrypoints. Shipping screens use native setup/empty/loading/error states and
 actual public product data, not synthetic game illustrations. See
 [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
-Live startup opens Discover, with real public results and scoped search.
+Live startup opens Library. Foreground entry performs one saved-sign-in check
+only if access is unconfirmed, then one bounded recently-played read after a
+current credential-present result. View rebuilds and navigation do not repeat
+the attempt; failures require an explicit retry, and no login starts automatically.
+Discover remains available for real public results and scoped search.
 This source adds metadata-backed Store cover/hero images and a separate
-**Recently played** Library window. Personal history loads only after an explicit
-saved-status check and explicit history action; it is not owned-game inventory,
+**Recently played** Library window. Personal history is not owned-game inventory,
 installation or PC/Mac compatibility. Its reported-platform filter and scoped
 search apply only to that partial in-memory window. No personal history is
 persisted, and no title-to-Store mapping is guessed. The controlled
@@ -26,7 +29,8 @@ visually confirmed with real title artwork and a featured tile. Real Store
 covers and hero images were separately confirmed in Discover and Product.
 Own-view evidence is not compositor or accessibility certification. The
 reopened shipping app has a separate session: the export does not persist or
-inject history, so loading it still requires the user's explicit action.
+inject history. The new foreground Library-loading source is not yet deployed;
+the 113be57 shipping build still requires explicit Account/history actions.
 
 Owned/installed Library enumeration remains unavailable: the installed snapshot is a constant empty
 response, not a durable registry or scan of this Mac. It never proves that no
