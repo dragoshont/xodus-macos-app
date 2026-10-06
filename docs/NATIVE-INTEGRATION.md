@@ -25,10 +25,40 @@ Public fixture confirmation establishes this source format only, not the cause
 of the earlier 20 actual history rejections. Optional closed rejection-shape
 counts on stderr expose no URLs, assets, account identifiers or query values;
 they are not management responses and remain discarded in production.
-The c1073100 producer is Release-qualified, but its matching replacement package
-and actual-history artwork confirmation are pending. The earlier controlled
-4e20427/2b31d199 pair was independently admitted and installed after exact
-consumer CI passed. Neither is a distribution release.
+The controlled 113be57/c1073100 pair was Release-qualified, independently admitted
+and installed after exact consumer CI
+[37502060591](https://github.com/dragoshont/xodus-macos-app/actions/runs/37502060591)
+passed. It is not a distribution release.
+
+Actual artwork confirmation on 2026-10-06 used consumer
+`113be57c7ceba230bc9252585bd98e4ce1679fa4`, tree
+`868cac2bdae2691b185b7bff400c35d0672c9053`, and this producer. Package receipt
+SHA256 is
+`e0b19abee839821b35feaad3e486932642c92351942b28b44a463263ef5b71b2`;
+the signed CLI SHA256 is
+`c8fe69a3bc2b6a84c5bad5ef0c1ae041f36466a87419c0f17d9567c6df3ed14d`.
+Stable local certificate `6C5F1CD832A2B2842686245B4DEF219BB8B465B2`
+and fixed app/CLI/helper identities are unchanged.
+One foreground saved-status request returned current `credentialPresent`,
+then one recent request returned 20 live/partial titles. Artwork counts were
+available 20, absent 0, rejected 0, notQueried 0; all 20 preload references
+succeeded, with zero failures. Reference success is not a unique-HTTP-request
+count. One actual Library image was retrieved and visually confirmed, showing
+real title artwork and a featured tile, not an invented hero-role image.
+No public Store query, authenticated verification or Account render was repeated.
+This closes the observed history-art gap without establishing owned inventory,
+package access, installation or Mac compatibility.
+Normal Quit released the old owner without forced retirement. The complete
+working 4e bundle and all earlier rollbacks were preserved; the profile and
+saved credentials were not copied, deleted or reset. The reopened shipping
+app matched all 21 admitted files and owned one matching engine with no helper.
+Personal history remains memory-only: the private export never populates the
+newly reopened shipping session.
+
+### Earlier saved-status and history confirmation
+
+The earlier controlled 4e20427/2b31d199 pair was independently admitted and
+installed after exact consumer CI passed.
 The earlier fb39072/680 pair proved real public Store artwork, but personal
 history was not accessed: its captured foreground status reads failed with
 `credentialStoreUnavailable`. No successful permission or TitleHub read is
@@ -91,14 +121,16 @@ classification, not Xbox history as blanket PC compatibility.
 
 The private nonshipping admitted exporter performs one actual recent-history
 read after foreground Account confirmation, preloads only accepted metadata art
-and renders the same Library/Account components without repeating the earlier
-public Store query. A valid zero-title result renders an honest empty recent
-scope. Together with the earlier real Discover/Product exports, its four private
-PNGs contain no XUID, email, raw responses or secrets. A development-only
-stderr capture admits only the producer's closed, at-most-512-byte failed-read
-diagnostic; production stderr handling remains unchanged. It still renders only
-its own NSView hierarchy, not the compositor or a VoiceOver certification.
-Neutral checks remain separate from this actual account/history evidence.
+and renders the shared Library component without repeating the earlier public
+Store query or Account image. A valid zero-title result renders an honest empty
+recent scope. Private own-view images contain no XUID, email, raw responses or
+secrets. Development-only stderr capture admits only the producer's closed,
+at-most-512-byte failed-read diagnostic or rejection-shape aggregate.
+The latter exposes only fixed scheme/host/path categories and known query-key
+counts, never URLs, assets, unknown key names or query values; 69 neutral capture
+checks passed. Production stderr handling remains unchanged. Own-view renders
+are not compositor or VoiceOver certification, and neutral checks remain
+separate from actual account/history evidence.
 
 ## Implemented client and native surfaces
 

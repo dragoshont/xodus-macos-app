@@ -16,14 +16,17 @@ This source adds metadata-backed Store cover/hero images and a separate
 saved-status check and explicit history action; it is not owned-game inventory,
 installation or PC/Mac compatibility. Its reported-platform filter and scoped
 search apply only to that partial in-memory window. No personal history is
-persisted, and no title-to-Store mapping is guessed. The controlled 4e20427/2b31d199
-pair is admitted and installed: one foreground check confirmed saved sign-in,
-and one actual TitleHub read returned a partial 20-title window. All 20 history
-artwork entries were rejected by the current image-source policy, so Library
-shows honest placeholders, not a successfully loaded hero. Real Store covers
-and hero images were separately loaded and visually confirmed in Discover and
-Product. Four private own-view images cover those public surfaces plus the real
-Library and saved Account state; they are not compositor or accessibility certification.
+persisted, and no title-to-Store mapping is guessed. The controlled
+113be57/c1073100 pair is admitted and installed: one foreground check confirmed
+saved sign-in, and one actual TitleHub read returned a partial 20-title window
+with 20 available artwork entries and none rejected. All 20 preload references
+succeeded, with zero failures; references may share cached images, so this is
+not a claim of 20 unique HTTP requests. A private actual Library image was
+visually confirmed with real title artwork and a featured tile. Real Store
+covers and hero images were separately confirmed in Discover and Product.
+Own-view evidence is not compositor or accessibility certification. The
+reopened shipping app has a separate session: the export does not persist or
+inject history, so loading it still requires the user's explicit action.
 
 Owned/installed Library enumeration remains unavailable: the installed snapshot is a constant empty
 response, not a durable registry or scan of this Mac. It never proves that no
