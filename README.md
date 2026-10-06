@@ -19,8 +19,8 @@ This source adds metadata-backed Store cover/hero images and a separate
 **Recently played** Library window. Personal history is not owned-game inventory,
 installation or PC/Mac compatibility. Its reported-platform filter and scoped
 search apply only to that partial in-memory window. No personal history is
-persisted, and no title-to-Store mapping is guessed. The controlled
-113be57/c1073100 pair is admitted and installed: one foreground check confirmed
+persisted, and no title-to-Store mapping is guessed. The earlier controlled
+113be57/c1073100 pair was admitted and installed: one foreground check confirmed
 saved sign-in, and one actual TitleHub read returned a partial 20-title window
 with 20 available artwork entries and none rejected. All 20 preload references
 succeeded, with zero failures; references may share cached images, so this is
@@ -28,9 +28,16 @@ not a claim of 20 unique HTTP requests. A private actual Library image was
 visually confirmed with real title artwork and a featured tile. Real Store
 covers and hero images were separately confirmed in Discover and Product.
 Own-view evidence is not compositor or accessibility certification. The
-reopened shipping app has a separate session: the export does not persist or
-inject history. The new foreground Library-loading source is not yet deployed;
-the 113be57 shipping build still requires explicit Account/history actions.
+reopened shipping app had a separate session: the export did not persist or
+inject history. That historical export is not proof of the new startup flow.
+
+The current **7aa9eb9/c1073100 shipping pair is admitted and installed**. Its
+ordinary foreground startup published one real 20-title recently-played window,
+and the same shipping process decoded 12 actual artwork images successfully.
+That populated app was left running, with one matching engine and no sign-in
+helper. No private exporter, additional personal request or reopen was used.
+These are aggregate publication/decode observations, not a claim that every
+title has a distinct fetched image or that recent activity proves ownership.
 
 Owned/installed Library enumeration remains unavailable: the installed snapshot is a constant empty
 response, not a durable registry or scan of this Mac. It never proves that no

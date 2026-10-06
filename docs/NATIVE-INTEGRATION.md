@@ -79,9 +79,33 @@ Neither event contains titles, identifiers, URLs, profile information or wire
 frames. These aggregate events can be bound to the exact installed app PID
 without a debug/export API or another personal request. Production engine stderr
 remains discarded. The signed c107 engine, schema, artwork policy and saved
-profile are unchanged. Deployment and same-shipping-process evidence for this
-new source remain pending; the earlier private-export evidence is not reused
-as proof of this startup flow.
+profile are unchanged.
+
+Actual shipping confirmation on 2026-10-06 used consumer
+`7aa9eb9de094c5f96233a6e99fb08b48c61fc92a`, tree
+`bc23e93f4e0de2a870616bf2a18ba325666bc0ce`, after exact CI
+[37509107895](https://github.com/dragoshont/xodus-macos-app/actions/runs/37509107895)
+succeeded and independent source/package admission passed. Receipt SHA256 is
+`b36305e73a4b0aa4fd779582089f716d3f368e86049582d0d06975626bc61035`.
+The signed c107 CLI remains byte-for-byte
+`c8fe69a3bc2b6a84c5bad5ef0c1ae041f36466a87419c0f17d9567c6df3ed14d`,
+reused from the previously admitted e0b package through the existing
+signed-CLI preservation path, without rebuilding or re-signing the engine.
+
+One normal Quit released the old owner. Atomic replacement preserved the full
+working 113 bundle, prior rollbacks, profile and credentials. One ordinary
+foreground launch of the actual shipping app published **one** recently-played
+list with **20** real titles after the guarded saved-status/history sequence.
+The same installed app PID emitted **12** successful actual image-decode events.
+These are decode observations, not 20 unique HTTP requests or proof that every
+offscreen image loaded. All 21 installed files and strict fixed signatures
+matched admission; the app owned exactly one unchanged matching engine and no
+sign-in helper. **That same populated shipping process was left running.**
+No private exporter, extra personal RPC, relogin/reset or reopen was used.
+Only fixed stage/count events were read, and only aggregate proof was retained.
+The earlier private-export evidence is not reused as proof of this flow.
+Recently played remains live/partial activity, not authoritative owned-PC
+inventory, installation, package authorization or Mac compatibility.
 
 ### Earlier saved-status and history confirmation
 
