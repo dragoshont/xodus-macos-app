@@ -107,6 +107,22 @@ The earlier private-export evidence is not reused as proof of this flow.
 Recently played remains live/partial activity, not authoritative owned-PC
 inventory, installation, package authorization or Mac compatibility.
 
+### Explicit recent-title Store search
+
+The next source slice adds a native "Find in Store" action to the existing
+recent-title feature and grid. The action routes only the actual title name as
+the Discover query and clears any stale product-sheet selection. It sends no
+request itself: the existing user-directed Discover search task, capability
+gates and bounded/coalesced client perform the catalog search. Results remain
+unmapped catalog candidates until the user explicitly selects a product.
+No product/edition identity, ownership, installation or playability is inferred
+from the history entry. Navigation and catalog search do not refresh Account,
+reload personal history or alter its fences. Stock buttons support keyboard
+activation; title-specific VoiceOver labels remain separate reachable children.
+Artwork sizing, tokens and the current native composition are unchanged.
+Qualification is source/neutral CI only at this stage; the populated admitted
+7aa9 shipping process remains unchanged, with no extra personal or artwork read.
+
 ### Earlier saved-status and history confirmation
 
 The earlier controlled 4e20427/2b31d199 pair was independently admitted and

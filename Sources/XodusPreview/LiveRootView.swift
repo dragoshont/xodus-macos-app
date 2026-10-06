@@ -89,7 +89,9 @@ struct LiveRootView: View {
     private var library: some View {
         VStack(alignment: .leading, spacing: 20) {
             if session.isReady, session.supports(.libraryRecent) {
-                LiveRecentLibraryView(query: scopedQuery) { state.showingAccount = true }
+                LiveRecentLibraryView(query: scopedQuery,
+                                      openAccount: { state.showingAccount = true },
+                                      findInStore: { state.findInStore($0, session: session) })
             } else {
                 ContentUnavailableView {
                     Label(session.isReady ? "Your games" : session.libraryTitle,

@@ -22,6 +22,7 @@ private final class RecentLibrarySelection: ObservableObject {
 struct LiveRecentLibraryView: View {
     let query: String
     let openAccount: () -> Void
+    let findInStore: (String) -> Void
     @EnvironmentObject private var session: LiveSession
     @StateObject private var selection = RecentLibrarySelection()
 
@@ -85,9 +86,10 @@ struct LiveRecentLibraryView: View {
                                 Text(title.name).font(.headline).lineLimit(2)
                                     .frame(minHeight: 40, alignment: .topLeading)
                                 Text(title.platform.label).font(.caption).foregroundStyle(.secondary)
+                                storeAction(for: title)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .accessibilityElement(children: .combine)
+                            .accessibilityElement(children: .contain)
                         }
                     }
                 }
@@ -141,7 +143,7 @@ struct LiveRecentLibraryView: View {
                 featuredText(title)
             }
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 
     private func featuredText(_ title: RecentLibraryTitle) -> some View {
@@ -152,7 +154,18 @@ struct LiveRecentLibraryView: View {
                 Text("Last played \(date.formatted(date: .abbreviated, time: .omitted))")
                     .font(.callout).foregroundStyle(.secondary)
             }
+            storeAction(for: title)
         }
+    }
+
+    private func storeAction(for title: RecentLibraryTitle) -> some View {
+        Button("Find in Store") { findInStore(title.name) }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(!session.isReady || (!session.supports(.query) && !session.supports(.search)))
+            .accessibilityLabel("Find \(title.name) in Store")
+            .accessibilityHint("Search Microsoft Store for this game name.")
+            .accessibilityIdentifier("xodus.library.findInStore")
     }
 
     private static func playedDate(_ value: String) -> Date? {

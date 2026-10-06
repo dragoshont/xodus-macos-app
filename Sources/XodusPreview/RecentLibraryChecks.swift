@@ -64,6 +64,55 @@ enum RecentLibraryChecks {
                 try await Task.sleep(for: .milliseconds(10))
             }
         }
+        for scenario in ["recentstorecandidates", "recentstoreempty", "recentstorefailure"] {
+            let value = LiveSession(configuration: configuration(scenario))
+            await value.connect()
+            await value.loadRecentLibraryOnEntry()
+            guard let history = value.recentLibrary, let title = history.titles.first else {
+                throw ManagementError.invalidPayload
+            }
+            let account = value.authentication
+            let before = try trace(scenario)
+            let state = AppState()
+            state.query = "previous Library filter"
+            state.findInStore(title.name, session: value)
+            check(try state.destination == .discover && state.query == title.name
+                  && value.selectedProduct == nil && trace(scenario) == before,
+                  "Explicit Find in Store routes only the actual title name, without product selection or immediate RPC")
+            await value.refreshCatalog(state.query)
+            check(value.recentLibrary == history && value.recentLibraryCurrent
+                  && value.authentication == account && value.accountStatusCurrent
+                  && title.productID == nil,
+                  "Store search preserves personal history and account fences without inferring a Store mapping")
+            check(try trace(scenario).filter { $0 == "auth.status" }.count == 1
+                  && trace(scenario).filter { $0 == "library.recent" }.count == 1
+                  && trace(scenario).filter { $0 == "catalog.query" }.count == 1,
+                  "Only the existing user-directed catalog search runs; no extra status or personal read")
+            if scenario == "recentstorecandidates" {
+                guard let candidate = value.products.first else { throw ManagementError.invalidPayload }
+                check(value.selectedProduct == nil && value.catalogError == nil,
+                      "Matching catalog candidates never automatically become a mapped game detail")
+                value.selectedProduct = candidate
+                check(value.selectedProduct == candidate,
+                      "The existing catalog candidate can be explicitly selected for its own product detail")
+                state.findInStore(title.name, session: value)
+                check(value.selectedProduct == nil && state.query == title.name,
+                      "Another explicit title-name route dismisses stale product selection")
+                state.navigate(.library)
+                check(state.query.isEmpty && value.recentLibrary == history,
+                      "Returning to Library restores its scoped search without clearing or rereading activity")
+            } else if scenario == "recentstoreempty" {
+                check(value.products.isEmpty && value.catalogError == nil && value.discoveryFailures.isEmpty
+                      && value.catalogEmptyTitle == "No Store matches" && value.selectedProduct == nil,
+                      "A genuine zero-candidate search stays the existing honest empty result")
+            } else {
+                check(value.products.isEmpty && value.catalogError != nil && !value.discoveryFailures.isEmpty
+                      && value.catalogEmptyTitle != "No Store matches" && value.selectedProduct == nil,
+                      "Failed catalog candidate checking stays a visible partial/error state, not a false empty match")
+            }
+            check(await value.disconnect(), "Neutral title-name Store navigation owner closes")
+        }
+
         let bootstrap = LiveSession(configuration: configuration("recentbootstrapstatusslow"))
         await bootstrap.connect()
         let entering = Task { await bootstrap.loadRecentLibraryOnEntry() }

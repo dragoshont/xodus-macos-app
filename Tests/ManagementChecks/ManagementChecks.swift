@@ -967,6 +967,27 @@ enum MockBackend {
                             continue
                         }
                         if command == "catalog.query" {
+                            if scenario == "recentstorefailure" {
+                                guard var response = frames.first(where: {
+                                    $0["error"]?["details"]?["corpus"]?.string == "publicMicrosoftStoreSearch"
+                                })?.object, var error = response["error"]?.object,
+                                      var details = error["details"]?.object else { exit(3) }
+                                response["requestID"] = request["requestID"]
+                                details["query"] = request["params"]?["query"]
+                                error["details"] = .object(details)
+                                response["error"] = .object(error)
+                                try emit(.object(response))
+                                continue
+                            }
+                            if scenario == "recentstoreempty" {
+                                guard var page = frames.first(where: {
+                                    $0["data"]?["corpus"]?.string == "publicMicrosoftStoreSearch"
+                                        && $0["data"]?["products"]?.array?.isEmpty == true
+                                })?["data"]?.object else { exit(3) }
+                                page["query"] = request["params"]?["query"]
+                                try emit(.object(result(request, data: .object(page))))
+                                continue
+                            }
                             guard var page = frames.first(where: {
                                 $0["data"]?["corpus"]?.string == "publicMicrosoftStoreSearch"
                                     && $0["data"]?["products"]?.array?.isEmpty == false

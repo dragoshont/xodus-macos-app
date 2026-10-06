@@ -62,6 +62,15 @@ in the toolbar, and its cancellation, refresh and credential gates are
 unchanged. No Home shelves, invented installed games, new framework or
 speculative navigation API is introduced.
 
+**Recent-title Store action:** a stock bordered "Find in Store" button accompanies
+the existing featured title and tile entries without changing artwork geometry
+or tokens. The button has native keyboard focus/activation and a title-specific
+VoiceOver label; containing accessibility groups keep the action independently
+reachable. Only this explicit action routes the title name into the existing
+Discover search. It does not establish a product/edition mapping or select a
+result. The user chooses among catalog candidates, with the existing partial,
+empty and error presentation; history and account state remain separate.
+
 **Production hardening:** the shipping/live path no longer uses the invented
 harbor/orbit promotional hero or game poster in Account. Title-specific artwork
 comes only from normalized real Microsoft metadata, not bundled covers, invented

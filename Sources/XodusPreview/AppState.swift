@@ -67,6 +67,12 @@ final class AppState: ObservableObject {
 #endif
     }
 
+    func findInStore(_ titleName: String, session: LiveSession) {
+        session.selectedProduct = nil
+        navigate(.discover)
+        query = titleName
+    }
+
 #if !XODUS_SHIPPING
     var visibleGames: [Game] {
         guard inventory != .empty && inventory != .failed else { return [] }
