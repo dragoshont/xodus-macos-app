@@ -17,11 +17,33 @@ under the existing serialized credential-read guard and checks restoration of
 the exact prior policy. Noninteractive reads and credential writes retain their
 existing behavior. Its bounded failure-only stderr diagnostic is not a new
 management response or shipping UI feature; production stderr remains discarded.
-The replacement pair is pending release qualification and artifact admission.
+The controlled replacement pair was release-qualified, independently admitted
+and installed after exact consumer CI passed. It is not a distribution release.
 The earlier fb39072/680 pair proved real public Store artwork, but personal
 history was not accessed: its captured foreground status reads failed with
 `credentialStoreUnavailable`. No successful permission or TitleHub read is
 inferred from source changes or neutral checks.
+
+Actual confirmation on 2026-10-06 used consumer
+`4e204270550f2f83082e7562187f8619b777fc05` and this producer, with stable local
+certificate `6C5F1CD832A2B2842686245B4DEF219BB8B465B2`. Package receipt SHA256:
+`91e2adf68c0c224fe5a123d5fb19c3565fb75c706be22072d03403a2521e6269`.
+The actual signed CLI was
+`67b6de5ec1c56316313d6901a3beaa71857c782c1cd036fc19e08c209c8ae00a`.
+One foreground `auth.status` returned current `credentialPresent`, followed by
+one `library.recent` request with limit 20 returning 20 real titles. This is
+recently-played/live/partial evidence, not owned-PC inventory.
+Artwork metadata counts were available 0, absent 0, rejected 20, notQueried 0.
+No history image fetch was attempted: zero approved references is not fetch
+success. No unsafe host or URL policy was broadened to obtain covers.
+Actual native Library and saved-Account images showed the real results and
+honest artwork fallbacks. Earlier anonymous Store cover/hero confirmation is
+reused, without another public query or authenticated verification.
+The reopened shipping app matched every admitted package file and owned one
+engine with no sign-in helper. Full fb and earlier a8/397 rollbacks were
+preserved; saved credentials were not copied, deleted or reset. Retirement of
+the earlier fb app and its exact parent-bound engine used explicitly authorized
+SIGTERM after normal Quit failed, separately from the atomic installer.
 
 Every product and recent title requires the same max-four unique-role artwork
 array and explicit available/absent/rejected/notQueried status. Positive,
@@ -56,14 +78,16 @@ binding, so "same profile" cannot be inferred. Failed/unconfirmed credentials,
 profile change, sign-out and disconnection also clear it. PC filtering uses the reported platform
 classification, not Xbox history as blanket PC compatibility.
 
-The nonshipping admitted exporter now performs one actual recent-history read
-after foreground Account confirmation, preloads only accepted metadata art and
-renders the same Library/Discover/Product/Account components. A valid zero-title
-result renders an honest empty recent scope. Its four private PNGs never contain
-XUID, email, raw responses or secrets. It still renders only its own NSView
-hierarchy, not the compositor or a VoiceOver certification. The new matching
-package and this actual-data confirmation remain pending; neutral checks are
-not live account/history evidence.
+The private nonshipping admitted exporter performs one actual recent-history
+read after foreground Account confirmation, preloads only accepted metadata art
+and renders the same Library/Account components without repeating the earlier
+public Store query. A valid zero-title result renders an honest empty recent
+scope. Together with the earlier real Discover/Product exports, its four private
+PNGs contain no XUID, email, raw responses or secrets. A development-only
+stderr capture admits only the producer's closed, at-most-512-byte failed-read
+diagnostic; production stderr handling remains unchanged. It still renders only
+its own NSView hierarchy, not the compositor or a VoiceOver certification.
+Neutral checks remain separate from this actual account/history evidence.
 
 ## Implemented client and native surfaces
 

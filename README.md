@@ -16,8 +16,14 @@ This source adds metadata-backed Store cover/hero images and a separate
 saved-status check and explicit history action; it is not owned-game inventory,
 installation or PC/Mac compatibility. Its reported-platform filter and scoped
 search apply only to that partial in-memory window. No personal history is
-persisted, and no title-to-Store mapping is guessed. The new producer pair and
-actual four-view artwork/history confirmation are not yet admitted or deployed.
+persisted, and no title-to-Store mapping is guessed. The controlled 4e20427/2b31d199
+pair is admitted and installed: one foreground check confirmed saved sign-in,
+and one actual TitleHub read returned a partial 20-title window. All 20 history
+artwork entries were rejected by the current image-source policy, so Library
+shows honest placeholders, not a successfully loaded hero. Real Store covers
+and hero images were separately loaded and visually confirmed in Discover and
+Product. Four private own-view images cover those public surfaces plus the real
+Library and saved Account state; they are not compositor or accessibility certification.
 
 Owned/installed Library enumeration remains unavailable: the installed snapshot is a constant empty
 response, not a durable registry or scan of this Mac. It never proves that no
@@ -78,7 +84,7 @@ separate approval. See [controlled pair admission](docs/SHIPPING-ADMISSION.md).
 
 The proposed deployment baseline is **macOS 14**, not a user-approved support commitment. The shared native toolbar groups Library / Discover / Downloads with compact stock `NSSearchField` search: real `.tabs` on macOS 27+, segmented fallback on 14-26. Search expands for editing, Command-F or a retained query; Account stays separate at the trailing edge. The Scene hides the visible title while retaining native traffic lights and app identity. Live title art uses only actual normalized Microsoft metadata URLs through a
 bounded memory-only native loader; proprietary covers are not bundled or
-committed. Empty/error states keep semantic native backgrounds. Account content scrolls independently of its adaptive action footer, and normal activation remains AppKit-owned. Source/headless evidence is **not deployed or visually confirmed**.
+committed. Empty/error states keep semantic native backgrounds. Account content scrolls independently of its adaptive action footer, and normal activation remains AppKit-owned. Source/headless checks alone do not establish deployment or visual conformance; the controlled pair's actual own-view confirmation is recorded separately.
 
 **Official CrossOver, installed separately, is the first-release dependency.**
 The app checks only standard app locations, bounded metadata and a fixed
@@ -100,8 +106,9 @@ sign-in result does not qualify this runtime policy for gameplay or distribution
 anonymous-channel protocol. Its exact seven-string legacy handoff remains
 memory-only; Rust retains proof/SOAP processing and credential commit. Neutral
 WebKit and channel checks do not contact Microsoft. The controlled human flow
-now reaches saved sign-in, including after restart; passkey coverage and
-authenticated provider-read verification remain unqualified.
+now reaches saved sign-in, including after restart. Actual bounded provider
+reads are recorded separately from neutral checks; passkey coverage and full
+owned-library enumeration remain unqualified.
 
 **Visual revision v0.2 supersedes the unapproved flat v0.1 concepts.** SVGs describe editable layout and intended glass placement, not live compositor refraction. Native own-view exports also cannot establish backdrop/refraction fidelity; the native implementation, not an SVG blur, owns system Glass.
 
