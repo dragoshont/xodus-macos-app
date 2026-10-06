@@ -36,6 +36,7 @@ public enum ManagementCommand: String, CaseIterable, Codable, Sendable {
     public var defaultTimeout: Duration {
         switch self {
         case .authBegin, .authLogout: .seconds(600)
+        case .authStatus: .seconds(130)
         default: .seconds(30)
         }
     }

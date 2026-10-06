@@ -13,7 +13,9 @@ Closing the client first closes stdin for owned-child cleanup, waits for the eng
 `LiveSession` and the native views implement a real default development shell: account status, explicit sign-in/cancel/logout actions, scoped partial catalog, edition detail, catalog-check cancellation/retry and authoritative activity snapshots. Native sign-in is backend-owned; the Swift app never receives tokens, redirect fragments or raw provider errors. Optional agreed flow metadata is consumed only through the bundled producer schema and negotiated capabilities. New sign-in is always an explicit user action, never startup or a test action.
 
 Anonymous startup does not read the Keychain. Account initially remains unchecked;
-explicitly opening Account requests a noninteractive saved-profile check.
+explicitly opening Account requests a foreground saved-profile check. The paired
+native producer may show macOS's ordinary Keychain permission prompt. Only the
+human handles that prompt; the app does not collect or type its password.
 **Check status** remains available during pending sign-in. A new sign-in requires
 fresh, confirmed signed-out status; expired/invalid profiles instead expose a
 confirmed launcher-only disconnect. An unavailable store never causes deletion.
@@ -37,8 +39,14 @@ The original GUI startup
 was observed to time out specifically in `auth.status`, despite the equivalent
 SSH read failing promptly with `credentialStoreUnavailable`. Removing that
 automatic read preserves anonymous browsing without approving any native consent.
-The coordinated producer fix makes management-profile status reads noninteractive
-and bounds them to two seconds without blocking public dispatch. OSLog records process start, negotiation and the canonical command
+The foreground status request has a 130-second client budget around the producer's
+120-second human-permission budget, without blocking public dispatch. One native
+busy gate prevents duplicate status requests and account mutations during the
+check. Freshness is invalidated before the read, and a late retired-generation
+result cannot restore it. A denial remains an explicit error, not signed-out
+evidence or an automatic permission retry. A new locally signed development
+engine may require its own approval even when its designated requirement is
+unchanged. OSLog records process start, negotiation and the canonical command
 name on timeout only; no paths, arguments, IDs, credentials or upstream messages
 are logged.
 
@@ -48,7 +56,8 @@ Human-interactive `auth.begin` preparation and `auth.logout` have separate finit
 600-second transport budgets; ordinary reads retain 30-second defaults. A
 mutation failure invalidates the pre-mutation account freshness and never causes
 a blind retry. Pending flow reconciliation survives transient unavailable-store
-or retryable responses. A rejected cancellation during credential commit resumes
+responses only after an explicit status request when Keychain access failed;
+retryable network responses remain reconcilable. A rejected cancellation during credential commit resumes
 polling with the original monotonic deadline instead of claiming cancellation.
 Terminal flows cannot regress to a late pending snapshot. At deadline, the app
 asks for current status rather than manufacturing a terminal outcome.
@@ -134,12 +143,19 @@ The schema is a separate bundle resource; C95 and the reviewed Swift auth-host
 source remain unchanged. This integration is source/headless only, not deployed
 or a claim of any installed/runtime/game qualification.
 
-The current schema/fixture pin is public producer commit
-`c42e21aee18da893546cca94cbee09820bcbca95` in `dragoshont/xodus-macos`,
+The current producer pin is public commit
+`d00a8b97501a2ce1045d579e62568c5feb017ca8` in `dragoshont/xodus-macos`,
 branch `dragoshont-xodus-launcher-management`: 88 positive, 47 negative and four
 independent evidence-edge frames. This additive contract includes public
 `catalog.query`, read-only `installed.inspect` and explicit `auth.verify`; capabilities are negotiated from the running producer, not
 copied from a fixture.
+
+This producer retains the schema and fixtures unchanged. Foreground `auth.status`
+restores ordinary native Keychain read interaction with a bounded 120-second
+worker; its permit remains held until the OS call actually returns, including
+after timeout. Discovery remains responsive. Active sign-in polling and explicit
+`auth.verify` retain deliberate bounded noninteractive reads. A native permission
+approval is not a new Microsoft login or an entitlement result.
 
 Canonical committed schema SHA256:
 

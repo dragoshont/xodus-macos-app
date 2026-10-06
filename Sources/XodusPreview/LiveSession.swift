@@ -19,6 +19,7 @@ final class LiveSession: ObservableObject {
     @Published private(set) var searching = false
     @Published private(set) var catalogStopped = false
     @Published private(set) var accountBusy = false
+    @Published private(set) var accountStatusChecking = false
     @Published private(set) var accountStatusCurrent = false
     @Published private(set) var accountError: String?
     @Published private(set) var accountStatusError: ManagementError?
@@ -64,6 +65,7 @@ final class LiveSession: ObservableObject {
     private var cacheRevision: UInt64?
     private var discoveryRevision: String?
     private let configuration: BackendConfiguration?
+    private let signInPollingBudget: Duration
     private var signInDeadline: ContinuousClock.Instant?
     private var catalogTask: Task<Void, Never>?
     private var catalogWorkerID: UUID?
@@ -112,8 +114,10 @@ final class LiveSession: ObservableObject {
     }
 
     init(configuration: BackendConfiguration? = nil,
+         signInPollingBudget: Duration = .seconds(600),
          shutdownClient: @escaping @Sendable (ManagementClient) async -> Bool = { await $0.close() }) {
         self.shutdownClient = shutdownClient
+        self.signInPollingBudget = signInPollingBudget
 #if XODUS_SHIPPING
         self.configuration = nil
         backendPath = Bundle.main.bundleURL
@@ -152,6 +156,7 @@ final class LiveSession: ObservableObject {
             && accountStatusCurrent && authentication?.state == .signedOut && !accountBusy && !signInPending
     }
     var accountNoticeTitle: String {
+        if accountStatusChecking { return "Checking saved sign-in" }
         guard isReady, accountStatusCurrent else { return accountLabel }
         if authentication?.flow?.state == .failed { return "Sign-in failed" }
         if authentication?.flow?.state == .cancelled { return "Sign-in cancelled" }
@@ -160,6 +165,9 @@ final class LiveSession: ObservableObject {
     var accountMessage: String {
         if phase == .connecting { return "Connecting to Xodus." }
         guard isReady else { return "Xodus couldn't connect. Open Settings to reconnect." }
+        if accountStatusChecking {
+            return "If macOS asks for Keychain access, respond in its permission window. Your saved sign-in is not being replaced."
+        }
         if accountError != nil {
             if failedAccountAction == .status && accountStatusError == .credentialStoreUnavailable {
                 return "Your saved sign-in couldn't be checked because Xodus cannot access Keychain. Sign-in stays disabled until access is confirmed. After resolving Keychain access, choose Check status."
@@ -591,6 +599,7 @@ final class LiveSession: ObservableObject {
         catalogStopped = false
         lookupBusy = false
         accountBusy = false
+        accountStatusChecking = false
         guard let previous = client else {
             phase = .disconnected
             return true
@@ -628,12 +637,12 @@ final class LiveSession: ObservableObject {
     }
 
     func refreshAccount() async {
-        guard isReady, supports(.authStatus), let client else { return }
+        guard isReady, supports(.authStatus), let client, !accountBusy else { return }
         let token = generation
         authenticationGeneration += 1
         let authToken = authenticationGeneration
         do {
-            let status = try await client.request(.authStatus).decode(AuthenticationStatus.self)
+            let status = try await readAccountStatus(using: client, generation: token)
             guard token == generation, authToken == authenticationGeneration else { return }
             acceptAccountStatus(status)
             accountError = nil
@@ -647,6 +656,19 @@ final class LiveSession: ObservableObject {
             failedAccountAction = .status
             errorMessage = Self.describe(error)
         }
+    }
+
+    private func readAccountStatus(using client: ManagementClient, generation token: Int) async throws -> AuthenticationStatus {
+        accountBusy = true
+        accountStatusChecking = true
+        accountStatusCurrent = false
+        defer {
+            if token == generation {
+                accountBusy = false
+                accountStatusChecking = false
+            }
+        }
+        return try await client.request(.authStatus).decode(AuthenticationStatus.self)
     }
 
     private func acceptAccountStatus(_ status: AuthenticationStatus) {
@@ -749,7 +771,7 @@ final class LiveSession: ObservableObject {
             guard token == generation else { return }
             guard let flow = status.flow else { throw ManagementError.invalidPayload }
             acceptAccountStatus(status)
-            signInDeadline = ContinuousClock.now.advanced(by: .seconds(600))
+            signInDeadline = ContinuousClock.now.advanced(by: signInPollingBudget)
             accountBusy = false
             if flow.state == .pending { pollSignIn(flowID: flow.flowID, generation: token) }
         } catch {
@@ -768,30 +790,30 @@ final class LiveSession: ObservableObject {
     private func pollSignIn(flowID: String, generation token: Int) {
         authTask?.cancel()
         authTask = Task { [weak self] in
-            let deadline = self?.signInDeadline ?? ContinuousClock.now.advanced(by: .seconds(600))
+            let deadline = self?.signInDeadline ?? ContinuousClock.now.advanced(by: self?.signInPollingBudget ?? .seconds(600))
             do {
                 while !Task.isCancelled {
                     try await Task.sleep(for: .seconds(1))
                     guard let self, token == self.generation, let client = self.client else { return }
-                    guard ContinuousClock.now < deadline else {
-                        self.errorMessage = "Sign-in is still pending. Check status before retrying or closing; no cancellation was assumed."
-                        self.accountError = self.errorMessage
-                        self.failedAccountAction = .status
-                        return
-                    }
+                    if self.accountBusy { continue }
+                    let finalCheck = ContinuousClock.now >= deadline
+                    self.authenticationGeneration += 1
+                    let authToken = self.authenticationGeneration
                     let status: AuthenticationStatus
-                    do { status = try await client.request(.authStatus).decode(AuthenticationStatus.self) }
+                    do { status = try await self.readAccountStatus(using: client, generation: token) }
                     catch {
-                        guard token == self.generation, !Task.isCancelled else { return }
+                        guard token == self.generation, authToken == self.authenticationGeneration,
+                              !Task.isCancelled else { return }
                         self.accountStatusCurrent = false
+                        self.accountStatusError = error as? ManagementError
                         self.errorMessage = Self.describe(error)
                         self.accountError = self.errorMessage
                         self.failedAccountAction = .status
-                        if error as? ManagementError == .credentialStoreUnavailable { continue }
-                        if case ManagementError.backendError(_, retryable: true) = error { continue }
+                        if error as? ManagementError == .credentialStoreUnavailable { return }
+                        if case ManagementError.backendError(_, retryable: true) = error, !finalCheck { continue }
                         return
                     }
-                    guard token == self.generation, !Task.isCancelled,
+                    guard token == self.generation, authToken == self.authenticationGeneration, !Task.isCancelled,
                           self.authentication?.flow?.flowID == flowID,
                           self.authentication?.flow?.state == .pending else { return }
                     guard status.flow?.flowID == flowID else { throw ManagementError.invalidPayload }
@@ -800,6 +822,13 @@ final class LiveSession: ObservableObject {
                     self.failedAccountAction = nil
                     if status.flow?.state != .pending {
                         if status.flow?.state == .completed { self.errorMessage = nil }
+                        return
+                    }
+                    if finalCheck || ContinuousClock.now >= deadline {
+                        self.accountStatusCurrent = false
+                        self.errorMessage = "Sign-in is still pending. Check status before retrying or closing; no cancellation was assumed."
+                        self.accountError = self.errorMessage
+                        self.failedAccountAction = .status
                         return
                     }
                 }

@@ -504,20 +504,24 @@ actor Checks {
         check(await denied.close(), "Owned inaccessible-store transport closes")
         check(ManagementCommand.authBegin.defaultTimeout == .seconds(600)
               && ManagementCommand.authLogout.defaultTimeout == .seconds(600)
-              && ManagementCommand.authStatus.defaultTimeout == .seconds(30),
-              "Human account mutations have a separate finite budget; ordinary reads stay short")
+              && ManagementCommand.authStatus.defaultTimeout == .seconds(130)
+              && ManagementCommand.authVerify.defaultTimeout == .seconds(30)
+              && ManagementCommand.hello.defaultTimeout == .seconds(30),
+              "Foreground saved-status permits bounded human Keychain access; verification and other reads stay short")
         let human = try ManagementClient()
         _ = try await human.connect(mockConfiguration("humanwait"))
         async let preparing = human.request(.authBegin, params: ["accountScope": .string("default")])
         async let loggingOut = human.request(.authLogout)
+        async let checkingSaved = human.request(.authStatus)
         let readStart = ContinuousClock.now
         _ = try await human.request(.jobs)
         check(ContinuousClock.now - readStart < .seconds(2),
               "Public snapshot answers while fake human preparation/logout remain in flight")
         _ = try await preparing.decode(AuthenticationStatus.self)
         _ = try await loggingOut.decode(AuthenticationStatus.self)
+        _ = try await checkingSaved.decode(AuthenticationStatus.self)
         _ = try await human.request(.jobs)
-        check(true, "Preparation and logout exceeding thirty seconds preserve the connection")
+        check(true, "Preparation, logout and foreground saved-status exceeding thirty seconds preserve the connection")
         check(await human.close(), "Owned human-wait transport closes")
         let uncertain = try ManagementClient()
         _ = try await uncertain.connect(mockConfiguration("hangmutation"))
@@ -841,7 +845,8 @@ enum MockBackend {
         do {
             let lifecycleDirectory = URL(fileURLWithPath: CommandLine.arguments[index + 1])
             let lifecycleScenario = ["retireslow", "retirefailed", "retirehello", "retiresnapshot", "authgate",
-                                     "savedpermission", "startupquery", "uifailures"].contains(scenario)
+                                     "savedpermission", "startupquery", "uifailures",
+                                     "statuspermission", "deadlinecompleted"].contains(scenario)
             func trace(_ entry: String) throws {
                 guard lifecycleScenario else { return }
                 try FileManager.default.createDirectory(at: lifecycleDirectory, withIntermediateDirectories: true,
@@ -876,7 +881,7 @@ enum MockBackend {
             if ["inspection", "inspectionmissing", "inspectionmismatch"].contains(scenario) {
                 supported.insert(.inspectInstallation)
             }
-            if ["expired", "expiredpermission", "savedpermission", "transientauth", "latecancel", "humanwait", "hangmutation", "beginfail",
+            if ["expired", "expiredpermission", "savedpermission", "transientauth", "latecancel", "humanwait", "hangmutation", "beginfail", "statuspermission", "deadlinecompleted",
                 "failedflow", "failedflownocode", "authgate"].contains(scenario) || scenario.hasPrefix("failedstage-") {
                 supported.formUnion([.authBegin, .authCancel])
             }
@@ -918,7 +923,18 @@ enum MockBackend {
                         }
                         continue
                     }
-                    if ["savedpermission", "startupquery", "uifailures"].contains(scenario) { try trace(command) }
+                    if ["savedpermission", "startupquery", "uifailures", "statuspermission"].contains(scenario) { try trace(command) }
+                    if scenario == "statuspermission", command == "auth.status" {
+                        let response = result(request, data: .object([
+                            "state": .string("credentialPresent"), "credentialStore": .string("macOSKeychain"),
+                            "audience": .null, "expiresAt": .null, "entitlementAuthorized": .bool(false)
+                        ]))
+                        DispatchQueue.global().async {
+                            Thread.sleep(forTimeInterval: 0.5)
+                            do { try emit(.object(response)) } catch { exit(3) }
+                        }
+                        continue
+                    }
                     if scenario == "uifailures" {
                         if command == "auth.status" {
                             profileReads += 1
@@ -1020,6 +1036,7 @@ enum MockBackend {
                         continue
                     }
                     if scenario == "authgate", command.hasPrefix("auth.") {
+                        if command == "auth.status" { try trace("auth.status") }
                         var flowState = "pending"
                         let windowClosedMarker = lifecycleDirectory.appendingPathComponent("native-window-closed")
                         if command == "auth.begin" {
@@ -1133,7 +1150,7 @@ enum MockBackend {
                                         message: "Original preparation upstream sentinel must not enter local UI.")
                         continue
                     }
-                    if ["expired", "expiredpermission", "savedpermission", "transientauth", "latecancel"].contains(scenario) {
+                    if ["expired", "expiredpermission", "savedpermission", "transientauth", "latecancel", "deadlinecompleted"].contains(scenario) {
                         if command == "auth.begin" { flowStarted = true; flowReads = 0 }
                         if command == "auth.logout" { loggedOut = true; flowStarted = false }
                         if command == "auth.cancel", scenario == "latecancel" {
@@ -1174,7 +1191,7 @@ enum MockBackend {
                         }
                     }
                     if ["humanwait", "hangmutation"].contains(scenario),
-                       ["auth.begin", "auth.logout"].contains(command) {
+                       ["auth.begin", "auth.logout", "auth.status"].contains(command) {
                         if scenario == "humanwait" {
                             let response = result(request, data: .object([
                                 "state": .string("signedOut"), "credentialStore": .string("macOSKeychain"),

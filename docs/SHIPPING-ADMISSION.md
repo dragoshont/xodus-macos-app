@@ -34,8 +34,8 @@ plaintext/debug/console feature changes or mismatched sealed identity reject
 the input. These claims are accepted only under the operator's independent
 external pins, not because the JSON asserts them.
 
-The current source producer is `c42e21aee18da893546cca94cbee09820bcbca95`,
-tree `652c4b9e8b85e310ade62224c221991d89a97f80`. Required Cargo profile
+The current source producer is `d00a8b97501a2ce1045d579e62568c5feb017ca8`,
+tree `2d8e43151b3824bd485090d905a8fdf22a17fc9f`. Required Cargo profile
 is opt3/debug0, no debug assertions/overflow
 checks/test. Exact features are xodus/CLI empty, management live, native Keychain
 and security-framework. The old e7/304 engine cannot satisfy this gate.
@@ -65,6 +65,14 @@ identifiers are fixed to `io.github.dragoshont.xodus`,
 The designated requirement binds the fixed identifier to that certificate's
 fingerprint, not a build-specific code hash. The development bundle identifier
 and existing preferences are unchanged by this signing-identifier preparation.
+
+An equal designated requirement is not proof of unattended saved-item access
+after a locally signed engine rebuild. Apple's securityd also checks a separate
+partition: locally self-signed, non-Apple-chain code is classified by its
+build-specific code-directory hash. A new build may therefore require a native
+human Keychain approval. The app's foreground status read permits that prompt;
+verification remains a separate noninteractive read. No arbitrary Team ID,
+global trust change or credential reset is used to bypass this distinction.
 
 Certificate creation, trust changes and any private-key permission prompt need
 separate human approval. The tooling never creates/unlocks a Keychain, exports a

@@ -60,6 +60,7 @@ struct LiveAccountView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text(session.accountExplanation)
                         Text("Credentials stay in the native Keychain.")
+                        Text("macOS may ask for Keychain access again after an app update. Respond in its permission window; a new Microsoft sign-in is not required to check saved sign-in.")
                     }
                     .foregroundStyle(.secondary).textSelection(.enabled).padding(.top, 12)
                     .frame(maxWidth: .infinity, alignment: .leading)

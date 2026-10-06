@@ -22,7 +22,8 @@ Current app review-fix milestone: **14 core + 189 management + 24 presentation +
 51 native session = 278 checks**, zero failures, plus twenty-two actual signed
 engine checks, including original isolated marker inspection and owned exit.
 Anonymous startup does not read Keychain;
-explicit Account opening checks status noninteractively. Owned-window navigation,
+explicit Account opening checks saved status with a bounded human Keychain
+permission budget; anonymous startup still does not read it. Owned-window navigation,
 Check status/Close and sustained engine lifetime were verified without consent.
 Producer e3129/da548 includes retained-review-closed R05/R06/R07 and enabled
 inspection. App R01-R04 closed at fb66, R08/R09 at 675; db0 picker/consumer had no

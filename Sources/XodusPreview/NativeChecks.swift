@@ -190,6 +190,34 @@ enum NativeChecks {
                   "Disconnect removes current account presentation evidence")
             try cleanLifecycle(savedConfiguration)
 
+            let permissionConfiguration = configuration("statuspermission")
+            let permission = LiveSession(configuration: permissionConfiguration)
+            await permission.connect()
+            let readingPermission = Task { await permission.refreshAccount() }
+            try await wait { permission.accountStatusChecking }
+            check(permission.accountBusy && !permission.accountStatusCurrent
+                  && !permission.canSignIn && !permission.canDisconnectAccount
+                  && permission.accountNoticeTitle == "Checking saved sign-in"
+                  && permission.accountMessage.contains("macOS asks for Keychain access"),
+                  "Foreground Keychain check shows native permission guidance and fences account actions")
+            await permission.refreshAccount()
+            await permission.beginSignIn()
+            await permission.signOut()
+            await readingPermission.value
+            check(try trace(permissionConfiguration).filter { $0.hasPrefix("auth.") } == ["auth.status"],
+                  "Two status clicks and gated sign-in/logout issue only one foreground status request")
+            check(permission.currentCredentialState == .credentialPresent && !permission.accountBusy
+                  && !permission.accountStatusChecking && permission.accountStatusCurrent,
+                  "Actual status alone restores saved-state presentation after the bounded permission wait")
+            let retiringRead = Task { await permission.refreshAccount() }
+            try await wait { permission.accountStatusChecking }
+            await permission.disconnect()
+            await retiringRead.value
+            check(permission.authentication == nil && !permission.accountStatusCurrent
+                  && !permission.accountBusy && !permission.accountStatusChecking,
+                  "A retired generation's status completion cannot restore credentials or checking state")
+            try cleanLifecycle(permissionConfiguration)
+
             let denied = session("expiredpermission")
             await denied.connect()
             await denied.refreshAccount()
@@ -404,11 +432,37 @@ enum NativeChecks {
             await gated.disconnect()
             try cleanLifecycle(gateConfiguration)
 
+            for scenario in ["authgate", "deadlinecompleted"] {
+                let deadlineConfiguration = configuration(scenario)
+                let deadlineSession = LiveSession(configuration: deadlineConfiguration,
+                                                  signInPollingBudget: .milliseconds(1))
+                await deadlineSession.connect()
+                await deadlineSession.refreshAccount()
+                await deadlineSession.beginSignIn()
+                if scenario == "authgate" {
+                    try await wait { deadlineSession.accountError != nil && !deadlineSession.accountBusy }
+                    check(deadlineSession.signInPending && !deadlineSession.accountStatusCurrent
+                          && !deadlineSession.canSignIn && !deadlineSession.canDisconnectAccount,
+                          "Final deadline read retains unknown pending outcome and invalidates freshness without cancellation")
+                    check(try trace(deadlineConfiguration).filter { $0 == "auth.status" }.count == 2
+                          && trace(deadlineConfiguration).filter { $0 == "auth.cancel" }.isEmpty,
+                          "Deadline performs exactly one final live status read, not another flow or cancellation")
+                } else {
+                    try await wait { deadlineSession.currentCredentialState == .credentialPresent }
+                    check(!deadlineSession.signInPending && deadlineSession.accountStatusCurrent
+                          && deadlineSession.authentication?.flow?.state == .completed,
+                          "Final deadline read accepts a real completion instead of leaving the old pending snapshot")
+                }
+                await deadlineSession.disconnect()
+                try cleanLifecycle(deadlineConfiguration)
+            }
+
             let unavailable = session("transientauth")
             await unavailable.connect()
             await unavailable.refreshAccount()
             await unavailable.beginSignIn()
-            try await wait { !unavailable.accountStatusCurrent && unavailable.signInPending }
+            try await wait { unavailable.accountStatusError == .credentialStoreUnavailable
+                && !unavailable.accountBusy && unavailable.signInPending }
             check(!unavailable.canSignIn && !unavailable.canDisconnectAccount,
                   "Transient inaccessible store never permits deletion or new sign-in")
             check(unavailable.accountLabel == "Sign-in status needs checking"
@@ -416,9 +470,10 @@ enum NativeChecks {
                   && unavailable.accountExplanation.contains("current outcome could not be confirmed")
                   && unavailable.accountLibraryTitle == unavailable.accountLabel,
                   "Unconfirmed pending flow remains cancellation-fenced and displays an unknown outcome")
+            await unavailable.refreshAccount()
             try await wait { unavailable.authentication?.flow?.state == .completed }
             check(unavailable.isReady && unavailable.authentication?.state == .credentialPresent,
-                  "Pending sign-in reconciles after one credential-store-unavailable result")
+                  "Explicit status reconciles after denied Keychain access without automatically repeating a prompt")
             await unavailable.disconnect()
 
             let committing = session("latecancel")
