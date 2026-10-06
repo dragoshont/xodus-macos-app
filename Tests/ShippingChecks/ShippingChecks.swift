@@ -99,8 +99,8 @@ final class ShippingChecks: XCTestCase {
             guard let bundle = Bundle(url: app) else { throw ManagementError.invalidPayload }
             let pins = ShippingPairIdentity(schemaVersion: 1, appSourceCommit: source,
                 appSourceTree: String(repeating: "b", count: 40),
-                producerCommit: "2b31d199a3be15422596b46bc70e0926df30b539",
-                producerTree: "c3df6885a74f806320b299ff2ce56832d7c091a2",
+                producerCommit: "c1073100ce8936a751b962b1401ddb641c8be38a",
+                producerTree: "7a808c0e6a8a909455d07eb463379ab55bdf138c",
                 engineSHA256: hash(engineData), engineBytes: Int64(engineData.count),
                 helperSHA256: hash(helperData), helperBytes: Int64(helperData.count),
                 helperVersion: 1, helperSourceCommit: source)
@@ -131,7 +131,7 @@ final class ShippingChecks: XCTestCase {
                 } catch { check(error as? ManagementError == .pairedEngineUnavailable, name) }
             }
             func altered(engineBytes: Int64? = nil, helperVersion: Int = 1,
-                         producer: String = "2b31d199a3be15422596b46bc70e0926df30b539") -> ShippingPairIdentity {
+                         producer: String = "c1073100ce8936a751b962b1401ddb641c8be38a") -> ShippingPairIdentity {
                 ShippingPairIdentity(schemaVersion: 1, appSourceCommit: pins.appSourceCommit,
                     appSourceTree: pins.appSourceTree, producerCommit: producer, producerTree: pins.producerTree,
                     engineSHA256: pins.engineSHA256, engineBytes: engineBytes ?? pins.engineBytes,
@@ -143,8 +143,8 @@ final class ShippingChecks: XCTestCase {
             rejects("Unexpected helper version cannot grant native login admission", identity: altered(helperVersion: 2))
             rejects("A compiled stale producer source is not the reviewed native-host producer",
                     identity: altered(producer: String(repeating: "0", count: 40)))
-            rejects("The previous producer cannot borrow the foreground-interaction pair approval",
-                    identity: altered(producer: "680593de3d32390fe2105780b9a21b09fd302337"))
+            rejects("The previous producer cannot borrow the artwork-normalization pair approval",
+                    identity: altered(producer: "2b31d199a3be15422596b46bc70e0926df30b539"))
             try Data((String(data: canonical, encoding: .utf8) ?? "")
                 .replacingOccurrences(of: source, with: String(repeating: "c", count: 40)).utf8).write(to: receipt)
             rejects("A helper receipt from another source cannot borrow compiled pair approval")

@@ -5,27 +5,38 @@ This is implementation work beyond the immutable foundation at `44d7338`. It is 
 ## Artwork and recently played source slice
 
 The current source pairs with producer
-`2b31d199a3be15422596b46bc70e0926df30b539`, tree
-`c3df6885a74f806320b299ff2ce56832d7c091a2`. Its exact generated management
+`c1073100ce8936a751b962b1401ddb641c8be38a`, tree
+`7a808c0e6a8a909455d07eb463379ab55bdf138c`. Its exact generated management
 schema SHA256 is
 `6945db01df88eeaf80f495f6b9d7240e270a879851c2c830fc5548ba20d32192`,
 with 100 positive and 96 negative sanitized producer frames. Earlier pins below
 record historical stages, not authorization to pair this consumer with d00.
 
-This producer revision explicitly sets the requested native interaction policy
+This producer retains the 2b31d199 revision's explicit requested native interaction policy
 under the existing serialized credential-read guard and checks restoration of
 the exact prior policy. Noninteractive reads and credential writes retain their
 existing behavior. Its bounded failure-only stderr diagnostic is not a new
 management response or shipping UI feature; production stderr remains discarded.
-The controlled replacement pair was release-qualified, independently admitted
-and installed after exact consumer CI passed. It is not a distribution release.
+Only exact Store metadata URLs with a previously validated single ASCII asset
+path may be upgraded from HTTP to canonical HTTPS, with the same asset.
+Explicit ports, credentials, queries, fragments, other hosts and wrapper URLs
+remain rejected. Consumer URL validation and image fetching are unchanged.
+Public fixture confirmation establishes this source format only, not the cause
+of the earlier 20 actual history rejections. Optional closed rejection-shape
+counts on stderr expose no URLs, assets, account identifiers or query values;
+they are not management responses and remain discarded in production.
+The c1073100 producer is Release-qualified, but its matching replacement package
+and actual-history artwork confirmation are pending. The earlier controlled
+4e20427/2b31d199 pair was independently admitted and installed after exact
+consumer CI passed. Neither is a distribution release.
 The earlier fb39072/680 pair proved real public Store artwork, but personal
 history was not accessed: its captured foreground status reads failed with
 `credentialStoreUnavailable`. No successful permission or TitleHub read is
 inferred from source changes or neutral checks.
 
 Actual confirmation on 2026-10-06 used consumer
-`4e204270550f2f83082e7562187f8619b777fc05` and this producer, with stable local
+`4e204270550f2f83082e7562187f8619b777fc05` and producer
+`2b31d199a3be15422596b46bc70e0926df30b539`, with stable local
 certificate `6C5F1CD832A2B2842686245B4DEF219BB8B465B2`. Package receipt SHA256:
 `91e2adf68c0c224fe5a123d5fb19c3565fb75c706be22072d03403a2521e6269`.
 The actual signed CLI was
