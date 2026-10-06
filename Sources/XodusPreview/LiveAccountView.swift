@@ -36,6 +36,11 @@ struct LiveAccountView: View {
                 Text(session.accountMessage)
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("xodus.account.statusExplanation")
+                if let error = session.accountError {
+                    Label(error, systemImage: "exclamationmark.circle")
+                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("xodus.account.error")
+                }
                 if session.isReady && !session.supports(.authBegin) {
                     Text("Sign-in isn't available in this build.").foregroundStyle(.secondary)
                 }
@@ -50,10 +55,6 @@ struct LiveAccountView: View {
                         }
                         if let observation = session.accountFailureObservation {
                             Text(observation).accessibilityIdentifier("xodus.account.failureObservation")
-                        }
-                        if let error = session.accountError {
-                            Text(error).fixedSize(horizontal: false, vertical: true)
-                                .accessibilityIdentifier("xodus.account.error")
                         }
                     }
                     .foregroundStyle(.secondary).textSelection(.enabled).padding(.top, 12)
@@ -76,11 +77,8 @@ struct LiveAccountView: View {
                 if session.isReady {
                     Button("Check status") { Task { await session.refreshAccount() } }
                         .disabled(session.accountBusy)
-                        .accessibilityElement(children: .ignore)
                         .accessibilityLabel("Check account status")
                         .accessibilityIdentifier("xodus.account.checkStatus")
-                        .accessibilityAddTraits(.isButton)
-                        .accessibilityAction { Task { await session.refreshAccount() } }
                 } else { Button("Settings", action: openSettings.callAsFunction) }
                 if session.needsAccountDisconnect {
                     Button(session.currentCredentialState == .expired ? "Disconnect expired sign-in" : "Sign out") {
@@ -88,17 +86,10 @@ struct LiveAccountView: View {
                     }
                         .disabled(!session.canDisconnectAccount)
                 } else {
-                    GlassAction(title: "Sign in with Microsoft") {
-                        if session.canSignIn { Task { await session.beginSignIn() } }
-                    }
+                    Button("Sign in with Microsoft") { Task { await session.beginSignIn() } }
                         .disabled(!session.canSignIn)
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("Sign in with Microsoft")
                         .accessibilityIdentifier("xodus.account.signIn")
-                        .accessibilityAddTraits(.isButton)
-                        .accessibilityAction {
-                            if session.canSignIn { Task { await session.beginSignIn() } }
-                        }
+                        .buttonStyle(.borderedProminent)
                 }
             }
             .controlSize(.regular)

@@ -158,17 +158,24 @@ enum NativeChecks {
                   && saved.accountExplanation.contains("earlier result is not current")
                   && !saved.canSignIn && !saved.canDisconnectAccount,
                   "Failed status read retains the safe snapshot but removes saved-account claims across all live surfaces")
+            check(saved.accountStatusError == .credentialStoreUnavailable
+                  && saved.accountMessage.contains("cannot access Keychain")
+                  && saved.accountMessage.contains("Sign-in stays disabled")
+                  && saved.accountError == ManagementError.credentialStoreUnavailable.localizedDescription,
+                  "Blocked Keychain status has a typed cause and visible recovery, not an unexplained gray sign-in")
             await saved.refreshAccount()
             check(saved.accountStatusCurrent && saved.currentCredentialState == .credentialPresent
                   && saved.accountLabel == "Microsoft sign-in saved" && saved.canDisconnectAccount
                   && saved.authentication?.entitlementAuthorized == false,
                   "Fresh status restores credential display without promoting PC access")
+            check(saved.accountStatusError == nil,
+                  "A successful fresh status clears the earlier typed Keychain-access failure")
             check(try trace(savedConfiguration).filter { $0.hasPrefix("auth.") } ==
                   ["auth.status", "auth.status", "auth.status"],
                   "Account display recovery performs only neutral requested status reads, no sign-in or logout mutation")
             check(await saved.disconnect(), "Account presentation regression retires its owned neutral child")
             check(saved.currentCredentialState == nil && saved.accountSymbol == "person.crop.circle"
-                  && saved.accountLabel == "Connect Xodus",
+                  && saved.accountLabel == "Connect Xodus" && saved.accountStatusError == nil,
                   "Disconnect removes current account presentation evidence")
             try cleanLifecycle(savedConfiguration)
 
@@ -468,9 +475,11 @@ enum NativeChecks {
             check(visibleFailures.accountError != nil && !visibleFailures.accountStatusCurrent
                   && visibleFailures.authentication?.state == .credentialPresent
                   && visibleFailures.currentCredentialState == nil
-                  && visibleFailures.accountMessage == "Account status couldn't be checked. Choose Check status to try again."
+                  && visibleFailures.accountStatusError == .credentialStoreUnavailable
+                  && visibleFailures.accountMessage.contains("cannot access Keychain")
+                  && visibleFailures.accountMessage.contains("choose Check status.")
                   && !visibleFailures.canSignIn && !visibleFailures.canDisconnectAccount,
-                  "Failed Account read visibly names Check status while retaining only an unconfirmed saved snapshot")
+                  "Blocked Account read names Keychain access and Check status while retaining only an unconfirmed saved snapshot")
             await visibleFailures.refreshAccount()
             check(visibleFailures.accountError == nil && visibleFailures.currentCredentialState == .credentialPresent
                   && visibleFailures.catalogError == catalogFailure,

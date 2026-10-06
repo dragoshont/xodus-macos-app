@@ -21,6 +21,7 @@ final class LiveSession: ObservableObject {
     @Published private(set) var accountBusy = false
     @Published private(set) var accountStatusCurrent = false
     @Published private(set) var accountError: String?
+    @Published private(set) var accountStatusError: ManagementError?
     @Published private(set) var activityError: String?
     @Published private(set) var lookupBusy = false
     @Published private(set) var installedSnapshot: InstalledSnapshot?
@@ -134,6 +135,9 @@ final class LiveSession: ObservableObject {
         if phase == .connecting { return "Connecting to Xodus." }
         guard isReady else { return "Xodus couldn't connect. Open Settings to reconnect." }
         if accountError != nil {
+            if failedAccountAction == .status && accountStatusError == .credentialStoreUnavailable {
+                return "Your saved sign-in couldn't be checked because Xodus cannot access Keychain. Sign-in stays disabled until access is confirmed. After resolving Keychain access, choose Check status."
+            }
             switch failedAccountAction {
             case .status: return "Account status couldn't be checked. Choose Check status to try again."
             case .signIn: return "Sign-in couldn't be confirmed. Check status before trying again."
@@ -533,6 +537,7 @@ final class LiveSession: ObservableObject {
         authentication = nil
         accountStatusCurrent = false
         accountError = nil
+        accountStatusError = nil
         failedAccountAction = nil
         activityError = nil
         signInDeadline = nil
@@ -612,6 +617,7 @@ final class LiveSession: ObservableObject {
         } catch {
             guard token == generation, authToken == authenticationGeneration else { return }
             accountStatusCurrent = false
+            accountStatusError = error as? ManagementError
             accountError = Self.describe(error)
             failedAccountAction = .status
             errorMessage = Self.describe(error)
@@ -624,6 +630,7 @@ final class LiveSession: ObservableObject {
            currentFlow.state != .pending, incomingFlow.state == .pending { return }
         authentication = status
         accountStatusCurrent = true
+        accountStatusError = nil
     }
 
     func refreshInstalled() async {

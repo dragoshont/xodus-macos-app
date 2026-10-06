@@ -17,6 +17,14 @@ explicitly opening Account requests a noninteractive saved-profile check.
 **Check status** remains available during pending sign-in. A new sign-in requires
 fresh, confirmed signed-out status; expired/invalid profiles instead expose a
 confirmed launcher-only disconnect. An unavailable store never causes deletion.
+When Keychain access fails, Account shows the error outside the collapsed
+Account info section and explains why Sign in remains disabled. The typed status
+failure clears only after a successful status response or disconnection; a
+previous saved snapshot is not fresh evidence. Check status and Sign in retain
+native Button accessibility and enabled-state semantics, without substitute
+accessibility actions. Resolving a denied saved-item permission or choosing to
+reset saved sign-in remains a separate human decision: this UI correction adds
+neither an interactive Keychain command nor an automatic reset.
 The original GUI startup
 was observed to time out specifically in `auth.status`, despite the equivalent
 SSH read failing promptly with `credentialStoreUnavailable`. Removing that
