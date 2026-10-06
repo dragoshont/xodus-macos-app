@@ -4,7 +4,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 if [ "$#" -lt 9 ]; then
-    printf '%s\n' 'Usage: build_app.sh engine unsignedSHA bytes provenanceSHA bytes approvedAppCommit approvedAppTree newOutputRoot (--signing-identity CERT_SHA1 | --local-ad-hoc) [--preserve-signed-cli path SHA256 bytes]' >&2
+    printf '%s\n' 'Usage: build_app.sh engine unsignedSHA bytes provenanceSHA bytes approvedAppCommit approvedAppTree newOutputRoot (--signing-identity CERT_SHA1 | --local-ad-hoc) [--preserve-signed-cli path SHA256 bytes priorPackageReceipt receiptSHA256 receiptBytes]' >&2
     exit 2
 fi
 engine=$1
@@ -31,12 +31,15 @@ while [ "$#" -gt 0 ]; do
             local_ad_hoc=true
             shift ;;
         --preserve-signed-cli)
-            test "$#" -ge 4
+            test "$#" -ge 7
             test -z "$signed_cli"
             signed_cli=$2
             signed_cli_hash=$3
             signed_cli_bytes=$4
-            shift 4 ;;
+            prior_receipt=$5
+            prior_receipt_hash=$6
+            prior_receipt_bytes=$7
+            shift 7 ;;
         *) printf '%s\n' 'Unknown signing option; no fallback.' >&2; exit 2 ;;
     esac
 done
@@ -85,7 +88,10 @@ cp "$bin/XodusAuthHost" "$app/Contents/MacOS/XodusAuthHost"
 if [ -n "$signed_cli" ]; then
     python3 tools/signing_identity.py reuse-cli --source "$signed_cli" \
         --destination "$app/Contents/Resources/XodusEngine/xodus-cli" \
-        --hash "$signed_cli_hash" --bytes "$signed_cli_bytes"
+        --hash "$signed_cli_hash" --bytes "$signed_cli_bytes" \
+        --prior-receipt "$prior_receipt" --receipt-hash "$prior_receipt_hash" --receipt-bytes "$prior_receipt_bytes" \
+        --engine "$engine" --engine-hash "$engine_hash" --engine-bytes "$engine_bytes" \
+        --proof-hash "$proof_hash" --proof-bytes "$proof_bytes"
 else
     cp "$engine" "$app/Contents/Resources/XodusEngine/xodus-cli"
 python3 - "$app/Contents/Resources/XodusEngine/xodus-cli" "$engine_hash" "$engine_bytes" <<'PY'
@@ -128,11 +134,13 @@ python3 tools/shipping_pair.py verify --engine "$engine" --engine-hash "$engine_
     --output "$stage/unsigned-approval-after.json"
 cmp "$stage/unsigned-approval.json" "$stage/unsigned-approval-after.json"
 if [ -n "$signed_cli" ]; then
-    python3 - "$signed_cli" "$app/Contents/Resources/XodusEngine/xodus-cli" "$signed_cli_hash" "$signed_cli_bytes" <<'PY'
+    python3 - "$signed_cli" "$app/Contents/Resources/XodusEngine/xodus-cli" "$signed_cli_hash" "$signed_cli_bytes" \
+        "$prior_receipt" "$prior_receipt_hash" "$prior_receipt_bytes" <<'PY'
 import sys
 from tools.shipping_pair import owned_bytes
 for path in sys.argv[1:3]:
     owned_bytes(path, sys.argv[3], int(sys.argv[4]))
+owned_bytes(sys.argv[5], sys.argv[6], int(sys.argv[7]), 65536)
 PY
 fi
 printf '%s\n' "$app" "$stage/package-receipt.json"

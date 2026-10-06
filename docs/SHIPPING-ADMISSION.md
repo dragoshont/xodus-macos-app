@@ -64,25 +64,44 @@ Certificate creation, trust changes and any private-key permission prompt need
 separate human approval. The tooling never creates/unlocks a Keychain, exports a
 private key or changes a credential ACL. Preparation and neutral tests are not
 proof that a usable identity exists or that saved credentials became accessible.
-Before accepting an identity migration, compare two independently built and
-signed CLI artifacts:
+Before accepting an identity migration, obtain two independently approved build
+receipts/runs that each bind an actual build to its signed CLI artifact, and
+compare those artifacts:
 
 ```sh
 python3 tools/signing_identity.py compare --kind cli --identity CERT_SHA1 \
     --first /absolute/first/signed-cli --second /absolute/second/signed-cli
 ```
 
-Both must have valid signatures, different bytes and exactly the same fixed,
-certificate-bound designated requirement. This real check remains pending
-until approved identity provisioning and signing; neutral policy tests do not
-substitute for it.
+The comparison checks valid signatures, different signed bytes and exactly the
+same fixed certificate-bound designated requirement. Its result is only
+**different signed artifacts share a requirement**: file-hash inequality cannot
+distinguish an independent rebuild from signature variation or re-signing the
+same binary. Independent build evidence must be approved separately; this tool
+does not qualify two builds. Real identity/persistence qualification remains
+pending human-approved provisioning, signing and independent build receipts/runs.
+Neutral tests are simulations, not certificate, build or persistence evidence.
 
 An explicitly approved UI-only package may select `--local-ad-hoc` together
-with `--preserve-signed-cli /absolute/accepted/cli SHA256 BYTES`. It copies the
-externally approved signed CLI unchanged and verifies it before/after copying
-and after the app sign; it never re-signs that engine. This preserves the
-existing engine identity, not credential access or a durable signing fix.
-Stable-identity mode refuses this historical ad-hoc preservation combination.
+with the externally pinned prior final package receipt:
+
+```sh
+--preserve-signed-cli /absolute/accepted/cli SHA256 BYTES \
+    /absolute/prior/package-receipt.json RECEIPT_SHA256 RECEIPT_BYTES
+```
+
+The independently approved receipt must bind that exact signed CLI in both its
+signed identity and final package inventory, the required producer/tree, and
+the same sealed unsigned/provenance approval, profile and features as the current
+externally pinned inputs. A hash/size supplied for the CLI alone is insufficient.
+The bounded prior receipt is hash-pinned before parsing; missing, changed,
+cross-producer or mismatched sealed-input approval rejects reuse before signature
+verification or copying. The copied CLI and receipt are verified again after
+copying and after the app sign; the engine is never re-signed.
+This preserves the existing engine identity, not credential access or a durable
+signing fix. Stable-identity mode refuses this historical ad-hoc preservation
+combination. The receipt's existence or self-asserted contents never replace
+independent operator approval of its exact hash/bytes.
 
 Runtime admission requires canonical no-follow current-UID single-link regular
 executables, non-group/world-writable files, exact sizes and SHA256; helper

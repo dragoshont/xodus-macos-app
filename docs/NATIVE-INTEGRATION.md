@@ -436,8 +436,9 @@ The script reports a new distinct bundle and external package receipt; it never
 opens a window or replaces `dist/Xodus.app`. Launch requires separate approval.
 The supplied identity must already exist in the OS Keychain; provisioning and
 private-key prompts require separate human approval. Fixed signing identifiers,
-the required two-different-build designated-requirement comparison and explicit
-UI-only signed-CLI preservation are described in [shipping admission](SHIPPING-ADMISSION.md).
+artifact-level designated-requirement comparison, the separate requirement for
+independent approved build evidence, and prior-package-receipt-bound UI-only CLI
+preservation are described in [shipping admission](SHIPPING-ADMISSION.md).
 
 The existing deployed `.app` includes a release executable, SwiftPM resources,
 original native icon and development bundle identifier. Its Rust native worker

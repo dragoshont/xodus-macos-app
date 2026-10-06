@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
 """Neutral policy checks; no certificate, private key, Keychain or actual signing operation."""
+import copy
+import hashlib
+import json
 from pathlib import Path
 import tempfile
-from signing_identity import IDENTIFIERS, compare, preflight, sign
+from shipping_pair import FEATURES, PROFILE, PRODUCER, PRODUCER_TREE
+from signing_identity import COMPARISON_RESULT, IDENTIFIERS, compare, preflight, reuse_cli, sign
 
 fingerprint = "A" * 40
 calls = []
@@ -19,7 +23,7 @@ def neutral(arguments):
 def rejected(operation):
     try:
         operation()
-    except ValueError:
+    except (ValueError, OSError):
         return
     raise AssertionError("Unsafe signing policy was accepted")
 
@@ -48,8 +52,8 @@ assert calls[0][calls[0].index("--sign") + 1] == "-"
 
 with tempfile.TemporaryDirectory(prefix="xodus-signing-neutral-") as temporary:
     first, second = Path(temporary).resolve() / "first", Path(temporary).resolve() / "second"
-    first.write_bytes(b"Different neutral build one. Never executed.")
-    second.write_bytes(b"Different neutral build two. Never executed.")
+    first.write_bytes(b"Same neutral payload; simulated signature A. Never executed.")
+    second.write_bytes(b"Same neutral payload; simulated signature B. Never executed.")
     identifier = IDENTIFIERS["cli"]
     requirement = 'identifier "' + identifier + '" and certificate leaf = H"' + fingerprint + '"'
     def metadata(arguments):
@@ -58,7 +62,11 @@ with tempfile.TemporaryDirectory(prefix="xodus-signing-neutral-") as temporary:
         if "--display" in arguments:
             return "Identifier=" + identifier + "\ndesignated => " + requirement + "\n"
         return ""
-    compare(first, second, "cli", fingerprint, metadata)
+    assert compare(first, second, "cli", fingerprint, metadata) == COMPARISON_RESULT
+    assert "Independent-build qualification" in COMPARISON_RESULT
+    assert "not established by this comparison" in COMPARISON_RESULT
+    assert compare(first, second, "cli", fingerprint, lambda arguments:
+                   metadata(arguments).replace("\ndesignated =>", "\n# designated =>")) == COMPARISON_RESULT
     for bad in ('identifier "wrong" and certificate leaf = H"' + fingerprint + '"',
                 requirement + ' and cdhash H"' + "B" * 40 + '"',
                 requirement.replace(fingerprint, "B" * 40)):
@@ -68,5 +76,84 @@ with tempfile.TemporaryDirectory(prefix="xodus-signing-neutral-") as temporary:
         rejected(lambda: compare(first, second, "cli", fingerprint, altered))
     second.write_bytes(first.read_bytes())
     rejected(lambda: compare(first, second, "cli", fingerprint, metadata))
+
+    signed_data = first.read_bytes()
+    signed = {"sha256": hashlib.sha256(signed_data).hexdigest(), "bytes": len(signed_data)}
+    approval = {"schemaVersion": 1, "producerCommit": PRODUCER, "producerTree": PRODUCER_TREE,
+                "externalUnsignedCLI": {"sha256": "b" * 64, "bytes": 100},
+                "externalProvenance": {"sha256": "c" * 64, "bytes": 200},
+                "profile": PROFILE, "features": FEATURES}
+    base_receipt = {**approval, "signedBundledCLI": signed,
+                    "finalPackageFiles": {"Contents/Resources/XodusEngine/xodus-cli": signed}}
+    receipt = Path(temporary).resolve() / "prior-package-receipt.json"
+    destination = Path(temporary).resolve() / "new-copy"
+
+    def attempt(payload, digest=None, size=None, source_hash=signed["sha256"], source_size=signed["bytes"],
+                approved=approval, receipt_path=receipt):
+        encoded = json.dumps(payload, sort_keys=True).encode() if isinstance(payload, dict) else payload
+        receipt.write_bytes(encoded)
+        receipt.chmod(0o600)
+        calls.clear()
+        reuse_cli(first, destination, source_hash, source_size, receipt_path,
+                  digest or hashlib.sha256(encoded).hexdigest(), size or len(encoded), approved, run=neutral)
+
+    negatives = []
+    for key, value in [
+        ("schemaVersion", True), ("schemaVersion", 1.0), ("producerCommit", "0" * 40),
+        ("producerTree", "0" * 40), ("externalUnsignedCLI", {"sha256": "d" * 64, "bytes": 100}),
+        ("externalProvenance", {"sha256": "e" * 64, "bytes": 200}),
+        ("externalUnsignedCLI", {"sha256": "b" * 64, "bytes": 100.0}),
+        ("profile", {**PROFILE, "debug_assertions": 0}),
+        ("features", {**FEATURES, "xodus-cli": ["plaintext"]}),
+        ("signedBundledCLI", {"sha256": "f" * 64, "bytes": signed["bytes"]}),
+        ("signedBundledCLI", {**signed, "bytes": float(signed["bytes"])}),
+        ("signedBundledCLI", {**signed, "bytes": signed["bytes"] + 1}),
+        ("finalPackageFiles", {}),
+        ("finalPackageFiles", {"Contents/Resources/XodusEngine/xodus-cli":
+                              {"sha256": "f" * 64, "bytes": signed["bytes"]}}),
+        ("finalPackageFiles", {"Contents/Resources/XodusEngine/xodus-cli":
+                              {**signed, "bytes": float(signed["bytes"])}}),
+    ]:
+        payload = copy.deepcopy(base_receipt)
+        payload[key] = value
+        negatives.append(payload)
+    missing = copy.deepcopy(base_receipt)
+    del missing["externalProvenance"]
+    negatives += [missing, b'{"schemaVersion":1,"schemaVersion":1}', b'{"unfinished"', b"[]", b"x" * 65537]
+    for payload in negatives:
+        rejected(lambda payload=payload: attempt(payload))
+        assert not destination.exists() and not calls
+    for options in [
+        {"digest": "0" * 64}, {"size": 1}, {"size": True}, {"source_hash": "0" * 64},
+        {"source_size": signed["bytes"] + 1},
+        {"approved": {**approval, "producerCommit": "0" * 40}},
+        {"approved": {**approval, "producerTree": "0" * 40}},
+        {"approved": {**approval, "externalUnsignedCLI": {"sha256": "f" * 64, "bytes": 100}}},
+        {"approved": {**approval, "externalProvenance": {"sha256": "f" * 64, "bytes": 200}}},
+        {"approved": {**approval, "externalProvenance": None}},
+        {"receipt_path": Path(temporary).resolve() / "missing-receipt"},
+    ]:
+        rejected(lambda options=options: attempt(base_receipt, **options))
+        assert not destination.exists() and not calls
+    attempt(base_receipt)
+    assert destination.read_bytes() == signed_data and first.read_bytes() == signed_data
+    assert len(calls) == 2 and all(call[:3] == ["/usr/bin/codesign", "--verify", "--strict"] for call in calls)
+    rejected(lambda: attempt(base_receipt))
+    assert not calls
+    destination.unlink()
+
+    def changed_receipt(arguments):
+        calls.append(arguments)
+        receipt.write_bytes(b"Changed after initial admission")
+        return ""
+
+    encoded = json.dumps(base_receipt, sort_keys=True).encode()
+    receipt.write_bytes(encoded)
+    calls.clear()
+    rejected(lambda: reuse_cli(first, destination, signed["sha256"], signed["bytes"], receipt,
+                              hashlib.sha256(encoded).hexdigest(), len(encoded), approval, run=changed_receipt))
+    assert len(calls) == 1
+
 assert all(call[1:3] == ["find-identity", "-v"] for call in calls if call[0] == "/usr/bin/security")
-print("PASS explicit missing identity, fixed signer IDs, no fallback/provisioning/export, and neutral two-build requirement policy.")
+print("PASS simulated identity/requirement and receipt-bound CLI reuse policy, including cross-producer/seal rejection. "
+      "Neutral bytes and mocked OS commands only; no real signing, independent builds or persistence qualification.")

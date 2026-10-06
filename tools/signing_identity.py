@@ -2,16 +2,22 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Explicit local signing policy; never provision, unlock or export a Keychain identity."""
 import argparse
+import json
 import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
-from shipping_pair import owned_bytes, require
+from shipping_pair import (FEATURES, PROFILE, PRODUCER, PRODUCER_TREE, hex_value,
+                           owned_bytes, positive, require, unique_object, verify_input)
 
 IDENTIFIERS = {"app": "io.github.dragoshont.xodus",
                "cli": "io.github.dragoshont.xodus.cli",
                "helper": "io.github.dragoshont.xodus.auth-host"}
+COMPARISON_RESULT = (
+    "Different signed artifacts share the fixed certificate-bound designated requirement. "
+    "Independent-build qualification requires two separately approved build receipts/runs; "
+    "it is not established by this comparison.")
 
 
 def command(arguments):
@@ -53,13 +59,13 @@ def compare(first, second, kind, identity, run=command):
     first_record, _ = owned_bytes(first)
     second_record, _ = owned_bytes(second)
     require(first_record["sha256"] != second_record["sha256"],
-            "Designated-requirement comparison requires two different signed builds")
+            "Designated-requirement comparison requires two different signed artifacts")
     requirements = []
     for path in (first, second):
         run(["/usr/bin/codesign", "--verify", "--strict", str(path)])
         metadata = run(["/usr/bin/codesign", "--display", "--requirements", "-", "--verbose=2", str(path)])
         identifiers = re.findall(r"^Identifier=(.+)$", metadata, re.MULTILINE)
-        designated = re.findall(r"^designated => (.+)$", metadata, re.MULTILINE)
+        designated = re.findall(r"^(?:# )?designated => (.+)$", metadata, re.MULTILINE)
         require(identifiers == [IDENTIFIERS[kind]] and len(designated) == 1,
                 "Expected one fixed signing identifier and designated requirement")
         requirement = designated[0]
@@ -69,18 +75,46 @@ def compare(first, second, kind, identity, run=command):
                                  requirement, re.IGNORECASE) is not None,
                 "Requirement must bind only the fixed identifier and supplied certificate")
         requirements.append(requirement)
-    require(requirements[0] == requirements[1], "Different builds have different designated requirements")
+    require(requirements[0] == requirements[1], "Signed artifacts have different designated requirements")
+    return COMPARISON_RESULT
 
 
-def reuse_cli(source, destination, digest, size):
+def validate_reuse_cli(source, digest, size, receipt, receipt_hash, receipt_size, approved_input):
+    _, data = owned_bytes(receipt, receipt_hash, receipt_size, 65536)
+    record = json.loads(data, object_pairs_hook=unique_object)
+    require(type(record) is dict and type(approved_input) is dict, "Expected prior package and sealed-input approval")
+    signed = {"sha256": hex_value(digest, 64), "bytes": positive(size)}
+    expected = {"schemaVersion": 1, "producerCommit": PRODUCER, "producerTree": PRODUCER_TREE,
+                "profile": PROFILE, "features": FEATURES}
+    for key in ("externalUnsignedCLI", "externalProvenance"):
+        identity = approved_input.get(key)
+        require(type(identity) is dict and set(identity) == {"sha256", "bytes"},
+                "Missing verified sealed-input identity")
+        expected[key] = {"sha256": hex_value(identity["sha256"], 64), "bytes": positive(identity["bytes"])}
+    for key, value in expected.items():
+        # Canonical JSON equality also separates booleans/floats from exact integer fields.
+        require(json.dumps(approved_input.get(key), sort_keys=True) == json.dumps(value, sort_keys=True)
+                and json.dumps(record.get(key), sort_keys=True) == json.dumps(value, sort_keys=True),
+                "Prior package differs from the required producer or approved sealed inputs: " + key)
+    inventory = record.get("finalPackageFiles")
+    require(type(inventory) is dict
+            and record.get("signedBundledCLI") == signed
+            and inventory.get("Contents/Resources/XodusEngine/xodus-cli") == signed
+            and type(record["signedBundledCLI"].get("bytes")) is int
+            and type(inventory["Contents/Resources/XodusEngine/xodus-cli"].get("bytes")) is int,
+            "Prior final package does not approve this exact signed CLI")
     owned_bytes(source, digest, size)
-    command(["/usr/bin/codesign", "--verify", "--strict", str(source)])
-    require(not Path(destination).exists(), "CLI reuse destination must be new")
+
+
+def reuse_cli(source, destination, digest, size, receipt, receipt_hash, receipt_size, approved_input, run=command):
+    validate_reuse_cli(source, digest, size, receipt, receipt_hash, receipt_size, approved_input)
+    require(not Path(destination).exists() and not Path(destination).is_symlink(), "CLI reuse destination must be new")
+    run(["/usr/bin/codesign", "--verify", "--strict", str(source)])
     shutil.copyfile(source, destination)
     Path(destination).chmod(0o755)
-    owned_bytes(source, digest, size)
+    validate_reuse_cli(source, digest, size, receipt, receipt_hash, receipt_size, approved_input)
     owned_bytes(destination, digest, size)
-    command(["/usr/bin/codesign", "--verify", "--strict", str(destination)])
+    run(["/usr/bin/codesign", "--verify", "--strict", str(destination)])
 
 
 def main():
@@ -99,9 +133,11 @@ def main():
             operation.add_argument("--first", required=True)
             operation.add_argument("--second", required=True)
     reuse = operations.add_parser("reuse-cli")
-    for name in ("source", "destination", "hash"):
+    for name in ("source", "destination", "hash", "prior-receipt", "receipt-hash",
+                 "engine", "engine-hash", "proof-hash"):
         reuse.add_argument("--" + name, required=True)
-    reuse.add_argument("--bytes", type=int, required=True)
+    for name in ("bytes", "receipt-bytes", "engine-bytes", "proof-bytes"):
+        reuse.add_argument("--" + name, type=int, required=True)
     args = parser.parse_args()
     require(sys.platform == "darwin", "Actual signing and reuse require an approved macOS stage")
     if args.operation == "preflight":
@@ -109,10 +145,11 @@ def main():
     elif args.operation == "sign":
         sign(args.path, args.kind, args.identity, args.local_ad_hoc)
     elif args.operation == "compare":
-        compare(args.first, args.second, args.kind, args.identity)
-        print("Different signed builds have the same fixed certificate-bound designated requirement.")
+        print(compare(args.first, args.second, args.kind, args.identity))
     else:
-        reuse_cli(args.source, args.destination, args.hash, args.bytes)
+        approval = verify_input(args.engine, args.engine_hash, args.engine_bytes, args.proof_hash, args.proof_bytes)
+        reuse_cli(args.source, args.destination, args.hash, args.bytes,
+                  args.prior_receipt, args.receipt_hash, args.receipt_bytes, approval)
 
 
 if __name__ == "__main__":
