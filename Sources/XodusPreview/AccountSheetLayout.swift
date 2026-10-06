@@ -34,8 +34,8 @@ struct AccountSheetLayout<Header: View, Content: View, Actions: View>: View {
                 actions.padding(20)
             }
         }
-        .frame(minWidth: 480, idealWidth: 650, maxWidth: 760,
-               minHeight: 340, idealHeight: 620, maxHeight: 700)
+        .frame(minWidth: 480, idealWidth: showsHeader ? 650 : 560, maxWidth: 760,
+               minHeight: showsHeader ? 340 : 280, idealHeight: showsHeader ? 620 : 280, maxHeight: 700)
     }
 }
 

@@ -531,7 +531,7 @@ enum NativeChecks {
             await localEmpty.connect()
             check(localEmpty.installedSnapshot?.installations.isEmpty == true
                   && localEmpty.libraryTitle == "Your Library isn't available yet"
-                  && localEmpty.libraryMessage.contains("can't list your owned or installed games"),
+                  && localEmpty.libraryMessage == "Your game library isn't available yet.",
                   "A constant-empty registry response never advertises an implemented registry or an empty Mac")
             await localEmpty.disconnect()
             let localUnavailable = session("registryunavailable")
@@ -548,7 +548,7 @@ enum NativeChecks {
             await visibleFailures.refreshCatalog("Synthetic query")
             let catalogFailure = visibleFailures.catalogError
             check(catalogFailure != nil && visibleFailures.accountError == nil
-                  && visibleFailures.accountMessage.hasPrefix("You're signed in.")
+                  && visibleFailures.accountMessage == "Your game library isn't available yet."
                   && visibleFailures.catalogNotice == "Games couldn't be loaded. Choose Refresh to try again.",
                   "A catalog failure has visible catalog recovery and never contaminates Account")
             await visibleFailures.refreshAccount()

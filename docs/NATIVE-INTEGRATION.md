@@ -501,7 +501,23 @@ This is not a full VoiceOver or provider-consent test. Missing included engines 
 developer binary. User-mediated store authentication will use a backend-isolated
 launcher Keychain profile, not implicit CLI/private-worker credential import.
 
-`--fixture` opens the separate, labelled original design preview. Switching to it disconnects live work first. Fixture data never populates the live app. `--export-live <directory>` deliberately suppresses backend connection and renders only a disconnected shell, so its images cannot expose account/library content.
+`--fixture` opens the separate, labelled original design preview. Switching to it disconnects live work first. Fixture data never populates the live app. `--export-live <directory>` deliberately suppresses backend connection and renders only a disconnected shell.
+
+The separate **development-only** `--export-live-data <directory>` renders four
+actual live component hierarchies: unavailable Library, public Halo search,
+the first returned product and generic signed-in Account. It requires
+`XODUS_EXPORT_ADMITTED_BUNDLE` plus externally generated compiler pins for that
+exact admitted installed engine/helper pair; an ordinary unpaired repository
+build fails closed. The operator must close the normal app first and admit
+this single read owner. The existing client validates structured results;
+one explicit fresh account read and one bounded public search supply the views.
+Account appearance does not trigger another read. No fixture data, account
+identifiers, credential export, new sign-in or repeated authenticated-provider
+verification is used. The client closes before the operator reopens the normal
+app. Own-NSView PNGs include the native toolbar hierarchy on main views and
+native sheet content on detail/Account, but are **not desktop captures,
+compositor/glass certification or accessibility acceptance**. No such exporter
+or development argument is included in shipping.
 
 ## Evidence and still-open gates
 

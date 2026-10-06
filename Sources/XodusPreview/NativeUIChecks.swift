@@ -126,9 +126,9 @@ enum NativeUIChecks {
         check(Sheet.headerHeight(for: 340) == 0 && Sheet.headerHeight(for: 620) < 210
               && Sheet.headerHeight(for: 700) == 210,
               "Account decoration shrinks before the stable footer at constrained heights")
-        for size in [CGSize(width: 480, height: 340), CGSize(width: 650, height: 620)] {
+        for size in [CGSize(width: 480, height: 280), CGSize(width: 480, height: 340), CGSize(width: 650, height: 620)] {
             let footer = NSView()
-            let host = NSHostingView(rootView: AccountSheetLayout {
+            let host = NSHostingView(rootView: AccountSheetLayout(showsHeader: size.height >= 340) {
                 Color.clear
             } content: {
                 Text(String(repeating: "Synthetic pending or failure explanation. ", count: 80))
@@ -178,17 +178,23 @@ enum NativeUIChecks {
             }
         }
         if let product = session.products.first {
-            let host = NSHostingView(rootView: LiveProductView(product: product).environmentObject(session))
-            host.sizingOptions = []
-            host.frame = CGRect(x: 0, y: 0, width: 680, height: 620)
-            host.layoutSubtreeIfNeeded()
-            check(host.window == nil && host.fittingSize.width <= 680 && host.fittingSize.height <= 620,
-                  "Replayed public multi-edition detail fits the bounded native sheet")
+            for size in [CGSize(width: 480, height: 280), CGSize(width: 600, height: 300), CGSize(width: 680, height: 620)] {
+                let host = NSHostingView(rootView: LiveProductView(product: product).environmentObject(session))
+                host.sizingOptions = []
+                host.frame = CGRect(origin: .zero, size: size)
+                host.layoutSubtreeIfNeeded()
+                let scrollViews = descendants(of: host).compactMap { $0 as? NSScrollView }
+                check(host.window == nil && host.fittingSize.width <= 680 && host.fittingSize.height <= 620
+                      && scrollViews.allSatisfy {
+                          !$0.hasHorizontalScroller && ($0.documentView?.bounds.width ?? 0) <= size.width + 1
+                      },
+                      "Replayed public multi-edition detail fits compact and expanded native sheets without horizontal scrolling")
+            }
         }
         let account = NSHostingView(rootView: LiveAccountView(refreshStatusOnAppear: false)
             .environmentObject(state).environmentObject(session))
         account.sizingOptions = []
-        account.frame = CGRect(x: 0, y: 0, width: 480, height: 340)
+        account.frame = CGRect(x: 0, y: 0, width: 480, height: 280)
         account.layoutSubtreeIfNeeded()
         check(account.window == nil && NSApplication.shared.windows.count == windows
               && session.authentication == nil && !session.accountBusy && !session.signInPending,

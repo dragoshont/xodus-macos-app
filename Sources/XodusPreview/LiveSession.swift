@@ -191,7 +191,7 @@ final class LiveSession: ObservableObject {
         }
         if authentication?.flow?.state == .cancelled { return "You can sign in whenever you're ready." }
         switch currentCredentialState {
-        case .credentialPresent: return "You're signed in. Library syncing isn't available yet."
+        case .credentialPresent: return "Your game library isn't available yet."
         case .expired, .invalid: return "Disconnect this sign-in, then sign in again."
         case .signedOut: return "Connect your Microsoft account. You can browse games without signing in."
         case nil: return "Check status to see whether you're signed in."
@@ -203,7 +203,7 @@ final class LiveSession: ObservableObject {
     }
     var libraryMessage: String {
         guard isReady else { return "You can reconnect in Settings." }
-        return "Xodus can't list your owned or installed games yet. Browse Discover, or check a folder you choose."
+        return "Your game library isn't available yet."
     }
     var activityNotice: String? {
         guard activityError != nil else { return nil }

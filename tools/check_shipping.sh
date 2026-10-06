@@ -12,7 +12,7 @@ XODUS_NEUTRAL_ENGINE="$neutral" XODUS_NEUTRAL_FIXTURE="$PWD/Tests/ManagementChec
 python3 - "$bin" <<'PY'
 import pathlib, subprocess, sys
 root = pathlib.Path(sys.argv[1])
-for flag in ("--fixture", "--export-preview", "--export-live", "--live-check", "--self-check"):
+for flag in ("--fixture", "--export-preview", "--export-live", "--export-live-data", "--live-check", "--self-check"):
     result = subprocess.run([str(root / "XodusPreview"), flag], timeout=10,
                             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     assert result.returncode == 64, (flag, result.returncode)

@@ -34,6 +34,15 @@ struct XodusPreviewApp: App {
             exit(64)
         }
 #else
+        if PreviewExporter.liveDataRequested {
+            do {
+                let configuration = try PreviewExporter.liveConfiguration()
+                _session = StateObject(wrappedValue: LiveSession(configuration: configuration))
+            } catch {
+                FileHandle.standardError.write(Data("Actual live export requires the explicitly admitted, compiled-pin-bound installed pair.\n".utf8))
+                exit(1)
+            }
+        }
         if CommandLine.arguments.contains("--live-check") { NativeChecks.launch() }
         if CommandLine.arguments.contains("--self-check") {
             exit(PreviewChecks.run() ? 0 : 1)

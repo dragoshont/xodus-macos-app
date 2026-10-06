@@ -40,8 +40,12 @@ selected-folder marker inspection remain available in contextual information
 disclosures. Operation-specific failures remain visible and actionable;
 retained account snapshots are explicitly unconfirmed, not current saved-state
 evidence. Product
-detail has one combined status line, with independent per-edition evidence in
-Catalog info. Account stays
+detail has one availability line, with independent per-edition evidence in
+Catalog info, a compact preferred size and a separate native Done footer.
+Library has one unavailable state and Browse games action; selected-folder
+inspection is secondary under Library details. Discover places results directly
+after one source/ownership subtitle and any actual partial/failure notice.
+Account stays
 in the toolbar, and its cancellation, refresh and credential gates are
 unchanged. No Home shelves, invented installed games, new framework or
 speculative navigation API is introduced.
@@ -76,7 +80,9 @@ The live development shell inherits this world without copying fixture game name
 Account uses a bounded width/height range, a scrollable explanation/status body
 and a separate adaptive native-action footer. Decoration contracts first at
 short heights; longer action labels stack through one layout, not duplicated
-button trees. Authentication predicates, stable identifiers, keyboard
+button trees. The live text-only sheet prefers a compact 280 pt height instead
+of the illustrated fixture's 620 pt height; long failures and expanded Account
+info scroll without moving the action footer. Authentication predicates, stable identifiers, keyboard
 cancellation, dismissal protection and explicit Account refresh are unchanged.
 The main Scene declares a hidden-title-bar window and unified toolbar. No post-creation
 bridge forces titlebar background, opacity or full-size content geometry, and

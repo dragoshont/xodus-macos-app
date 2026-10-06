@@ -16,7 +16,7 @@ struct LiveRootView: View {
 #if XODUS_SHIPPING
         true
 #else
-        allowsStartupTasks && !CommandLine.arguments.contains("--export-live")
+        allowsStartupTasks && !CommandLine.arguments.contains("--export-live") && !PreviewExporter.liveDataRequested
 #endif
     }
     private var canRefreshCatalog: Bool {
@@ -51,7 +51,7 @@ struct LiveRootView: View {
         }
         .onAppear {
 #if !XODUS_SHIPPING
-            PreviewExporter.startIfRequested(state: state)
+            PreviewExporter.startIfRequested(state: state, session: session)
 #endif
         }
         .task {
@@ -67,7 +67,13 @@ struct LiveRootView: View {
             catch { return }
             await session.refreshCatalog(state.query)
         }
-        .sheet(isPresented: $state.showingAccount) { LiveAccountView() }
+        .sheet(isPresented: $state.showingAccount) {
+#if !XODUS_SHIPPING
+            LiveAccountView(refreshStatusOnAppear: !PreviewExporter.liveDataRequested)
+#else
+            LiveAccountView()
+#endif
+        }
         .sheet(item: $session.selectedProduct) { product in LiveProductView(product: product) }
         .background {
             Button("Focus search") { searchFocused = true }.keyboardShortcut("f").hidden()
@@ -76,13 +82,9 @@ struct LiveRootView: View {
 
     private var library: some View {
         VStack(alignment: .leading, spacing: 20) {
-            HStack {
-                Text("Your Library").font(.largeTitle.bold())
-                Spacer()
-                if session.phase == .connecting { ProgressView().controlSize(.small) }
-            }
             ContentUnavailableView {
-                Label(session.libraryTitle, systemImage: session.isReady ? "gamecontroller" : "cable.connector")
+                Label(session.isReady ? "Your Library" : session.libraryTitle,
+                      systemImage: session.isReady ? "gamecontroller" : "cable.connector")
             } description: {
                 Text(session.libraryMessage).frame(maxWidth: 520)
             } actions: {
@@ -98,13 +100,13 @@ struct LiveRootView: View {
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 220)
-            Divider()
-            selectedFolderInspection
-            DisclosureGroup("Library info") {
+            DisclosureGroup("Library details") {
                 VStack(alignment: .leading, spacing: 18) {
+                    selectedFolderInspection
+                    Divider()
                     Text(session.accountLibraryExplanation).foregroundStyle(.secondary)
                     Text("Owned-game listing and a durable installed-game registry aren't implemented. The engine's empty registry response isn't a check of your Mac or evidence that no games are installed.")
-                    Text("Folder checks don't register a game, verify its files, establish ownership or enable play.")
+                    Text("The selected-folder check only reads an Xodus marker. It doesn't scan your Mac, register a game, verify its files, establish ownership, download or enable play.")
                 }
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -116,9 +118,6 @@ struct LiveRootView: View {
     private var selectedFolderInspection: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Check a game folder").font(.title2.bold())
-                Spacer()
-                if session.inspectionBusy { ProgressView().controlSize(.small) }
                 Button("Inspect a game folder") { session.chooseInstallationFolder() }
                     .disabled(!session.isReady || !session.supports(.inspectInstallation) || session.inspectionBusy)
                     .accessibilityElement(children: .ignore)
@@ -126,10 +125,12 @@ struct LiveRootView: View {
                     .accessibilityIdentifier("xodus.library.inspectFolder")
                     .accessibilityAddTraits(.isButton)
                     .accessibilityAction { session.chooseInstallationFolder() }
+                if session.inspectionBusy { ProgressView().controlSize(.small) }
+                Spacer()
             }
             Text(session.supports(.inspectInstallation)
-                 ? "Read-only marker check in one selected folder. No scan, registration, download or launch."
-                 : "Read-only selected-folder inspection requires a matching engine capability. No other game folders have been scanned.")
+                 ? "Choose a folder to check for an existing Xodus marker."
+                 : "This build can't inspect a selected game folder.")
                 .font(.callout).foregroundStyle(.secondary)
             if let error = session.inspectionError {
                 Label(error, systemImage: "exclamationmark.circle")
@@ -162,7 +163,9 @@ struct LiveRootView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(scopedQuery.isEmpty ? "Discover" : session.catalogTitle).font(.largeTitle.bold())
-                    Text(scopedQuery.isEmpty ? "Find your next PC game." : "Games matching your search.")
+                    Text(scopedQuery.isEmpty ? "Public PC games. Ownership not checked."
+                         : session.supports(.query) ? "Microsoft Store games. Ownership not checked."
+                         : "Checked public games. Coverage is partial; ownership not checked.")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -173,10 +176,6 @@ struct LiveRootView: View {
                 Button("Refresh") { Task { await session.refreshCatalog(state.query) } }
                     .disabled(session.searching || !canRefreshCatalog)
             }
-            Text(scopedQuery.isEmpty ? "Public PC game catalog. Your ownership hasn't been checked."
-                 : session.supports(.query) ? "Microsoft Store results. Your ownership hasn't been checked."
-                 : "Checked public games. Coverage is partial; ownership hasn't been checked.")
-                .font(.callout).foregroundStyle(.secondary)
             if let notice = session.catalogNotice {
                 Label(notice, systemImage: session.catalogStopped ? "pause.circle" : "exclamationmark.circle")
                     .foregroundStyle(.secondary)
@@ -196,7 +195,7 @@ struct LiveRootView: View {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 340), spacing: 24)], spacing: 26) {
                     ForEach(session.products) { product in
                         Button { session.selectedProduct = product } label: {
-                            HStack(alignment: .top, spacing: 14) {
+                            HStack(spacing: 14) {
                                 Image(systemName: "gamecontroller")
                                     .font(.title2).foregroundStyle(.secondary)
                                     .frame(width: 64, height: 64)
@@ -205,7 +204,6 @@ struct LiveRootView: View {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(product.title).font(.headline).foregroundStyle(.primary)
                                         .fixedSize(horizontal: false, vertical: true)
-                                    Text("View game").font(.callout).foregroundStyle(.secondary)
                                     if product.freshness == "cached" {
                                         Text("Offline details").font(.caption).foregroundStyle(.secondary)
                                     }
