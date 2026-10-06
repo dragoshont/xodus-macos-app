@@ -5,12 +5,23 @@ This is implementation work beyond the immutable foundation at `44d7338`. It is 
 ## Artwork and recently played source slice
 
 The current source pairs with producer
-`680593de3d32390fe2105780b9a21b09fd302337`, tree
-`4b6fda27f9cf8aa546dfff6693b4270eabfee230`. Its exact generated management
+`2b31d199a3be15422596b46bc70e0926df30b539`, tree
+`c3df6885a74f806320b299ff2ce56832d7c091a2`. Its exact generated management
 schema SHA256 is
 `6945db01df88eeaf80f495f6b9d7240e270a879851c2c830fc5548ba20d32192`,
 with 100 positive and 96 negative sanitized producer frames. Earlier pins below
 record historical stages, not authorization to pair this consumer with d00.
+
+This producer revision explicitly sets the requested native interaction policy
+under the existing serialized credential-read guard and checks restoration of
+the exact prior policy. Noninteractive reads and credential writes retain their
+existing behavior. Its bounded failure-only stderr diagnostic is not a new
+management response or shipping UI feature; production stderr remains discarded.
+The replacement pair is pending release qualification and artifact admission.
+The earlier fb39072/680 pair proved real public Store artwork, but personal
+history was not accessed: its captured foreground status reads failed with
+`credentialStoreUnavailable`. No successful permission or TitleHub read is
+inferred from source changes or neutral checks.
 
 Every product and recent title requires the same max-four unique-role artwork
 array and explicit available/absent/rejected/notQueried status. Positive,
