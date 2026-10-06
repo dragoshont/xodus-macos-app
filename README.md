@@ -31,13 +31,18 @@ Own-view evidence is not compositor or accessibility certification. The
 reopened shipping app had a separate session: the export did not persist or
 inject history. That historical export is not proof of the new startup flow.
 
-The current **7aa9eb9/c1073100 shipping pair is admitted and installed**. Its
+The current **0a6dca1/c1073100 shipping pair is admitted and installed**. Its
 ordinary foreground startup published one real 20-title recently-played window,
 and the same shipping process decoded 12 actual artwork images successfully.
 That populated app was left running, with one matching engine and no sign-in
 helper. No private exporter, additional personal request or reopen was used.
 These are aggregate publication/decode observations, not a claim that every
 title has a distinct fetched image or that recent activity proves ownership.
+Recent entries now have a native **Find in Store** action. Only invoking it
+uses the title name to search Discover; you choose among catalog candidates.
+It does not map history to a Store product, establish access or enable play.
+The routing/selection behavior was qualified with neutral tests and exact CI;
+no personal-title Store query was automated during deployment.
 
 Owned/installed Library enumeration remains unavailable: the installed snapshot is a constant empty
 response, not a durable registry or scan of this Mac. It never proves that no

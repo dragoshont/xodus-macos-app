@@ -120,8 +120,31 @@ from the history entry. Navigation and catalog search do not refresh Account,
 reload personal history or alter its fences. Stock buttons support keyboard
 activation; title-specific VoiceOver labels remain separate reachable children.
 Artwork sizing, tokens and the current native composition are unchanged.
-Qualification is source/neutral CI only at this stage; the populated admitted
-7aa9 shipping process remains unchanged, with no extra personal or artwork read.
+The action's routing and explicit candidate selection were qualified with
+425 native neutral session checks, unchanged portable pair gates, direct source
+review and exact successful CI
+[37512166260](https://github.com/dragoshont/xodus-macos-app/actions/runs/37512166260).
+Genuine empty/error responses stay distinct, and these tests confirm no
+additional saved-status or personal-history read during title-name navigation.
+
+The controlled consumer
+`0a6dca1751576e2484b1f7606c174ae1cc5970c4`, tree
+`b3e5c846f41dd95ab3e7c0f1881f4967224c803d`, was independently admitted and
+installed after that exact CI passed. Receipt SHA256 is
+`9ed8f5ea70818c803be4fd711aa0cd75505ecaa43f7ee6d88eecb670099fe51a`.
+The existing preservation path reused the exact signed C8 CLI from the admitted
+b363 package; producer c107, schema and stable signing identities are unchanged.
+One normal Quit released the old owner, and atomic replacement preserved the
+entire working 7aa9 bundle, all earlier rollbacks, profile and saved credentials.
+One ordinary new shipping startup published one real recent20 window and
+12 successful actual image-decode events. All 21 installed files and strict
+signatures matched admission, with one parent-owned matching engine and no
+sign-in helper. The same populated shipping process was left open with the
+native action enabled. No private exporter, automated title-name Store search,
+extra proof RPC, relogin/reset or subsequent reopen was used. The action's
+actual public search remains for the user to invoke; neutral route tests are
+not misrepresented as a personal live-query result. Installation, package
+authorization, owned-PC inventory and gameplay remain separate unfinished work.
 
 ### Earlier saved-status and history confirmation
 
