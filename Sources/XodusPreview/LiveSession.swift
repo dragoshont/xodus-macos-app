@@ -22,6 +22,7 @@ final class LiveSession: ObservableObject {
     @Published private(set) var accountStatusCurrent = false
     @Published private(set) var accountError: String?
     @Published private(set) var accountStatusError: ManagementError?
+    @Published private(set) var lastSignInFailure: SignInFailureSnapshot?
     @Published private(set) var activityError: String?
     @Published private(set) var lookupBusy = false
     @Published private(set) var installedSnapshot: InstalledSnapshot?
@@ -67,6 +68,31 @@ final class LiveSession: ObservableObject {
     private var catalogTask: Task<Void, Never>?
     private var catalogWorkerID: UUID?
     private var queuedCatalog: CatalogRequest?
+
+    struct SignInFailureSnapshot: Equatable {
+        enum Code: String {
+            case invalid = "AUTH_INVALID", cancelled = "AUTH_CANCELLED"
+            case expired = "AUTH_EXPIRED", networkUnavailable = "NETWORK_UNAVAILABLE"
+        }
+
+        let code: Code?
+        let diagnostic: NativeConsentFailure?
+        let observation: String?
+
+        init(_ failure: WireFailure?) {
+            code = failure.flatMap { Code(rawValue: $0.code) }
+            diagnostic = failure?.nativeConsentFailure
+            observation = failure.flatMap(LiveSession.validatedNativeSignInObservation)
+        }
+
+        init(requestError: Error) {
+            if case let ManagementError.backendError(value, _) = requestError {
+                code = Code(rawValue: value)
+            } else { code = nil }
+            diagnostic = nil
+            observation = nil
+        }
+    }
 
     private struct CatalogRequest {
         let command: ManagementCommand
@@ -307,23 +333,22 @@ final class LiveSession: ObservableObject {
     }
 
     var accountFailureSummary: String? {
-        guard let flow = authentication?.flow, flow.state == .failed else { return nil }
-        guard let failure = flow.error else {
-            return "Failure stage is unavailable. No successful sign-in or credential commit was assumed."
+        guard let failure = lastSignInFailure else { return nil }
+        guard let code = failure.code?.rawValue else {
+            return "Stage: stageUnavailable. No successful sign-in or credential commit was assumed."
         }
-        if let diagnostic = failure.nativeConsentFailure {
-            return "Sign-in failure code: \(failure.code). Stage: \(diagnostic.stage). Reason: \(diagnostic.rawValue). "
+        if let diagnostic = failure.diagnostic {
+            return "Sign-in failure code: \(code). Stage: \(diagnostic.stage). Reason: \(diagnostic.rawValue). "
                 + Self.describeConsentFailure(diagnostic)
         }
-        return Self.describeSignInFailure(code: failure.code)
+        return Self.describeSignInFailure(code: code)
     }
 
     var accountFailureObservation: String? {
-        guard let flow = authentication?.flow, flow.state == .failed, let failure = flow.error else { return nil }
-        return Self.validatedNativeSignInObservation(failure)
+        lastSignInFailure?.observation
     }
 
-    static func validatedNativeSignInObservation(_ failure: WireFailure) -> String? {
+    nonisolated static func validatedNativeSignInObservation(_ failure: WireFailure) -> String? {
         guard failure.code == "AUTH_INVALID", failure.nativeConsentFailure == .pipelineFailed else { return nil }
         let reasons = ["helper.invalidFrame", "helper.invalidNavigation", "helper.navigationFailed",
                        "helper.popupUnsupported", "helper.contentTerminated", "helper.javaScriptFailed",
@@ -341,7 +366,7 @@ final class LiveSession: ObservableObject {
     }
 
     var accountFailureTitle: String {
-        if authentication?.flow?.error?.nativeConsentFailure?.stage == "devicePreparation" {
+        if lastSignInFailure?.diagnostic?.stage == "devicePreparation" {
             return "Microsoft sign-in could not start."
         }
         return "Sign-in did not complete. Try again when you are ready."
@@ -628,6 +653,11 @@ final class LiveSession: ObservableObject {
         if let currentFlow = authentication?.flow, let incomingFlow = status.flow,
            currentFlow.flowID == incomingFlow.flowID,
            currentFlow.state != .pending, incomingFlow.state == .pending { return }
+        if let flow = status.flow, flow.state == .failed {
+            lastSignInFailure = SignInFailureSnapshot(flow.error)
+        } else if status.flow?.state == .completed {
+            lastSignInFailure = nil
+        }
         authentication = status
         accountStatusCurrent = true
         accountStatusError = nil
@@ -718,13 +748,13 @@ final class LiveSession: ObservableObject {
                 .decode(AuthenticationStatus.self)
             guard token == generation else { return }
             guard let flow = status.flow else { throw ManagementError.invalidPayload }
-            authentication = status
-            accountStatusCurrent = true
+            acceptAccountStatus(status)
             signInDeadline = ContinuousClock.now.advanced(by: .seconds(600))
             accountBusy = false
             if flow.state == .pending { pollSignIn(flowID: flow.flowID, generation: token) }
         } catch {
             guard token == generation else { return }
+            lastSignInFailure = SignInFailureSnapshot(requestError: error)
             accountBusy = false
             accountStatusCurrent = false
             if case let ManagementError.backendError(code, _) = error {
@@ -800,8 +830,7 @@ final class LiveSession: ObservableObject {
             guard status.flow?.flowID == flow.flowID, status.flow?.state != .pending else {
                 throw ManagementError.invalidPayload
             }
-            authentication = status
-            accountStatusCurrent = true
+            acceptAccountStatus(status)
             if status.flow?.state == .completed {
                 errorMessage = "Sign-in finished before cancellation. Your sign-in is saved; use Sign out to remove it."
             }

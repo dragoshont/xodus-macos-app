@@ -71,6 +71,10 @@ enum NativeChecks {
                 let message = "Native sign-in failed: \(reason)."
                 check(try LiveSession.validatedNativeSignInObservation(observationFailure(message)) == message,
                       "Exact approved \(reason) observation is available under Account Details")
+                let snapshot = try LiveSession.SignInFailureSnapshot(observationFailure(message))
+                check(snapshot.code == .invalid && snapshot.diagnostic == .pipelineFailed
+                      && snapshot.observation == message,
+                      "Latest-failure snapshot keeps only the closed \(reason) diagnostic")
             }
             for message in ["Native sign-in failed: helper.unknown.", "Native sign-in failed: channelEOF. secret",
                             " Native sign-in failed: helper.bridgeInvalid.", "Native sign-in failed: channelEOF.\n",
@@ -94,6 +98,13 @@ enum NativeChecks {
                   && LiveSession.validatedNativeSignInObservation(
                     observationFailure("Native sign-in failed: helper.bridgeInvalid.", reason: "unexpected")) == nil,
                   "An exact observation is rejected without the agreed AUTH_INVALID/nativeSignIn/pipelineFailed tuple")
+            let unknownSnapshot = try LiveSession.SignInFailureSnapshot(
+                observationFailure("Secret-shaped upstream token=value", code: "UNKNOWN_token=value", reason: "unexpected"))
+            let unknownRequest = LiveSession.SignInFailureSnapshot(
+                requestError: ManagementError.backendError("UNKNOWN_token=value", retryable: false))
+            check(unknownSnapshot.code == nil && unknownSnapshot.diagnostic == nil && unknownSnapshot.observation == nil
+                  && unknownRequest.code == nil && unknownRequest.diagnostic == nil && unknownRequest.observation == nil,
+                  "Unclassified helper/exchange/commit errors retain no raw code, details or secret-shaped message")
             for reason in ["tokenExchangeFailed", "helperCompletionFailed",
                            "tokenExchange.requestBuild", "tokenExchange.requestSerialization",
                            "tokenExchange.requestTransport", "tokenExchange.requestTimeout",
@@ -214,10 +225,16 @@ enum NativeChecks {
                   && !preparationSummary.contains("disconnect") && !preparationSummary.contains("saved sign-in")
                   && !preparationSummary.contains("Original preparation upstream sentinel"),
                   "Request-level sign-in failure never implies invalid saved credentials or deletion advice")
+            let preparationFailure = uncertain.lastSignInFailure
+            check(preparationFailure?.code == .invalid && preparationFailure?.diagnostic == nil
+                  && preparationFailure?.observation == nil && uncertain.accountFailureSummary?.contains("stageUnavailable") == true,
+                  "A terminal request error latches only its closed code and an unavailable stage")
             await uncertain.refreshAccount()
             check(uncertain.accountStatusCurrent && uncertain.canSignIn,
                   "A fresh status read is required to recover from failed sign-in preparation")
             await uncertain.disconnect()
+            check(uncertain.lastSignInFailure == preparationFailure,
+                  "Terminal request diagnostics survive no-flow status and client retirement")
 
             for scenario in ["failedflow", "failedflownocode"] {
                 let failed = session(scenario)
@@ -230,11 +247,19 @@ enum NativeChecks {
                       && !summary.contains("disconnect") && !summary.contains("saved sign-in"),
                       "Failed auth flow surfaces a local safe reason without raw upstream message or success")
                 check(scenario == "failedflow" ? summary.contains("AUTH_INVALID")
-                      : summary.contains("Failure stage is unavailable") && !summary.contains("AUTH_INVALID"),
+                      : summary.contains("Stage: stageUnavailable") && !summary.contains("AUTH_INVALID"),
                       "Auth summary preserves the validated failure code and never invents a missing cause")
                 check(failed.canSignIn && !failed.accountBusy,
                       "Terminal failure preserves the explicit user retry gate without an automatic retry")
+                let snapshot = failed.lastSignInFailure
+                await failed.refreshAccount()
+                check(failed.authentication?.state == .signedOut && failed.authentication?.flow == nil
+                      && failed.lastSignInFailure == snapshot && failed.accountFailureSummary == summary,
+                      "Fresh signed-out/no-flow status cannot erase the last terminal failure")
                 await failed.disconnect()
+                check(failed.authentication == nil && failed.lastSignInFailure == snapshot
+                      && failed.accountFailureSummary == summary,
+                      "Disconnect preserves only the fixed terminal diagnostic for observation")
             }
 
             for diagnostic in NativeConsentFailure.allCases {

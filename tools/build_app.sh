@@ -53,10 +53,6 @@ else
     fi
     set -- --identity "$signer"
 fi
-if [ -n "$signed_cli" ] && [ "$local_ad_hoc" != true ]; then
-    printf '%s\n' 'CLI preservation is a UI-only local-ad-hoc mode, not a stable identity migration.' >&2
-    exit 2
-fi
 python3 tools/signing_identity.py preflight "$@"
 test "$(git rev-parse HEAD)" = "$source"
 test "$(git rev-parse 'HEAD^{tree}')" = "$tree"
@@ -91,7 +87,7 @@ if [ -n "$signed_cli" ]; then
         --hash "$signed_cli_hash" --bytes "$signed_cli_bytes" \
         --prior-receipt "$prior_receipt" --receipt-hash "$prior_receipt_hash" --receipt-bytes "$prior_receipt_bytes" \
         --engine "$engine" --engine-hash "$engine_hash" --engine-bytes "$engine_bytes" \
-        --proof-hash "$proof_hash" --proof-bytes "$proof_bytes"
+        --proof-hash "$proof_hash" --proof-bytes "$proof_bytes" "$@"
 else
     cp "$engine" "$app/Contents/Resources/XodusEngine/xodus-cli"
 python3 - "$app/Contents/Resources/XodusEngine/xodus-cli" "$engine_hash" "$engine_bytes" <<'PY'
@@ -142,6 +138,10 @@ for path in sys.argv[1:3]:
     owned_bytes(path, sys.argv[3], int(sys.argv[4]))
 owned_bytes(sys.argv[5], sys.argv[6], int(sys.argv[7]), 65536)
 PY
+    if [ "$local_ad_hoc" != true ]; then
+        python3 tools/signing_identity.py verify --kind cli \
+            --path "$app/Contents/Resources/XodusEngine/xodus-cli" --identity "$signer"
+    fi
 fi
 printf '%s\n' "$app" "$stage/package-receipt.json"
 printf '%s\n' 'Controlled local pair only. No launch, account operation, previous app replacement, notarization or gameplay qualification.'

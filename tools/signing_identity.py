@@ -63,23 +63,27 @@ def compare(first, second, kind, identity, run=command):
     second_record, _ = owned_bytes(second)
     require(first_record["sha256"] != second_record["sha256"],
             "Designated-requirement comparison requires two different signed artifacts")
-    requirements = []
-    for path in (first, second):
-        run(["/usr/bin/codesign", "--verify", "--strict", str(path)])
-        metadata = run(["/usr/bin/codesign", "--display", "--requirements", "-", "--verbose=2", str(path)])
-        identifiers = re.findall(r"^Identifier=(.+)$", metadata, re.MULTILINE)
-        designated = re.findall(r"^(?:# )?designated => (.+)$", metadata, re.MULTILINE)
-        require(identifiers == [IDENTIFIERS[kind]] and len(designated) == 1,
-                "Expected one fixed signing identifier and designated requirement")
-        requirement = designated[0]
-        require("cdhash" not in requirement.lower()
-                and re.fullmatch(r'identifier "' + re.escape(IDENTIFIERS[kind])
-                                 + r'" and certificate leaf = H"' + signer + r'"',
-                                 requirement, re.IGNORECASE) is not None,
-                "Requirement must bind only the fixed identifier and supplied certificate")
-        requirements.append(requirement)
+    requirements = [verify_designated_requirement(path, kind, signer, run) for path in (first, second)]
     require(requirements[0] == requirements[1], "Signed artifacts have different designated requirements")
     return COMPARISON_RESULT
+
+
+def verify_designated_requirement(path, kind, identity, run=command):
+    require(isinstance(identity, str) and re.fullmatch(r"[0-9a-fA-F]{40}", identity) is not None,
+            "Exact public certificate SHA1 is required for fixed-leaf verification")
+    signer = identity.upper()
+    run(["/usr/bin/codesign", "--verify", "--strict", str(path)])
+    metadata = run(["/usr/bin/codesign", "--display", "--requirements", "-", "--verbose=2", str(path)])
+    identifiers = re.findall(r"^Identifier=(.+)$", metadata, re.MULTILINE)
+    designated = re.findall(r"^(?:# )?designated => (.+)$", metadata, re.MULTILINE)
+    require(identifiers == [IDENTIFIERS[kind]] and len(designated) == 1,
+            "Expected one fixed signing identifier and designated requirement")
+    requirement = designated[0]
+    require(re.fullmatch(r'identifier "' + re.escape(IDENTIFIERS[kind])
+                         + r'" and certificate leaf = H"' + signer + r'"',
+                         requirement, re.IGNORECASE) is not None,
+            "Requirement must bind only the fixed identifier and supplied certificate")
+    return requirement
 
 
 def validate_reuse_cli(source, digest, size, receipt, receipt_hash, receipt_size, approved_input):
@@ -109,33 +113,43 @@ def validate_reuse_cli(source, digest, size, receipt, receipt_hash, receipt_size
     owned_bytes(source, digest, size)
 
 
-def reuse_cli(source, destination, digest, size, receipt, receipt_hash, receipt_size, approved_input, run=command):
+def reuse_cli(source, destination, digest, size, receipt, receipt_hash, receipt_size, approved_input,
+              run=command, identity=None):
     validate_reuse_cli(source, digest, size, receipt, receipt_hash, receipt_size, approved_input)
     require(not Path(destination).exists() and not Path(destination).is_symlink(), "CLI reuse destination must be new")
-    run(["/usr/bin/codesign", "--verify", "--strict", str(source)])
+    if identity is not None:
+        verify_designated_requirement(source, "cli", identity, run)
+    else:
+        run(["/usr/bin/codesign", "--verify", "--strict", str(source)])
     shutil.copyfile(source, destination)
     Path(destination).chmod(0o755)
     validate_reuse_cli(source, digest, size, receipt, receipt_hash, receipt_size, approved_input)
     owned_bytes(destination, digest, size)
-    run(["/usr/bin/codesign", "--verify", "--strict", str(destination)])
+    if identity is not None:
+        verify_designated_requirement(destination, "cli", identity, run)
+    else:
+        run(["/usr/bin/codesign", "--verify", "--strict", str(destination)])
+    owned_bytes(destination, digest, size)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     operations = parser.add_subparsers(dest="operation", required=True)
-    for name in ("preflight", "sign", "compare"):
+    for name in ("preflight", "sign", "compare", "verify"):
         operation = operations.add_parser(name)
         operation.add_argument("--identity")
-        if name != "compare":
+        if name in ("preflight", "sign"):
             operation.add_argument("--local-ad-hoc", action="store_true")
         if name != "preflight":
             operation.add_argument("--kind", choices=IDENTIFIERS, required=True)
-        if name == "sign":
+        if name in ("sign", "verify"):
             operation.add_argument("--path", required=True)
         if name == "compare":
             operation.add_argument("--first", required=True)
             operation.add_argument("--second", required=True)
     reuse = operations.add_parser("reuse-cli")
+    reuse.add_argument("--identity")
+    reuse.add_argument("--local-ad-hoc", action="store_true")
     for name in ("source", "destination", "hash", "prior-receipt", "receipt-hash",
                  "engine", "engine-hash", "proof-hash"):
         reuse.add_argument("--" + name, required=True)
@@ -149,10 +163,13 @@ def main():
         sign(args.path, args.kind, args.identity, args.local_ad_hoc)
     elif args.operation == "compare":
         print(compare(args.first, args.second, args.kind, args.identity))
+    elif args.operation == "verify":
+        verify_designated_requirement(args.path, args.kind, args.identity)
     else:
+        require(not (args.identity and args.local_ad_hoc), "CLI reuse cannot select both signing modes")
         approval = verify_input(args.engine, args.engine_hash, args.engine_bytes, args.proof_hash, args.proof_bytes)
         reuse_cli(args.source, args.destination, args.hash, args.bytes,
-                  args.prior_receipt, args.receipt_hash, args.receipt_bytes, approval)
+                  args.prior_receipt, args.receipt_hash, args.receipt_bytes, approval, identity=args.identity)
 
 
 if __name__ == "__main__":

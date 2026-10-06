@@ -25,6 +25,14 @@ native Button accessibility and enabled-state semantics, without substitute
 accessibility actions. Resolving a denied saved-item permission or choosing to
 reset saved sign-in remains a separate human decision: this UI correction adds
 neither an interactive Keychain command nor an automatic reset.
+Terminal sign-in errors are latched in the current app session before account
+state is replaced. The latch contains only a known error-code enum, validated
+native-consent stage/reason and an exact allowlisted observation; unknown failures
+show an unavailable stage. Last sign-in error is always outside Account info and
+retains its accessibility identifiers across signed-out/no-flow refreshes and
+client disconnection. A completed flow clears it. It is not written to disk and
+does not survive quitting the app. No raw failure, provider text, account/flow ID,
+token or pending-exchange credential is retained in this snapshot.
 The original GUI startup
 was observed to time out specifically in `auth.status`, despite the equivalent
 SSH read failing promptly with `credentialStoreUnavailable`. Removing that

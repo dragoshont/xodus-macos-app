@@ -41,6 +41,18 @@ struct LiveAccountView: View {
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("xodus.account.error")
                 }
+                if let summary = session.accountFailureSummary {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Last sign-in error").font(.headline)
+                        Text(summary).fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("xodus.account.failureSummary")
+                        if let observation = session.accountFailureObservation {
+                            Text(observation).fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("xodus.account.failureObservation")
+                        }
+                    }
+                    .foregroundStyle(.secondary).textSelection(.enabled)
+                }
                 if session.isReady && !session.supports(.authBegin) {
                     Text("Sign-in isn't available in this build.").foregroundStyle(.secondary)
                 }
@@ -48,14 +60,6 @@ struct LiveAccountView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text(session.accountExplanation)
                         Text("Credentials stay in the native Keychain.")
-                        if let summary = session.accountFailureSummary {
-                            Text(summary)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .accessibilityIdentifier("xodus.account.failureSummary")
-                        }
-                        if let observation = session.accountFailureObservation {
-                            Text(observation).accessibilityIdentifier("xodus.account.failureObservation")
-                        }
                     }
                     .foregroundStyle(.secondary).textSelection(.enabled).padding(.top, 12)
                     .frame(maxWidth: .infinity, alignment: .leading)

@@ -88,7 +88,8 @@ does not qualify two builds. Real identity/persistence qualification remains
 pending human-approved provisioning, signing and independent build receipts/runs.
 Neutral tests are simulations, not certificate, build or persistence evidence.
 
-An explicitly approved UI-only package may select `--local-ad-hoc` together
+An explicitly approved UI-only package may preserve its signed engine with
+either the same exact stable certificate or explicit `--local-ad-hoc`, together
 with the externally pinned prior final package receipt:
 
 ```sh
@@ -104,9 +105,13 @@ The bounded prior receipt is hash-pinned before parsing; missing, changed,
 cross-producer or mismatched sealed-input approval rejects reuse before signature
 verification or copying. The copied CLI and receipt are verified again after
 copying and after the app sign; the engine is never re-signed.
-This preserves the existing engine identity, not credential access or a durable
-signing fix. Stable-identity mode refuses this historical ad-hoc preservation
-combination. The receipt's existence or self-asserted contents never replace
+Stable mode also strictly verifies the existing and copied CLI's exact fixed
+identifier/certificate-leaf designated requirement against the supplied
+certificate before copying and after the final app sign. A different certificate,
+identifier, build-cdhash requirement or ad-hoc CLI cannot pass as a stable pair.
+The app and helper may be rebuilt without re-signing or changing the CLI bytes.
+Preservation alone does not establish credential access or independent engine
+rebuild reuse. The receipt's existence or self-asserted contents never replace
 independent operator approval of its exact hash/bytes.
 
 Runtime admission requires canonical no-follow current-UID single-link regular

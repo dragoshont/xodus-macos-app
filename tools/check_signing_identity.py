@@ -7,7 +7,8 @@ import json
 from pathlib import Path
 import tempfile
 from shipping_pair import FEATURES, PROFILE, PRODUCER, PRODUCER_TREE
-from signing_identity import COMPARISON_RESULT, IDENTIFIERS, compare, preflight, reuse_cli, sign
+from signing_identity import (COMPARISON_RESULT, IDENTIFIERS, compare, preflight, reuse_cli, sign,
+                              verify_designated_requirement)
 
 fingerprint = "A" * 40
 calls = []
@@ -74,6 +75,7 @@ with tempfile.TemporaryDirectory(prefix="xodus-signing-neutral-") as temporary:
             return "Identifier=" + identifier + "\ndesignated => " + requirement + "\n"
         return ""
     assert compare(first, second, "cli", fingerprint, metadata) == COMPARISON_RESULT
+    assert verify_designated_requirement(first, "cli", fingerprint, metadata) == requirement
     assert "Independent-build qualification" in COMPARISON_RESULT
     assert "not established by this comparison" in COMPARISON_RESULT
     assert compare(first, second, "cli", fingerprint, lambda arguments:
@@ -85,6 +87,9 @@ with tempfile.TemporaryDirectory(prefix="xodus-signing-neutral-") as temporary:
             return ("Identifier=" + identifier + "\ndesignated => " + bad + "\n"
                     if "--display" in arguments else metadata(arguments))
         rejected(lambda: compare(first, second, "cli", fingerprint, altered))
+        rejected(lambda: verify_designated_requirement(first, "cli", fingerprint, altered))
+    rejected(lambda: verify_designated_requirement(first, "cli", fingerprint, lambda arguments:
+             metadata(arguments).replace("Identifier=" + identifier, "Identifier=wrong")))
     second.write_bytes(first.read_bytes())
     rejected(lambda: compare(first, second, "cli", fingerprint, metadata))
 
@@ -100,13 +105,14 @@ with tempfile.TemporaryDirectory(prefix="xodus-signing-neutral-") as temporary:
     destination = Path(temporary).resolve() / "new-copy"
 
     def attempt(payload, digest=None, size=None, source_hash=signed["sha256"], source_size=signed["bytes"],
-                approved=approval, receipt_path=receipt):
+                approved=approval, receipt_path=receipt, identity=None, command_run=neutral):
         encoded = json.dumps(payload, sort_keys=True).encode() if isinstance(payload, dict) else payload
         receipt.write_bytes(encoded)
         receipt.chmod(0o600)
         calls.clear()
         reuse_cli(first, destination, source_hash, source_size, receipt_path,
-                  digest or hashlib.sha256(encoded).hexdigest(), size or len(encoded), approved, run=neutral)
+                  digest or hashlib.sha256(encoded).hexdigest(), size or len(encoded), approved,
+                  run=command_run, identity=identity)
 
     negatives = []
     for key, value in [
@@ -151,6 +157,17 @@ with tempfile.TemporaryDirectory(prefix="xodus-signing-neutral-") as temporary:
     assert len(calls) == 2 and all(call[:3] == ["/usr/bin/codesign", "--verify", "--strict"] for call in calls)
     rejected(lambda: attempt(base_receipt))
     assert not calls
+    destination.unlink()
+    for bad in (requirement.replace(fingerprint, "B" * 40),
+                requirement.replace(identifier, "wrong"),
+                requirement + ' and cdhash H"' + "B" * 40 + '"'):
+        def cross_identity(arguments, bad=bad):
+            return ("Identifier=" + identifier + "\ndesignated => " + bad + "\n"
+                    if "--display" in arguments else metadata(arguments))
+        rejected(lambda: attempt(base_receipt, identity=fingerprint, command_run=cross_identity))
+        assert not destination.exists()
+    attempt(base_receipt, identity=fingerprint, command_run=metadata)
+    assert destination.read_bytes() == signed_data and first.read_bytes() == signed_data
     destination.unlink()
 
     def changed_receipt(arguments):
