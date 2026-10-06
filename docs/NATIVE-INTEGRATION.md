@@ -36,6 +36,32 @@ category or new error mapping was added. The targeted check entry point is
 `XodusManagementChecks --registry-development-checks`; it starts no engine and
 makes no `installed.snapshot`, credential, provider or artwork request.
 
+## Development-only installation-planning failures
+
+A standalone `InstallPlanFailure` codec preserves the exact 17 complete failure
+tuples from producer `75d5ed1f00a65f18e501a048e8f6b558c23206e7`, tree
+`aa7d8decf0bd885d4141e5d04570d0bb2ca94616`. Each tuple binds the exact
+code, fixed message and retryability to one category/stage/reason pair. Missing,
+extra, wrong-type, unknown or cross-paired values are rejected, rather than
+promoted from independently recognized stages or reasons. Only
+`provider/unavailable` is retryable.
+
+Its separate, producer-qualified development schema SHA256 is
+`dbd7bada96bebb09ff17bbecca622e613bb94d661766f08c2e5bd61d235cddcd`,
+with 119 positive and 172 negative frames. Tests use the actual copied producer
+failure witnesses and the authoritative `/$defs/installPlanError/oneOf`, not
+reconstructed accepted examples. Additional invalid-input mutations exercise
+missing/type-invalid fields and cross-paired complete tuples.
+
+This preparation adds no live error routing, ready-plan Data variant, plan
+cache, enqueue path, license authorization or UI. The existing transport and
+auth/history failure decoding are unchanged. Reserved plan descriptors remain
+codec-only and excluded from live success; no descriptor establishes payload,
+runtime, entitlement or installation readiness. Production resources and pins
+remain unchanged. `XodusManagementChecks --install-plan-development-checks`
+runs the retained registry checks and new plan data checks without starting an
+engine or making any management, credential, provider or artwork request.
+
 ## Artwork and recently played source slice
 
 The current source pairs with producer

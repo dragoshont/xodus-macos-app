@@ -21,6 +21,9 @@ enum ManagementChecks {
                     discover: CommandLine.arguments.contains("--probe-discovery"),
                     query: CommandLine.arguments.contains("--probe-query"),
                     inspect: CommandLine.arguments.contains("--probe-inspect"))
+            } else if CommandLine.arguments.contains("--install-plan-development-checks") {
+                try await checks.registryDevelopmentChecks()
+                try await checks.installPlanDevelopmentChecks()
             } else if CommandLine.arguments.contains("--registry-development-checks") {
                 try await checks.registryDevelopmentChecks()
             } else { try await checks.run() }
@@ -62,6 +65,7 @@ actor Checks {
 
     func run() async throws {
         try registryDevelopmentChecks()
+        try installPlanDevelopmentChecks()
         try await runtimePlanChecks()
         try await hostBindingChecks()
         try await artworkChecks()
