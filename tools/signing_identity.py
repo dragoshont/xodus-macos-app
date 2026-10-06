@@ -35,9 +35,12 @@ def preflight(identity=None, local_ad_hoc=False, run=command):
     require(re.fullmatch(r"[0-9a-fA-F]{40}", identity) is not None,
             "Signing identity must be an exact public certificate SHA1 fingerprint, not a name or private key")
     fingerprint = identity.upper()
-    available = run(["/usr/bin/security", "find-identity", "-v", "-p", "codesigning"])
-    valid = re.findall(r'^\s*\d+\)\s+([0-9A-Fa-f]{40})\s+"[^"\n]*"\s*$', available, re.MULTILINE)
-    require(fingerprint in {value.upper() for value in valid},
+    available = run(["/usr/bin/security", "find-identity", "-p", "codesigning"])
+    # A local fixed-leaf requirement does not need global certificate trust.
+    matching = re.findall(
+        r'^\s*\d+\)\s+([0-9A-Fa-f]{40})\s+"[^"\n]*"'
+        r'(?:[ \t]+\(CSSMERR_TP_NOT_TRUSTED\))?[ \t]*$', available, re.MULTILINE)
+    require(fingerprint in {value.upper() for value in matching},
             "Supplied OS Keychain code-signing identity is unavailable; human-approved provisioning is required")
     return fingerprint
 

@@ -52,8 +52,14 @@ or a protected bundle.
 
 ## Explicit signing policy
 
-Packaging requires a supplied valid OS Keychain code-signing certificate SHA1
-through `--signing-identity`; there is no automatic ad-hoc fallback. Signing
+Packaging requires a supplied matching OS Keychain code-signing identity's
+exact certificate SHA1 through `--signing-identity`; there is no automatic
+ad-hoc fallback. Preflight uses `security find-identity -p codesigning`, not
+the trusted-valid-only `-v` filter. A matching local self-signed identity may
+report `CSSMERR_TP_NOT_TRUSTED`: this does not require global OS trust for a
+fixed-leaf designated requirement. Expired or wrong-purpose error entries are
+not accepted. This is not Developer ID, Gatekeeper or distribution qualification.
+Signing
 identifiers are fixed to `io.github.dragoshont.xodus`,
 `io.github.dragoshont.xodus.cli` and `io.github.dragoshont.xodus.auth-host`.
 The designated requirement binds the fixed identifier to that certificate's

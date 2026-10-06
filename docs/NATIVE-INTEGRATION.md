@@ -434,8 +434,10 @@ sh tools/build_app.sh /absolute/reviewed/engine UNSIGNED_SHA BYTES PROVENANCE_SH
 
 The script reports a new distinct bundle and external package receipt; it never
 opens a window or replaces `dist/Xodus.app`. Launch requires separate approval.
-The supplied identity must already exist in the OS Keychain; provisioning and
-private-key prompts require separate human approval. Fixed signing identifiers,
+The supplied exact fingerprint must match an existing code-signing identity in
+the OS Keychain; a local self-signed identity need not have global OS trust for
+the fixed-leaf requirement. Provisioning and private-key prompts require separate
+human approval. Fixed signing identifiers,
 artifact-level designated-requirement comparison, the separate requirement for
 independent approved build evidence, and prior-package-receipt-bound UI-only CLI
 preservation are described in [shipping admission](SHIPPING-ADMISSION.md).

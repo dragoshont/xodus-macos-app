@@ -36,6 +36,17 @@ rejected(lambda: preflight(fingerprint, True, neutral))
 assert preflight(local_ad_hoc=True, run=neutral) == "-"
 rejected(lambda: preflight(fingerprint, run=lambda _: "0 valid identities found\n"))
 assert preflight(fingerprint.lower(), run=neutral) == fingerprint
+untrusted_matching = (
+    'Matching identities\n  1) ' + fingerprint + ' "Neutral local identity" (CSSMERR_TP_NOT_TRUSTED)\n'
+    '     1 identities found\n\nValid identities only\n     0 valid identities found\n')
+assert preflight(fingerprint, run=lambda arguments: (
+    untrusted_matching if arguments == ["/usr/bin/security", "find-identity", "-p", "codesigning"] else ""
+)) == fingerprint
+for wrong in ("B" * 40,):
+    rejected(lambda: preflight(wrong, run=lambda _: untrusted_matching))
+for failure in ("CSSMERR_TP_CERT_EXPIRED", "CSSMERR_TP_INVALID_EXTENDED_KEY_USAGE"):
+    rejected(lambda failure=failure: preflight(fingerprint, run=lambda _:
+             untrusted_matching.replace("CSSMERR_TP_NOT_TRUSTED", failure)))
 for kind, identifier in IDENTIFIERS.items():
     calls.clear()
     sign("/neutral/new-build", kind, fingerprint, run=neutral)
@@ -154,6 +165,8 @@ with tempfile.TemporaryDirectory(prefix="xodus-signing-neutral-") as temporary:
                               hashlib.sha256(encoded).hexdigest(), len(encoded), approval, run=changed_receipt))
     assert len(calls) == 1
 
-assert all(call[1:3] == ["find-identity", "-v"] for call in calls if call[0] == "/usr/bin/security")
-print("PASS simulated identity/requirement and receipt-bound CLI reuse policy, including cross-producer/seal rejection. "
+assert all(call == ["/usr/bin/security", "find-identity", "-p", "codesigning"]
+           for call in calls if call[0] == "/usr/bin/security")
+print("PASS simulated matching/untrusted identity, fixed requirement and receipt-bound CLI reuse policy, "
+      "including cross-producer/seal rejection. "
       "Neutral bytes and mocked OS commands only; no real signing, independent builds or persistence qualification.")
