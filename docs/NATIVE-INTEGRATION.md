@@ -4,6 +4,69 @@ This is implementation work beyond the immutable foundation at `44d7338`. It is 
 
 ## Local imported-game Play
 
+### S3/S5/S6 game operations (source candidate; no installed/live claim)
+
+This app-only batch implements the approved
+[remaining-work spec at bda88fe](https://github.com/dragoshont/xodus-macos/blob/bda88fe/docs/xodus/remaining-work-plan.md).
+The owner confirmed four existing private script entrypoints under
+`~/src/xodus-macos-private-ai/scripts/macos`: `private-xodus-service-status.sh`,
+`private-xodus-service-signin.sh`, `private-xodus-install.sh`, and
+`private-xodus-uninstall.sh`. The public app contains their invocation contract,
+not their source, credentials or runtime. No engine/schema pin is changed.
+
+Every invocation uses `/bin/bash`, an exact generated run ID, separate arguments,
+and the existing minimal Play environment. Receipts under
+`~/Library/Application Support/XodusRemote/processed` are bounded, private,
+regular nonsymlink files. The owner guarantees atomic receipt publication with
+status last and process exit equal to status, including SIGTERM. Missing or
+conflicting terminal status is an explicit failure, never success.
+Show log reveals only an existing generated-run stderr file in Finder.
+
+Game-service status/sign-in is explicit in Account and Settings. Sign-in opens
+the service-owned Microsoft flow, then reads fresh status. No library token is
+passed to the service. Service restart is disabled during gameplay or a
+mutation. PC-library authentication and game-service authentication remain
+separate truthful states.
+
+An uninstalled account-bound PC tile offers Install. Consent shows the exact
+ASCII-title destination under `~/Games/Xodus`, measured volume capacity, and
+unknown-size copy because the current catalog DTO does not retain a proven
+download size. The operation view uses real receipt bytes/phases, not estimated
+or simulated progress. Cancellation signals only its owned script and joins it;
+code 14 retains partial files for retry. Codes 10–13 have specific storage,
+sign-in, unsupported-package and verification recovery. Only code zero plus
+matching requested StoreId/folder, valid MicrosoftGame.config, executable
+launcher and durable registry save enables Play. Repair uses that same
+validator/store path and preserves entry identity/session history.
+
+Uninstall requires confirmation, refuses a running game, and delegates deletion
+to the private script. The owner guarantees verified save copying before
+deletion, code 20 without deletion if preservation fails, and a folder under
+`~/Games/Xodus` whose config StoreId matches. The app itself never deletes game
+files. Only confirmed code zero removes its list entry. Remove from list
+remains nondestructive. One mutation reserves edits/affected-game Play; normal
+Quit refuses to orphan a mutation or game sign-in, without changing the prior
+rule that quitting during ordinary gameplay leaves the game running.
+
+A private atomic 0600 journal (0700 directory) records the one pending mutation.
+Reopening never replays a script: explicit Check last operation reconciles a
+terminal receipt through the same validator. Uncertain registration stays
+visible and fenced. Known joined failures release the mutation without
+inventing an installed game. Container identifiers that masked Installed and
+PC Library child actions are removed; controls keep their own identifiers.
+
+Neutral checks use synthetic scripts, config, receipts, local folders and a fake
+one-second Play session only. They do not authenticate, run private scripts,
+install/uninstall a real title, query an account, or start the installed app.
+Mac qualification passed 683 native session checks (76 game-operation checks),
+75 presentation checks and 29 portable packaging checks, with shipping-debug
+compilation. The focused operation checks also passed after the final
+integration corrections. Fixture receipt publication follows the same atomic,
+private-file contract; additional result keys are ignored, never promoted into
+registration metadata. Exact frozen-source CI, package admission and owner live
+acceptance remain pending. The installed S4 app and its profile/list are
+unchanged.
+
 ### S4 owned PC Library (admitted, installed and live-accepted)
 
 This slice implements AC4.1–AC4.5 of the

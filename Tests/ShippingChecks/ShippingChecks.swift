@@ -29,6 +29,9 @@ final class ShippingChecks: XCTestCase {
         check(!state.pcGames.hasSavedSignIn && state.pcGames.snapshot == nil && !state.pcGames.busy
               && state.pcGames.deviceCode == nil,
               "Shipping PC Library starts without credential access, network results or invented owned games")
+        check(state.gameOperations.serviceStatus == nil && !state.gameOperations.serviceBusy
+              && state.gameOperations.operation == nil && !state.installedGames.mutationActive,
+              "Shipping game operations start without private-script, credential or mutation activity")
         await state.loadRecentActivityIfVisible(session: session)
         check(session.recentLibrary == nil && !session.recentLibraryBootstrapRunning
               && session.authentication == nil && session.libraryTitle == "Your PC library isn't available yet"

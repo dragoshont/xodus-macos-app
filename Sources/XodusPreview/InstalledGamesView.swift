@@ -3,6 +3,7 @@ import SwiftUI
 
 struct InstalledGamesView: View {
     @ObservedObject var library: InstalledGamesController
+    @ObservedObject var operations: GameOperationsController
     var allowsArtworkLoading = true
 
     var body: some View {
@@ -32,7 +33,6 @@ struct InstalledGamesView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .accessibilityElement(children: .contain)
                     .accessibilityLabel("Continue Playing, \(game.title)")
-                    .accessibilityIdentifier("xodus.installed.continuePlaying")
                 }
                 .padding(.bottom, 10)
             }
@@ -70,14 +70,7 @@ struct InstalledGamesView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                         Text(game.title).font(.headline).fixedSize(horizontal: false, vertical: true)
                         Spacer()
-                        Button(role: .destructive) { Task { await library.remove(game) } } label: {
-                            Image(systemName: "minus.circle")
-                        }
-                        .buttonStyle(.borderless)
-                        .disabled(library.editing || library.choosing || library.runningGameID == game.id)
-                        .help("Remove from list. Game files are kept.")
-                        .accessibilityLabel("Remove \(game.title) from list")
-                        .accessibilityIdentifier("xodus.installed.remove")
+                        InstalledGameActions(library: library, operations: operations, game: game)
                         InstalledPlayButton(library: library, game: game)
                     }
                     playError(game)
@@ -86,12 +79,11 @@ struct InstalledGamesView: View {
                 Divider()
             }
         }
-        .accessibilityIdentifier("xodus.installed.section")
     }
 
     private var importButton: some View {
         Button("Import installed Xbox game") { Task { await library.chooseGame() } }
-            .disabled(!library.loaded || library.editing || library.choosing)
+            .disabled(!library.loaded || library.editing || library.choosing || library.mutationActive)
             .accessibilityIdentifier("xodus.installed.import")
     }
 
@@ -129,7 +121,8 @@ struct InstalledPlayButton: View {
             Task { await library.play(game) }
         }
         .buttonStyle(.borderedProminent)
-        .disabled(library.runningGameID != nil || library.editing || library.choosing)
+        .disabled(library.runningGameID != nil || library.editing || library.choosing
+                  || library.mutationGameID == game.id || library.serviceSignInActive)
         .accessibilityLabel(library.runningGameID == game.id
             ? "\(game.title) is \(library.playState == .launching ? "launching" : "playing")"
             : "Play \(game.title)")

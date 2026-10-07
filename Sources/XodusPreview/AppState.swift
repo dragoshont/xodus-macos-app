@@ -40,6 +40,7 @@ final class AppState: ObservableObject {
     let runtimeSettings = RuntimeProviderSettings()
     let installedGames = InstalledGamesController()
     let pcGames = PCGamesController()
+    lazy var gameOperations = GameOperationsController(installed: installedGames)
 #if !XODUS_SHIPPING
     @Published var fixtureMode = CommandLine.arguments.contains("--fixture")
         || CommandLine.arguments.contains("--export-preview")

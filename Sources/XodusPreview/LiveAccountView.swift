@@ -36,6 +36,8 @@ struct LiveAccountView: View {
                 Text(session.accountMessage)
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("xodus.account.statusExplanation")
+                GameServiceAccountView(operations: state.gameOperations)
+                Divider()
                 if let error = session.accountError {
                     Label(error, systemImage: "exclamationmark.circle")
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -153,6 +155,7 @@ struct LiveSettingsView: View {
             }
             RuntimeProviderSection(settings: state.runtimeSettings, backendPath: session.backendPath)
             Section("Account") {
+                GameServiceAccountView(operations: state.gameOperations)
                 LabeledContent("Status", value: session.accountLabel)
                 Button("Open account") { state.showingAccount = true }
                 DisclosureGroup("Account info") { Text(session.accountExplanation).foregroundStyle(.secondary) }

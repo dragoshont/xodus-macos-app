@@ -5,13 +5,13 @@ import XodusManagement
 
 @MainActor
 enum NativeChecks {
-    static func launch() -> Never {
-        Task { exit(await run() ? 0 : 1) }
+    static func launch(gameOperationsOnly: Bool = false) -> Never {
+        Task { exit(await run(gameOperationsOnly: gameOperationsOnly) ? 0 : 1) }
         CFRunLoopRun()
         fatalError("The native check run loop ended before completion.")
     }
 
-    static func run() async -> Bool {
+    static func run(gameOperationsOnly: Bool = false) async -> Bool {
         var count = 0, failures = 0
         func check(_ condition: Bool, _ name: String) {
             count += 1
@@ -47,8 +47,14 @@ enum NativeChecks {
             }
         }
         do {
+            if gameOperationsOnly {
+                try await GameOperationChecks.run(check: check)
+                print("\(count) game operation checks, \(failures) failures. Synthetic scripts only.")
+                return failures == 0
+            }
             try await InstalledGameChecks.run(check: check)
             try await PCGamesChecks.run(check: check)
+            try await GameOperationChecks.run(check: check)
             func observationFailure(_ message: String, code: String = "AUTH_INVALID",
                                     reason: String = "pipelineFailed") throws -> WireFailure {
                 let value = JSONValue.object([

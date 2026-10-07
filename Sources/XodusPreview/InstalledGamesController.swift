@@ -20,6 +20,9 @@ final class InstalledGamesController: ObservableObject {
     @Published private(set) var historyError: String?
     @Published private(set) var playLogs: [UUID: URL] = [:]
     @Published private(set) var launchableIDs: Set<UUID> = []
+    @Published private(set) var mutationGameID: UUID?
+    @Published private(set) var mutationActive = false
+    @Published var serviceSignInActive = false
     var applicationTerminating = false
     private let store: InstalledGameStore
     private let launchingDuration: Duration
@@ -58,36 +61,21 @@ final class InstalledGamesController: ObservableObject {
     }
 
     func importGame(folder: URL, launcher: URL) async {
-        guard loaded, !editing, !applicationTerminating else { return }
+        guard loaded, !editing, !mutationActive, !applicationTerminating else { return }
         editing = true
         defer { editing = false }
         do {
-            let metadata = try await Task.detached(priority: .userInitiated) {
-                let config = try MicrosoftGameConfig.read(folder: folder)
-                try InstalledGameFiles.checkLauncher(launcher)
-                return config
-            }.value
-            let previous = games.first(where: { $0.folder == folder.path })
-            let game = InstalledGame(id: previous?.id ?? UUID(),
-                title: metadata.title, identityName: metadata.identityName, version: metadata.version,
-                storeId: metadata.storeId, folder: folder.path, launcher: launcher.path, importedAt: Date(),
-                publisher: metadata.publisher)
-            guard runningGameID != game.id else {
-                error = "Wait for this game to finish before changing its launch script."
-                return
-            }
-            let updated = try await store.upsert(game)
-            applySavedGames(updated)
+            try await saveValidatedGame(folder: folder, launcher: launcher, expectedStoreID: nil)
             error = nil
-            await refreshLaunchableGames()
         } catch {
             self.error = (error as? InstalledGameError)?.localizedDescription
+                ?? (error as? GameScriptError)?.localizedDescription
                 ?? InstalledGameError.storage.localizedDescription
         }
     }
 
     func chooseGame() async {
-        guard loaded, !editing, !choosing, !applicationTerminating else { return }
+        guard loaded, !editing, !choosing, !mutationActive, !applicationTerminating else { return }
         choosing = true
         defer { choosing = false }
         let folderPanel = NSOpenPanel()
@@ -115,7 +103,7 @@ final class InstalledGamesController: ObservableObject {
     }
 
     func remove(_ game: InstalledGame) async {
-        guard loaded, !editing, !choosing, !applicationTerminating, runningGameID != game.id else { return }
+        guard loaded, !editing, !choosing, !mutationActive, !applicationTerminating, runningGameID != game.id else { return }
         editing = true
         defer { editing = false }
         do {
@@ -129,7 +117,7 @@ final class InstalledGamesController: ObservableObject {
         } catch { self.error = InstalledGameError.storage.localizedDescription }
     }
 
-    static func runID(date: Date = Date(), nonce: UUID = UUID()) -> String {
+    nonisolated static func runID(date: Date = Date(), nonce: UUID = UUID()) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
@@ -138,13 +126,13 @@ final class InstalledGamesController: ObservableObject {
         return "xodus-\(formatter.string(from: date))-\(suffix)"
     }
 
-    static func launchEnvironment(_ inherited: [String: String]) -> [String: String] {
+    nonisolated static func launchEnvironment(_ inherited: [String: String]) -> [String: String] {
         var environment = inherited.filter { ["HOME", "USER", "LANG"].contains($0.key) }
         environment["PATH"] = "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         return environment
     }
 
-    static func sessionLog(runID: String, directory: URL) -> URL? {
+    nonisolated static func sessionLog(runID: String, directory: URL) -> URL? {
         guard runID.range(of: #"^xodus-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$"#,
                           options: .regularExpression) == runID.startIndex..<runID.endIndex else { return nil }
         return directory.appendingPathComponent(runID + ".stderr.log")
@@ -156,6 +144,7 @@ final class InstalledGamesController: ObservableObject {
 
     func play(_ game: InstalledGame) async {
         guard loaded, !editing, !choosing, runningGameID == nil, !applicationTerminating,
+              mutationGameID != game.id, !serviceSignInActive,
               games.contains(game) else { return }
         let token = UUID()
         runToken = token
@@ -251,6 +240,53 @@ final class InstalledGamesController: ObservableObject {
     }
 
     func waitForSessionPersistence() async { await sessionPersistence?.value }
+
+    func reserveMutation(gameID: UUID?) throws {
+        guard loaded, !editing, !choosing, !mutationActive, !serviceSignInActive, !applicationTerminating,
+              gameID == nil || runningGameID != gameID else { throw GameScriptError.busy }
+        mutationActive = true
+        mutationGameID = gameID
+    }
+
+    func releaseMutation() {
+        mutationActive = false
+        mutationGameID = nil
+    }
+
+    func registerInstallation(folder: URL, launcher: URL, expectedStoreID: String) async throws {
+        guard loaded, mutationActive, !editing, !applicationTerminating else { throw GameScriptError.busy }
+        editing = true
+        defer { editing = false }
+        try await saveValidatedGame(folder: folder, launcher: launcher, expectedStoreID: expectedStoreID)
+    }
+
+    func removeUninstalled(_ id: UUID) async throws {
+        guard mutationActive, mutationGameID == id, runningGameID != id, !editing else { throw GameScriptError.busy }
+        editing = true
+        defer { editing = false }
+        applySavedGames(try await store.remove(id: id))
+        launchableIDs.remove(id)
+        playErrors[id] = nil
+        playLogs[id] = nil
+        runIDs[id] = nil
+    }
+
+    private func saveValidatedGame(folder: URL, launcher: URL, expectedStoreID: String?) async throws {
+        let metadata = try await Task.detached(priority: .userInitiated) {
+            let config = try MicrosoftGameConfig.read(folder: folder)
+            try InstalledGameFiles.checkLauncher(launcher)
+            if let expectedStoreID, config.storeId != expectedStoreID { throw GameScriptError.invalidReceipt }
+            return config
+        }.value
+        let previous = games.first(where: { $0.folder == folder.path })
+        guard previous?.id != runningGameID || runningGameID == nil else { throw GameScriptError.busy }
+        let game = InstalledGame(id: previous?.id ?? UUID(),
+            title: metadata.title, identityName: metadata.identityName, version: metadata.version,
+            storeId: metadata.storeId, folder: folder.path, launcher: launcher.path, importedAt: Date(),
+            publisher: metadata.publisher)
+        applySavedGames(try await store.upsert(game))
+        await refreshLaunchableGames()
+    }
 
     private func applySavedGames(_ saved: [InstalledGame]) {
         games = saved.map { entry in

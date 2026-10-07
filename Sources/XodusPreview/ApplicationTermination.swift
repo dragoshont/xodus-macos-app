@@ -7,8 +7,11 @@ final class ApplicationTerminationCoordinator {
 
     func shutdown(session: LiveSession?, runtime: RuntimeProviderSettings?,
                   installedGames: InstalledGamesController? = nil,
-                  pcGames: PCGamesController? = nil) async -> Bool {
+                  pcGames: PCGamesController? = nil,
+                  gameOperations: GameOperationsController? = nil) async -> Bool {
         if let operation { return await operation.value }
+        guard gameOperations?.canQuit != false else { return false }
+        gameOperations?.beginTermination()
         installedGames?.applicationTerminating = true
         pcGames?.beginTermination()
         runtime?.beginApplicationTermination()
@@ -24,6 +27,7 @@ final class ApplicationTerminationCoordinator {
         if !closed {
             installedGames?.applicationTerminating = false
             pcGames?.resumeAfterTerminationRefusal()
+            gameOperations?.resumeAfterTerminationRefusal()
             runtime?.resumeAfterTerminationRefusal()
             session?.applicationTerminating = false
             operation = nil

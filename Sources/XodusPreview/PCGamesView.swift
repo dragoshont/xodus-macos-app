@@ -4,6 +4,7 @@ import SwiftUI
 struct PCGamesView: View {
     @ObservedObject var library: PCGamesController
     @ObservedObject var installed: InstalledGamesController
+    @ObservedObject var operations: GameOperationsController
     let query: String
     var allowsStartupTasks = true
     let browse: () -> Void
@@ -68,11 +69,14 @@ struct PCGamesView: View {
                                         InstalledPlayError(library: installed, game: match)
                                     } else {
                                         Text("Not installed").font(.callout).foregroundStyle(.secondary)
+                                        Button("Install") { Task { await operations.prepareInstall(game) } }
+                                            .disabled(!operations.canStartMutation)
+                                            .accessibilityLabel("Install \(game.title)")
+                                            .accessibilityIdentifier("xodus.pcGames.install")
                                     }
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .accessibilityElement(children: .contain)
-                                .accessibilityIdentifier("xodus.pcGames.game")
                             }
                         }
                     }
@@ -99,7 +103,6 @@ struct PCGamesView: View {
                     .accessibilityIdentifier("xodus.pcGames.error")
             }
         }
-        .accessibilityIdentifier("xodus.pcGames.section")
         .task { if allowsStartupTasks { await library.restorePresence() } }
         .sheet(isPresented: Binding(get: { library.sheetPresented }, set: { value in
             if !value { Task { await library.cancelSignIn() } }

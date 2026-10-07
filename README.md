@@ -10,6 +10,21 @@ entrypoints. Shipping screens use native setup/empty/loading/error states and
 actual public product data, not synthetic game illustrations. See
 [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
+**S3/S5/S6 source candidate (not yet admitted or installed):** the account area
+adds explicit game-service sign-in/status, separate from PC-library credentials.
+PC Library games offer Install with native destination/free-space consent.
+Downloads shows script-reported bytes and phases; Cancel signals only the
+app-owned install process and waits for its result. Installed entries offer
+Check for update / Repair, confirmed Uninstall, and the unchanged list-only
+removal. Script success still must pass the same local config/launcher validation
+and private registry save as Import. Games being changed cannot be played; one
+mutation runs at a time, and normal Quit waits for completion or cancellation.
+Private scripts, gameplay credentials, save preservation and engine behavior
+remain owned outside this public repository. No private implementation is
+imported and the signed C8 engine is unchanged. Neutral Mac checks pass; this
+candidate still requires exact-source CI, independent package admission and separate owner live
+acceptance; it does not claim installation or uninstall has been live-tested.
+
 **S4 PC Library (`7ec1daa`, admitted, installed and live-accepted):** a separate native
 Microsoft device-code sign-in reads the account's complete paged collection,
 then joins active, non-trial Game entries to exact Store products declaring

@@ -9,6 +9,7 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
     var runtimeSettings: RuntimeProviderSettings?
     var installedGames: InstalledGamesController?
     var pcGames: PCGamesController?
+    var gameOperations: GameOperationsController?
     let termination = ApplicationTerminationCoordinator()
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -17,7 +18,15 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         Task {
             let closed = await termination.shutdown(session: liveSession, runtime: runtimeSettings,
-                                                    installedGames: installedGames, pcGames: pcGames)
+                                                    installedGames: installedGames, pcGames: pcGames,
+                                                    gameOperations: gameOperations)
+            if !closed, gameOperations?.canQuit == false {
+                let alert = NSAlert()
+                alert.messageText = "Wait before quitting Xodus"
+                alert.informativeText = "Wait for installation, repair, removal or sign-in to finish. You can cancel an installation first."
+                alert.addButton(withTitle: "Keep Xodus open")
+                alert.runModal()
+            }
             sender.reply(toApplicationShouldTerminate: closed)
         }
         return .terminateLater
@@ -47,6 +56,7 @@ struct XodusPreviewApp: App {
             }
         }
         if CommandLine.arguments.contains("--live-check") { NativeChecks.launch() }
+        if CommandLine.arguments.contains("--game-operation-check") { NativeChecks.launch(gameOperationsOnly: true) }
         if CommandLine.arguments.contains("--self-check") {
             exit(PreviewChecks.run() ? 0 : 1)
         }
@@ -71,6 +81,7 @@ struct XodusPreviewApp: App {
                     delegate.runtimeSettings = state.runtimeSettings
                     delegate.installedGames = state.installedGames
                     delegate.pcGames = state.pcGames
+                    delegate.gameOperations = state.gameOperations
                 }
         }
         .defaultSize(width: 1200, height: 860)
@@ -111,6 +122,7 @@ struct XodusPreviewApp: App {
                     delegate.runtimeSettings = state.runtimeSettings
                     delegate.installedGames = state.installedGames
                     delegate.pcGames = state.pcGames
+                    delegate.gameOperations = state.gameOperations
                 }
         }
     }

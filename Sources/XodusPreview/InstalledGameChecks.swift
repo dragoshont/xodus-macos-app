@@ -276,7 +276,8 @@ enum InstalledGameChecks {
               "A new app coordinator restores the durable local list without running a game")
         let windows = NSApplication.shared.windows.count
         for width in [CGFloat(700), CGFloat(1100)] {
-            let host = NSHostingView(rootView: InstalledGamesView(library: reloaded, allowsArtworkLoading: false))
+            let host = NSHostingView(rootView: InstalledGamesView(library: reloaded,
+                operations: GameOperationsController(installed: reloaded), allowsArtworkLoading: false))
             host.sizingOptions = []
             host.frame = CGRect(x: 0, y: 0, width: width, height: 400)
             host.layoutSubtreeIfNeeded()

@@ -61,7 +61,10 @@ struct LiveRootView: View {
             if startupAllowed { await state.runtimeSettings.refreshCrossOverDependency() }
         }
         .task {
-            if startupAllowed { await state.installedGames.load() }
+            if startupAllowed {
+                await state.installedGames.load()
+                await state.gameOperations.restore()
+            }
         }
         .task {
             if startupAllowed, session.phase == .disconnected, !session.connectionTransitioning,
@@ -85,6 +88,7 @@ struct LiveRootView: View {
 #endif
         }
         .sheet(item: $session.selectedProduct) { product in LiveProductView(product: product) }
+        .background { GameOperationPresentation(operations: state.gameOperations) }
         .background {
             Button("Focus search") { searchFocused = true }.keyboardShortcut("f").hidden()
         }
@@ -100,8 +104,11 @@ struct LiveRootView: View {
                                       findInStore: { state.findInStore($0, session: session) })
                     .accessibilityIdentifier("xodus.library.recentActivity")
             } else {
-                InstalledGamesView(library: state.installedGames, allowsArtworkLoading: startupAllowed)
+                InstalledGamesView(library: state.installedGames, operations: state.gameOperations,
+                                   allowsArtworkLoading: startupAllowed)
+                GameOperationProgressView(operations: state.gameOperations)
                 PCGamesView(library: state.pcGames, installed: state.installedGames,
+                            operations: state.gameOperations,
                             query: scopedQuery, allowsStartupTasks: startupAllowed,
                             browse: { state.navigate(.discover) },
                             recentActivity: { state.openRecentActivity() })
@@ -112,7 +119,7 @@ struct LiveRootView: View {
                         selectedFolderInspection
                         Divider()
                         Text("Your PC games uses a separate Microsoft sign-in to read this account's game library. It shows active, non-trial games whose Store packages declare PC support.")
-                        Text("Installed shows only games you've imported. It doesn't scan your Mac or verify which PC games you own.")
+                        Text("Installed shows games you've imported or installed with Xodus. It doesn't scan your Mac.")
                         Text("Import an installed Xbox game and choose its working Xodus launch script to play. Removing it from the list keeps its game files and saves.")
                         Text("Inspect a game folder checks its Xodus marker only. This check doesn't import the game or enable Play.")
                     }
@@ -259,6 +266,7 @@ struct LiveRootView: View {
 }
 
 struct LiveActivityView: View {
+    @EnvironmentObject private var state: AppState
     @EnvironmentObject private var session: LiveSession
 
     var body: some View {
@@ -270,6 +278,7 @@ struct LiveActivityView: View {
                     Task { await session.refreshActivity() }
                 }.disabled(!session.supports(.jobs) || session.activity.isReconciling)
             }
+            GameOperationProgressView(operations: state.gameOperations)
             if let notice = session.activityNotice {
                 Label(notice, systemImage: "exclamationmark.circle")
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -279,9 +288,11 @@ struct LiveActivityView: View {
                       systemImage: "arrow.clockwise").foregroundStyle(.secondary)
             }
             if session.activity.jobs.isEmpty {
-                ContentUnavailableView("No downloads yet", systemImage: "arrow.down.circle",
-                    description: Text("Game downloads aren't available in this build."))
-                    .frame(maxWidth: .infinity, minHeight: 240)
+                if !state.gameOperations.isBusy && state.gameOperations.error == nil && state.gameOperations.notice == nil {
+                    ContentUnavailableView("No downloads yet", systemImage: "arrow.down.circle",
+                        description: Text("Choose Install on a game in your PC Library."))
+                        .frame(maxWidth: .infinity, minHeight: 240)
+                }
             } else {
                 Text("Game details checks").font(.title2.bold())
                 Text("These checks don't download games.").foregroundStyle(.secondary)

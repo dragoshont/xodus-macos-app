@@ -23,6 +23,21 @@ visually confirmed.
 
 **Detail/install/downloads (Operate):** full-bleed detail image, four independent evidence rows and one reasoned action; protected installation sheet with space/experimental consent; flat progress rows and recoverable errors. Artwork never replaces evidence.
 
+**S3/S5/S6 native operations:** preserve the Library's artwork-led Installed /
+Continue Playing / Your PC games order. Install on an uninstalled PC tile opens
+a protected native sheet with its title, exact destination, available storage
+and honest unknown-size copy. Installation progress is a flat real-byte/phase
+view in Library and Downloads, with Cancel and contextual recovery/log actions.
+Installed row menus group Check for update / Repair, nondestructive Remove from
+list, and separated confirmed Uninstall. The destructive confirmation explicitly
+states save preservation; failed preservation never looks like success.
+Account distinguishes game-service sign-in from library sign-in, using native
+labels/buttons and no credential transfer. Existing semantic colors, SF symbols,
+system text, keyboard defaults/cancellation and resize rules apply. Child
+buttons retain their own accessibility identifiers rather than inheriting a
+whole-section identifier. No additional navigation, sidebar or dashboard is
+introduced. This source candidate is not yet an installed visual acceptance.
+
 ## Actual native implementation
 
 **S4 PC Library (admitted and installed `7ec1daa`):** the existing native Library retains Continue Playing
