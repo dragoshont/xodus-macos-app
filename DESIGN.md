@@ -25,7 +25,7 @@ visually confirmed.
 
 ## Actual native implementation
 
-**S1 installed Library refinement (source candidate):** local tile art uses
+**S1 installed Library refinement (admitted shipping `e401464`):** local tile art uses
 Square480, Square150, then StoreLogo from the imported folder's ShellVisuals,
 with the existing 60-point square geometry and system-symbol fallback.
 Continue Playing appears above Installed only for the newest recorded
@@ -40,8 +40,11 @@ decorative; hero content and title-specific controls remain independently
 accessible. No motion, personal-history read or network artwork request is
 added. Missing art is silent; session-history save failure is a quiet
 product message and never prevents play/termination state updates.
+Source, neutral/native layout and installed-byte/signature/startup qualification
+passed. Actual Hogwarts artwork and post-install Continue Playing observations
+remain a separate user/Root gate; no such visual/session proof is inferred here.
 
-**Installed-game Play (admitted shipping `0926414`):** the non-activity Library begins with
+**Initial installed-game Play (admitted at `0926414`):** the non-activity Library begins with
 an Installed section, separate from the unchanged owned-PC unavailable state.
 User-imported entries use their config display name and a restrained system
 gamecontroller icon, with native Play and list-only Remove actions. No artwork

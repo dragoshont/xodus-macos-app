@@ -10,7 +10,7 @@ entrypoints. Shipping screens use native setup/empty/loading/error states and
 actual public product data, not synthetic game illustrations. See
 [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
-**Installed-game Play (admitted shipping `0926414`):** main Library has an **Installed** section
+**Installed-game Play (shipping `e401464`, initially admitted at `0926414`):** main Library has an **Installed** section
 above the unchanged owned-PC unavailable state. Import an already-installed Xbox
 game folder, then explicitly select its executable Xodus launch script. The app
 reads `MicrosoftGame.config` locally and saves only the selected entry in a
@@ -24,16 +24,23 @@ No backend, contract or signed engine change accompanies this interface.
 Hogwarts Legacy's live test is separately user-controlled; neutral checks never
 launch a real game.
 
-**S1 source candidate:** imported tiles use bounded local PNG/JPEG art from
+**S1 admitted and installed:** imported tiles use bounded local PNG/JPEG art from
 MicrosoftGame.config. The newest recorded Xodus-launched imported game supplies
 a Continue Playing splash card, publisher and relative last-played date, sharing
 the list's Play state. Session start/duration stay in the private local list;
 old entries still load. Nonzero sessions offer Show log only for an existing
 generated-session stderr file. This is not Xbox activity, ownership or network
-artwork. The currently running app/game will not be replaced until the session
-has ended and the staged package is admitted.
+artwork. [Exact-source CI passed](https://github.com/dragoshont/xodus-macos-app/actions/runs/37610002150).
+Root independently admitted the matching package and confirmed the game had
+ended before normal Quit/replacement. All 21 installed files and strict
+app/helper/engine signatures matched admission, with C8 unchanged. Full 092
+rollback, profile and installed-list bytes/permissions were preserved. One
+ordinary Library startup was left open; no Import or Play was automated.
+**S1 real-product closure remains pending:** Root/user must confirm actual
+Hogwarts tile art and a new session's Continue Playing splash. Neutral checks
+and installed-byte/startup evidence do not imply those observations.
 
-Exact-source [CI passed](https://github.com/dragoshont/xodus-macos-app/actions/runs/37603065132).
+The initial Play slice's exact-source [CI passed](https://github.com/dragoshont/xodus-macos-app/actions/runs/37603065132).
 The independently admitted package was installed after normal Quit, preserving
 a complete working 2d rollback, the profile and older rollbacks. All 21 installed
 files and app/helper/engine signatures matched admission. The exact signed C8

@@ -4,7 +4,7 @@ This is implementation work beyond the immutable foundation at `44d7338`. It is 
 
 ## Local imported-game Play
 
-### S1 artwork and Continue Playing (source candidate)
+### S1 artwork and Continue Playing (admitted and installed)
 
 This slice implements AC1.1–AC1.6 of the
 [published remaining-work spec](https://github.com/dragoshont/xodus-macos/blob/dragoshont-heroic-xbox-integration/docs/xodus/remaining-work-plan.md).
@@ -57,14 +57,20 @@ networking denied, plus a shipping Debug build. Exact-source
 also passed, including Release ShippingChecks and shipping resource exclusions.
 These are neutral/source evidence, not real game-art/session evidence.
 
-The matching `tmzPp3` package is staged, **not installed**. Its receipt SHA256 is
+The matching `tmzPp3` package was independently admitted and installed. Its receipt SHA256 is
 `fcb0d45ea18e0156a144dfdf52b0bd3f4bb715a7b252d7aaf86cac7a7f01e815`,
 13,887 bytes, covering 21 files. Local fixed app/helper/engine signature checks
 passed; the signed C8 engine is byte-for-byte preserved from admitted
-`0926414`/`18uWwt`. Independent Root admission and confirmation that the live
-game has ended are separate requirements before normal Quit/replacement.
-The staged installer cannot proceed without both. Existing app, game, profile
-and credentials remain untouched. S1 remains open until the admitted app shows
+`0926414`/`18uWwt`. Root independently reviewed the exact production diff,
+package and successful CI, confirmed no game/script was running, and explicitly
+authorized normal Quit/replacement. Full working 092 rollback and earlier
+rollbacks were preserved. Profile/credentials were not copied, deleted or reset;
+installed-games.json remained byte-identical and 0600 across replacement/startup.
+One ordinary main-Library startup left app PID 51247 owning sole engine 51265,
+with no helper. All 21 installed files and three strict fixed-leaf signatures
+matched admission. No Import, Play, game launch, activity/Account/Store action,
+screenshot, exporter or extra RPC was automated. This is installed/startup
+evidence, not visual or gameplay proof. S1 remains open until the admitted app shows
 Hogwarts tile art and a post-install user/Root-launched session supplies its
 Continue Playing splash; CI/package alone do not close the spec.
 
