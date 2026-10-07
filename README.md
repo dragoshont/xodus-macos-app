@@ -10,6 +10,20 @@ entrypoints. Shipping screens use native setup/empty/loading/error states and
 actual public product data, not synthetic game illustrations. See
 [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
+**S4 PC Library candidate (not yet admitted or installed):** a separate native
+Microsoft device-code sign-in reads the account's complete paged collection,
+then joins active, non-trial Game entries to exact Store products declaring
+`Windows.Desktop`. The Your PC games shelf never comes from Xbox activity or
+Game Pass discovery. Imported StoreId matches share the existing Play action;
+other games say Not installed. Refresh tokens alone use an app-owned Keychain
+item; access/Xbox tokens and the library remain in memory. Entry checks saved
+sign-in presence without reading credentials or automatically querying.
+Partial/failed refreshes are explicit and cannot become an empty library.
+Installed and Continue Playing remain above the shelf. This source slice still
+requires exact-source CI/package admission and Root-controlled installed
+sign-in evidence; it does not add installation, entitlement inference from
+history, or a backend/engine change.
+
 **Installed-game Play (shipping `e401464`, initially admitted at `0926414`):** main Library has an **Installed** section
 above the unchanged owned-PC unavailable state. Import an already-installed Xbox
 game folder, then explicitly select its executable Xodus launch script. The app

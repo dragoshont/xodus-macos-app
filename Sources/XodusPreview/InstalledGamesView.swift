@@ -96,6 +96,15 @@ struct InstalledGamesView: View {
     }
 
     @ViewBuilder private func playError(_ game: InstalledGame) -> some View {
+        InstalledPlayError(library: library, game: game)
+    }
+}
+
+struct InstalledPlayError: View {
+    @ObservedObject var library: InstalledGamesController
+    let game: InstalledGame
+
+    var body: some View {
         if let error = library.playErrors[game.id] {
             Text(error).font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -109,7 +118,7 @@ struct InstalledGamesView: View {
     }
 }
 
-private struct InstalledPlayButton: View {
+struct InstalledPlayButton: View {
     @ObservedObject var library: InstalledGamesController
     let game: InstalledGame
 

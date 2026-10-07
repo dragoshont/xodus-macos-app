@@ -6,9 +6,11 @@ final class ApplicationTerminationCoordinator {
     private var operation: Task<Bool, Never>?
 
     func shutdown(session: LiveSession?, runtime: RuntimeProviderSettings?,
-                  installedGames: InstalledGamesController? = nil) async -> Bool {
+                  installedGames: InstalledGamesController? = nil,
+                  pcGames: PCGamesController? = nil) async -> Bool {
         if let operation { return await operation.value }
         installedGames?.applicationTerminating = true
+        pcGames?.beginTermination()
         runtime?.beginApplicationTermination()
         session?.applicationTerminating = true
         let pending = Task {
@@ -21,6 +23,7 @@ final class ApplicationTerminationCoordinator {
         let closed = await pending.value
         if !closed {
             installedGames?.applicationTerminating = false
+            pcGames?.resumeAfterTerminationRefusal()
             runtime?.resumeAfterTerminationRefusal()
             session?.applicationTerminating = false
             operation = nil

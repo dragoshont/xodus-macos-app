@@ -25,7 +25,10 @@ final class ShippingChecks: XCTestCase {
                                                                         stateDirectory: URL(fileURLWithPath: "/invalid/state")))
         check(state.destination == .library && state.query.isEmpty && !state.showingAccount
               && state.liveLibraryScope == .games && !state.showsRecentActivity,
-              "Shipping navigation starts in the unavailable PC Library, not activity or fixture state")
+              "Shipping navigation starts in PC Library, not activity or fixture state")
+        check(!state.pcGames.hasSavedSignIn && state.pcGames.snapshot == nil && !state.pcGames.busy
+              && state.pcGames.deviceCode == nil,
+              "Shipping PC Library starts without credential access, network results or invented owned games")
         await state.loadRecentActivityIfVisible(session: session)
         check(session.recentLibrary == nil && !session.recentLibraryBootstrapRunning
               && session.authentication == nil && session.libraryTitle == "Your PC library isn't available yet"

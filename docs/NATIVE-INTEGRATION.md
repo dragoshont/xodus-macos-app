@@ -4,6 +4,60 @@ This is implementation work beyond the immutable foundation at `44d7338`. It is 
 
 ## Local imported-game Play
 
+### S4 owned PC Library (source candidate; not admitted or installed)
+
+This slice implements AC4.1–AC4.5 of the
+[remaining-work spec at fbf849d](https://github.com/dragoshont/xodus-macos/blob/fbf849d/docs/xodus/remaining-work-plan.md).
+Root supplied observed protocol evidence after one user-approved device-code
+sign-in: a complete two-page collection, 136 items including 69 Game entries.
+That producer-side probe is not evidence of this app's installed Library or
+of its PC-filtered result count.
+
+The app uses URLSession directly, not a new engine/schema/management command.
+Device-code and refresh POSTs use the approved Microsoft consumer OAuth client
+and `XboxLive.signin offline_access`. The native sheet exposes only user_code
+and an exact Microsoft verification link. Pending/slow_down/expiry/decline and
+Cancel are explicit. Only refresh_token is stored as a nonsynchronizing,
+app-owned generic-password item (service `Xodus Library`, account `xbox-web`,
+AfterFirstUnlockThisDeviceOnly); rotated refresh tokens replace that item.
+Access/user/XSTS tokens remain in memory, never argv, URLs, logs, registry,
+UserDefaults or exported diagnostics. Sign out deletes that one item.
+Library entry checks item presence without credential data or permission UI;
+credential reads are limited to foreground Load/Refresh actions.
+
+The fetch chain uses Xbox user auth (`RpsTicket=d=<access>`), XSTS for both exact
+audiences, and equal user hashes before any collection request. The beneficiary
+comes from the Xbox identity's xid. Collections queries use contract 2, All
+validity, excludeDuplicates, locale market (US fallback), maxPageSize 100 and
+bounded continuations. All requests have 30-second bounds, no redirects,
+cookies, credential storage or disk cache, and at most 4 MiB per response.
+Pagination stops at 20 pages; a repeated cursor, malformed page or incomplete
+fetch fails explicitly and cannot supply an empty or partial successful shelf.
+
+Only Game/Active/non-trial product IDs join to public DisplayCatalog in batches
+of at most 20. Products require exact `Windows.Desktop` package evidence.
+Missing/console/unresolved products are excluded and counted. Titles and
+BoxArt/Poster come only from the joined product; protocol-relative images use
+the existing exact-host/grammar validator and bounded memory-only artwork
+loader, without sending private authorization. Installed matches use exact
+StoreId, not names, activity or a PC tag. Imported games share existing Play
+states/log controls; others say Not installed. No install/cache/enqueue route
+or compatibility claim is added.
+
+Neutral checks use synthetic pages/catalog/OAuth responses and a mocked
+refresh-only store, never Microsoft/Keychain/game operations. The Mac source
+gate passed 607 native session checks (49 added for S4), 75 presentation checks
+and 29 portable packaging checks, with outbound networking denied for native
+checks; the shipping Debug composition built. They cover parsing/casing,
+continuations/caps, complete versus partial failures, filtering/PC join,
+deduplication/batches, image grammar, identity binding/XErr, device-code timing,
+refresh-only retention, cancellation/sign-out/termination and Installed match.
+These are not installed sign-in or owned-PC gameplay evidence. Exact-source
+CI and preserved-C8 packaging precede independent admission.
+Root owns subsequent user-present device-code and actual PC shelf/Play evidence.
+Current installed S1, signed C8, profile, contracts/pins and frozen support
+packets are untouched by this source candidate.
+
 ### S1 artwork and Continue Playing (admitted, installed and live-accepted)
 
 This slice implements AC1.1–AC1.6 of the

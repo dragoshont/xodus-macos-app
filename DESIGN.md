@@ -25,6 +25,22 @@ visually confirmed.
 
 ## Actual native implementation
 
+**S4 PC Library candidate:** the existing native Library retains Continue Playing
+and Installed above a distinct Your PC games shelf. Signed out, one native
+unavailable-content prompt offers Sign in, Browse games and Recent activity.
+The sign-in sheet shows Microsoft's short-lived code, opens the exact Microsoft
+verification link and offers Cancel; it distinguishes this library sign-in from
+the game service's sign-in. Signed in, a restrained header/count and stock
+Refresh/Sign out controls lead an adaptive artwork/title grid using the existing
+catalog-art component and geometry. Exact imported StoreId matches reuse the
+same Play/retry/log controls and one-session guard. Other rows say Not installed,
+not Install. A quiet excluded-item count and last-updated date describe the
+complete filtered account collection; failed refresh retains only the previous
+complete shelf with a clear stale notice. Main search filters this PC shelf;
+Recent activity keeps its separate scope. This is a bounded adaptation of the
+approved Figma Library hierarchy/native tokens, not a new UI world, invented
+owned shelf or fixture source. Live installed acceptance remains pending.
+
 **S1 installed Library refinement (admitted shipping `e401464`):** local tile art uses
 Square480, Square150, then StoreLogo from the imported folder's ShellVisuals,
 with the existing 60-point square geometry and system-symbol fallback.

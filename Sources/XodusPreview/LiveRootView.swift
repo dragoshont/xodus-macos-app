@@ -26,10 +26,11 @@ struct LiveRootView: View {
     }
     private var searchEnabled: Bool {
         state.destination == .discover
+            || (state.destination == .library && !state.showsRecentActivity)
             || (state.showsRecentActivity && session.recentLibrary != nil)
     }
     private var searchPlaceholder: String {
-        state.destination == .library ? (state.showsRecentActivity ? "Search recent activity" : "Search Library")
+        state.destination == .library ? (state.showsRecentActivity ? "Search recent activity" : "Search your PC games")
             : state.destination == .downloads ? "Search Library or Discover"
             : session.supports(.query) ? "Search Microsoft Store games" : "Search checked catalog"
     }
@@ -100,24 +101,17 @@ struct LiveRootView: View {
                     .accessibilityIdentifier("xodus.library.recentActivity")
             } else {
                 InstalledGamesView(library: state.installedGames, allowsArtworkLoading: startupAllowed)
-                ContentUnavailableView {
-                    Label(session.libraryTitle, systemImage: "gamecontroller")
-                } description: {
-                    Text(session.libraryMessage).frame(maxWidth: 520)
-                } actions: {
-                    GlassAction(title: "Browse games") { state.navigate(.discover) }
-                    Button("Recent activity") { state.openRecentActivity() }
-                        .accessibilityIdentifier("xodus.library.openRecentActivity")
-                }
-                .frame(maxWidth: .infinity, minHeight: 220)
-                .accessibilityIdentifier("xodus.library.unavailable")
+                PCGamesView(library: state.pcGames, installed: state.installedGames,
+                            query: scopedQuery, allowsStartupTasks: startupAllowed,
+                            browse: { state.navigate(.discover) },
+                            recentActivity: { state.openRecentActivity() })
             }
             if !state.showsRecentActivity {
                 DisclosureGroup("Library details") {
                     VStack(alignment: .leading, spacing: 18) {
                         selectedFolderInspection
                         Divider()
-                        Text(session.accountLibraryExplanation).foregroundStyle(.secondary)
+                        Text("Your PC games uses a separate Microsoft sign-in to read this account's game library. It shows active, non-trial games whose Store packages declare PC support.")
                         Text("Installed shows only games you've imported. It doesn't scan your Mac or verify which PC games you own.")
                         Text("Import an installed Xbox game and choose its working Xodus launch script to play. Removing it from the list keeps its game files and saves.")
                         Text("Inspect a game folder checks its Xodus marker only. This check doesn't import the game or enable Play.")
