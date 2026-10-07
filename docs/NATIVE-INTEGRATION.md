@@ -4,7 +4,7 @@ This is implementation work beyond the immutable foundation at `44d7338`. It is 
 
 ## Local imported-game Play
 
-### S3/S5/S6 game operations (admitted and installed; live acceptance pending)
+### S3/S5/S6 game operations (admitted, installed and live-accepted)
 
 This app-only batch implements the approved
 [remaining-work spec at bda88fe](https://github.com/dragoshont/xodus-macos/blob/bda88fe/docs/xodus/remaining-work-plan.md).
@@ -95,7 +95,7 @@ These are installed byte/signature/ownership/startup observations, not live
 Install, Repair, Uninstall, game sign-in, visual or gameplay acceptance. No
 sign-in, Import, Install, Repair, Uninstall or Play was automated by this lane;
 no capture, private exporter or extra RPC was used. Existing anonymous startup
-catalog search is unchanged. The owner is separately performing live acceptance.
+catalog search is unchanged. The owner separately completed live acceptance.
 
 **Owner-reported partial live acceptance, 2026-10-07:** no app defect found so
 far. The owner verified child accessibility identifiers (closing S4 follow-up
@@ -105,13 +105,35 @@ space, unknown-size copy and product wording. Repair invoked the real backend
 and correctly surfaced code 11 without changing the registry. This is evidence
 of the consent/invocation/sign-in-required failure path, not a successful repair.
 
-Remaining live acceptance is held on human-only Keychain approvals. The owner
+At that intermediate checkpoint, live acceptance was held on human-only
+Keychain approvals. The owner
 reported an `Xodus Library` access prompt while PC games remained at Loading
 your PC games, with an `Xodus Service` credential read queued behind it. The
 service credential-writing follow-up is owned outside this app repository; no
-app change was requested. The owner will resume Install, Uninstall, successful
-Repair and Play after user approval. This lane does not approve prompts,
-rewrite credentials or bypass Keychain protections.
+app change was requested. This lane did not approve prompts, rewrite credentials
+or bypass Keychain protections. The subsequent acceptance below supersedes
+that testing hold.
+
+**Owner-reported final live acceptance, 2026-10-07: ACCEPTED.** The owner closed
+S3/S5/S6 on installed `1463cdb` with no app defect and observed:
+
+- PC-game Install buttons and native Install consent.
+- Real Downloads progress: 1.14 GB of 3.25 GB (34%), with Cancel installation
+  available. This observation verifies the control, not a live cancellation.
+- A fresh 3.25 GB Lara installation that registered with its generated launcher,
+  followed by Play reaching the game's main menu.
+- Repair status zero with launcher migration.
+- Uninstall confirmation copy, then status zero with game files/environment
+  removed, saves kept and the Installed list updated.
+- Sign-in-required and unsupported-package (code 12) messages, Show log and
+  Continue Playing session recording.
+
+All backend corrections found during acceptance were private-script-only;
+the accepted app runtime and preserved C8 did not change. This is independent
+owner-reported installed-product evidence, not fixture or deployment inference.
+The earlier menu/consent/identifier and registry-preserving code-11 observations
+remain valid. S4 follow-up b is closed; broader owned-view coverage comparison
+and general gameplay certification are not established by this slice.
 
 ### S4 owned PC Library (admitted, installed and live-accepted)
 

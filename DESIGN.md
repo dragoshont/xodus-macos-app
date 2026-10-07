@@ -36,11 +36,14 @@ labels/buttons and no credential transfer. Existing semantic colors, SF symbols,
 system text, keyboard defaults/cancellation and resize rules apply. Child
 buttons retain their own accessibility identifiers rather than inheriting a
 whole-section identifier. No additional navigation, sidebar or dashboard is
-introduced. The source and signed package are admitted and installed; separate
-owner live acceptance is partial. The owner verified child identifiers, the
-Installed menu, Repair consent destination/free-space/unknown-size copy and the
-code-11 sign-in-required failure with no registry change. No app defect was found in
-those flows. Further operation acceptance awaits user-only Keychain approvals.
+introduced. The source and signed package are admitted, installed and
+owner-live-accepted at `1463cdb`. The owner verified child identifiers, Installed
+menus, Install/Repair consent, real Downloads bytes/percentage and Cancel
+control, Lara installation/registration, Play to its main menu, successful
+Repair and save-preserving Uninstall/list update. Sign-in-required and
+unsupported-package errors, Show log and Continue Playing session recording
+were also observed. The owner closed the slice with no app defect; this is
+bounded title/flow evidence, not complete accessibility or gameplay certification.
 
 ## Actual native implementation
 

@@ -2,7 +2,7 @@
 
 A native Mac launcher in development for legitimately entitled Xbox PC games, integrating with the Xodus management engine.
 
-**Current status: native development app, not a complete game launcher.** The default SwiftUI/AppKit app has a real bounded management client, isolated Microsoft Store sign-in integration, source-backed PC Game Pass discovery and Microsoft Store network search, edition detail and activity. A native folder picker also supports a read-only marker check in one explicitly selected game folder; observed header identifiers never become retail identity, registration or permission to launch. A packaged development build includes its matching engine and connects without Terminal setup; negotiated capabilities determine which actions work. Search coverage is explicitly partial, and public results never establish ownership. The admitted f30/d00 pair confirmed saved credentials after the user's native Keychain approval and completed one Halo authenticated read with `verified: true`; no repeat verification or ownership inference was made. S4 now has a live-accepted account-bound PC Library. Game-service sign-in, installation, repair and uninstall are implemented and installed, with owner live acceptance pending. Broader owned-PC coverage comparison, an engine-backed installed-game registry and general gameplay certification remain gaps. Saved sign-in alone is **not** proof of PC ownership or package access.
+**Current status: native development app, not a complete game launcher.** The default SwiftUI/AppKit app has a real bounded management client, isolated Microsoft Store sign-in integration, source-backed PC Game Pass discovery and Microsoft Store network search, edition detail and activity. A native folder picker also supports a read-only marker check in one explicitly selected game folder; observed header identifiers never become retail identity, registration or permission to launch. A packaged development build includes its matching engine and connects without Terminal setup; negotiated capabilities determine which actions work. Search coverage is explicitly partial, and public results never establish ownership. The admitted f30/d00 pair confirmed saved credentials after the user's native Keychain approval and completed one Halo authenticated read with `verified: true`; no repeat verification or ownership inference was made. S4 now has a live-accepted account-bound PC Library. Game-service sign-in, installation, repair and uninstall are implemented, installed and owner-accepted as S3/S5/S6. Broader owned-PC coverage comparison, an engine-backed installed-game registry and general gameplay certification remain gaps. Saved sign-in alone is **not** proof of PC ownership or package access.
 
 The original offline demonstration is **nonshipping only**. `XODUS_SHIPPING=1`
 compiles out its views, invented state, artwork, resources and check/export
@@ -10,7 +10,7 @@ entrypoints. Shipping screens use native setup/empty/loading/error states and
 actual public product data, not synthetic game illustrations. See
 [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
-**S3/S5/S6 (`1463cdb`, admitted and installed; live acceptance pending):** the account area
+**S3/S5/S6 (`1463cdb`, admitted, installed and live-accepted):** the account area
 adds explicit game-service sign-in/status, separate from PC-library credentials.
 PC Library games offer Install with native destination/free-space consent.
 Downloads shows script-reported bytes and phases; Cancel signals only the
@@ -29,13 +29,16 @@ was running before authorizing normal Quit/replacement. All 21 installed files
 and strict signatures match admission. A full S4 rollback is retained; the
 profile was left untouched and the private installed list remained byte-identical through one
 ordinary Library reopen. No game operation or sign-in was automated by the app
-implementation/deployment lane. Separate owner live acceptance remains pending.
+implementation/deployment lane. The owner separately completed live acceptance.
 
-The owner has now verified child accessibility identifiers, Installed menu
-actions, the Repair consent sheet's destination/free space/copy, and a real
-Repair failure with code 11 and no registry change. No app defect was found in
-those flows. Further live acceptance is held on user-only Keychain approvals;
-successful Install, Repair, Uninstall and Play on this build are not yet claimed.
+The owner closed S3/S5/S6 with no app defect: in-app Install consent, real
+Downloads progress and Cancel control, a fresh 3.25 GB Lara installation with
+generated-launcher registration, Play to its main menu, successful Repair,
+and confirmed Uninstall with files/environment removed, saves kept and the
+list updated. Sign-in-required and unsupported-package errors, Show log,
+Continue Playing session recording, child identifiers and Installed menus were
+also observed. Backend fixes during acceptance were private-script-only.
+This title-specific evidence is not general gameplay certification.
 
 **S4 PC Library (`7ec1daa`, admitted, installed and live-accepted):** a separate native
 Microsoft device-code sign-in reads the account's complete paged collection,
