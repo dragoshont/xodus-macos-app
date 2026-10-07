@@ -25,7 +25,7 @@ visually confirmed.
 
 ## Actual native implementation
 
-**Installed-game Play (current source):** the non-activity Library begins with
+**Installed-game Play (admitted shipping `0926414`):** the non-activity Library begins with
 an Installed section, separate from the unchanged owned-PC unavailable state.
 User-imported entries use their config display name and a restrained system
 gamecontroller icon, with native Play and list-only Remove actions. No artwork
@@ -39,6 +39,9 @@ labels and `xodus.installed.*` identifiers preserve keyboard/VoiceOver access.
 Quit leaves the game running; Remove keeps game files, launch script and saves.
 This local list is not an ownership or engine registry claim. Main Library
 still never reads TitleHub history; Recent activity remains separate.
+Source/native-layout checks and installed-byte/signature/startup verification
+passed. No screenshot, actual Import/Play interaction or live gameplay was used
+for admission or deployment; those outcomes are not implied by neutral checks.
 
 **User-directed Library semantic correction (current source):** Library is the
 default, but its owned-PC surface remains unavailable. It uses one stock native

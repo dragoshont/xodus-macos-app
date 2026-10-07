@@ -10,7 +10,7 @@ entrypoints. Shipping screens use native setup/empty/loading/error states and
 actual public product data, not synthetic game illustrations. See
 [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
-**Installed-game Play (current source):** main Library has an **Installed** section
+**Installed-game Play (admitted shipping `0926414`):** main Library has an **Installed** section
 above the unchanged owned-PC unavailable state. Import an already-installed Xbox
 game folder, then explicitly select its executable Xodus launch script. The app
 reads `MicrosoftGame.config` locally and saves only the selected entry in a
@@ -24,7 +24,16 @@ No backend, contract or signed engine change accompanies this interface.
 Hogwarts Legacy's live test is separately user-controlled; neutral checks never
 launch a real game.
 
-**Current admitted shipping correction:** startup opens an unavailable **PC Library**:
+Exact-source [CI passed](https://github.com/dragoshont/xodus-macos-app/actions/runs/37603065132).
+The independently admitted package was installed after normal Quit, preserving
+a complete working 2d rollback, the profile and older rollbacks. All 21 installed
+files and app/helper/engine signatures matched admission. The exact signed C8
+engine is unchanged. One ordinary main-Library startup was left open; no Import,
+Play or real-game launch was automated, and no screenshot or gameplay proof is
+claimed.
+
+**Preserved Library semantic correction (first admitted at `2d741a7`):** the
+owned-PC Library remains unavailable:
 Xodus cannot yet verify which PC games you own. It does not display TitleHub
 history as your games, a featured owned title or a PC Store shelf, and entering
 main Library makes no saved-status or history request. **Browse games** opens

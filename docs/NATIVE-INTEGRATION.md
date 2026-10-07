@@ -41,6 +41,38 @@ live target and is not launched by qualification or deployment.
 The signed C8 engine, production schemas/pins, future support packets and
 existing account/history boundaries are unchanged.
 
+The frozen UI-only implementation is consumer
+`0926414a258dc2f6247edcc3d9f2d962af4f2a1a`, tree
+`3cd51d3776dc8b3294b3274d53e9ca68c879f188`. On the user's Mac,
+516 native session checks (including 35 local import/Play checks), 75 native
+presentation checks and 29 portable packaging checks passed. Native checks ran
+with outbound networking denied; a separate shipping Debug composition built.
+Exact-source CI
+[37603065132](https://github.com/dragoshont/xodus-macos-app/actions/runs/37603065132)
+completed successfully, including Release ShippingChecks and exclusion of
+private fixture resources. Fake scripts and neutral bytes are not live
+Hogwarts gameplay or compositor/accessibility certification.
+
+Root independently admitted this source and the matching `18uWwt` package.
+Receipt SHA256 is
+`d6d916355faa41d8d4ff9c0bb1df0d092258ad3f76231f2d9e50da09149703b4`,
+13,743 bytes. All 21 files, the exact source/producer pair, preserved C8 input,
+strict signatures and exact-head CI passed admission. The final launcher SHA256
+is `92f9afdbfd4e18c1bacdf0806e1de002b85ed05cc1adb05b44bb81efd5278393`
+(4,408,624 bytes). The helper SHA256 is
+`c521d79cf4ba5b7101eab526960bc961a5f6f76f37fa96a09d9f887f11158e39`
+(359,120 bytes); the signed engine is byte-for-byte unchanged C8 (22,012,176 bytes).
+
+Installation used normal owned-idle Quit and atomic replacement, preserving
+the complete working 2d app, profile/credentials and earlier rollbacks. One
+ordinary main-Library startup left app PID 33405 with sole parent-owned engine
+33422 and no helper. All installed files and the three fixed-certificate strict
+requirements matched admission. No Import, Play, real-game launch, Recent
+activity, Account or Store action, screenshot, private exporter or additional
+RPC was automated. Existing anonymous startup catalog search is unchanged.
+This is installed-byte/signature and process-ownership evidence, not API-trace,
+visual or Hogwarts gameplay evidence. The user/Root retains the live game test.
+
 ## Development-only registry compatibility
 
 The typed registry record accepts a **required-but-nullable** `runtimeFingerprint`
