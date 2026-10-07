@@ -36,7 +36,8 @@ labels/buttons and no credential transfer. Existing semantic colors, SF symbols,
 system text, keyboard defaults/cancellation and resize rules apply. Child
 buttons retain their own accessibility identifiers rather than inheriting a
 whole-section identifier. No additional navigation, sidebar or dashboard is
-introduced. This source candidate is not yet an installed visual acceptance.
+introduced. The source and signed package are admitted and installed; separate
+owner visual/interaction acceptance is pending.
 
 ## Actual native implementation
 

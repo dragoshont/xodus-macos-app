@@ -4,7 +4,7 @@ This is implementation work beyond the immutable foundation at `44d7338`. It is 
 
 ## Local imported-game Play
 
-### S3/S5/S6 game operations (source candidate; no installed/live claim)
+### S3/S5/S6 game operations (admitted and installed; live acceptance pending)
 
 This app-only batch implements the approved
 [remaining-work spec at bda88fe](https://github.com/dragoshont/xodus-macos/blob/bda88fe/docs/xodus/remaining-work-plan.md).
@@ -58,21 +58,44 @@ PC Library child actions are removed; controls keep their own identifiers.
 Neutral checks use synthetic scripts, config, receipts, local folders and a fake
 one-second Play session only. They do not authenticate, run private scripts,
 install/uninstall a real title, query an account, or start the installed app.
-Mac qualification passed 683 native session checks (76 game-operation checks),
-75 presentation checks and 29 portable packaging checks, with shipping-debug
-compilation. The focused operation checks also passed after the final
-integration corrections. Fixture receipt publication follows the same atomic,
+Final frozen Git-LF Mac qualification passed 684 native session checks
+(77 game-operation checks), 75 presentation checks and 29 portable packaging
+checks, with shipping-debug compilation. Fixture receipt publication follows the same atomic,
 private-file contract; additional result keys are ignored, never promoted into
-registration metadata. Exact frozen-source CI, package admission and owner live
-acceptance remain pending. The installed S4 app and its profile/list are
-unchanged.
+registration metadata.
 
 The subsequent observation-only correction makes Downloads itself observe
 operation state (so its empty state disappears during work) and forwards
 Installed-state changes to computed service/consent controls. Its focused
-operation suite passed 77 checks and shipping-debug compilation. The initial
-frozen batch also passed exact-source CI; the corrected source requires its own
-exact CI and package admission.
+operation suite passed 77 checks and shipping-debug compilation.
+
+The admitted runtime is `1463cdb5260356a536f29d8f39d90d4e69b06689`, tree
+`fa3eac5f6d78e534c10e3816f615511003a5d22d`.
+[Exact-source CI 37640727574 passed](https://github.com/dragoshont/xodus-macos-app/actions/runs/37640727574).
+The owner independently admitted package `uybU6j`, receipt
+`a929185184862f9af0a095625cc7344da6130053cbd730fd4c78ad3b89c1e73f`
+(15,035 bytes, 21 files). Launcher SHA-256 is
+`6d98be96eb1d40a16ec78b504b00e600d5ef2acdf27e1723732626d349285bfe`
+(5,800,576 bytes); helper SHA-256 is
+`d0b1a85884cf9a5afa81470edc81771b7388a881b2d9793bda5f10ee77dce3cf`
+(359,120 bytes). C8 remains byte-identical to admitted S4:
+`c8fe69a3bc2b6a84c5bad5ef0c1ae041f36466a87419c0f17d9567c6df3ed14d`
+(22,012,176 bytes). Three fixed-leaf requirements and deep strict signature
+verification passed; the one-use GUI signing job completed and was unloaded.
+
+After a fresh owner check that no game, launch or stream process was running,
+normal Quit and replacement were explicitly authorized and executed. The full
+working S4 bundle and older rollbacks were retained. Profile/credentials were
+not copied, deleted or reset; installed-games.json stayed byte-identical at
+924 bytes/0600 across replacement and startup. All 21 installed files and
+strict signatures match admission. One ordinary Library reopen left app
+PID 92141 owning its sole engine PID 92153, with helper count zero.
+
+These are installed byte/signature/ownership/startup observations, not live
+Install, Repair, Uninstall, game sign-in, visual or gameplay acceptance. No
+sign-in, Import, Install, Repair, Uninstall or Play was automated by this lane;
+no capture, private exporter or extra RPC was used. Existing anonymous startup
+catalog search is unchanged. The owner is separately performing live acceptance.
 
 ### S4 owned PC Library (admitted, installed and live-accepted)
 

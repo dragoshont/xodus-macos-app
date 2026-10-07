@@ -10,7 +10,7 @@ entrypoints. Shipping screens use native setup/empty/loading/error states and
 actual public product data, not synthetic game illustrations. See
 [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
-**S3/S5/S6 source candidate (not yet admitted or installed):** the account area
+**S3/S5/S6 (`1463cdb`, admitted and installed; live acceptance pending):** the account area
 adds explicit game-service sign-in/status, separate from PC-library credentials.
 PC Library games offer Install with native destination/free-space consent.
 Downloads shows script-reported bytes and phases; Cancel signals only the
@@ -21,9 +21,15 @@ and private registry save as Import. Games being changed cannot be played; one
 mutation runs at a time, and normal Quit waits for completion or cancellation.
 Private scripts, gameplay credentials, save preservation and engine behavior
 remain owned outside this public repository. No private implementation is
-imported and the signed C8 engine is unchanged. Neutral Mac checks pass; this
-candidate still requires exact-source CI, independent package admission and separate owner live
-acceptance; it does not claim installation or uninstall has been live-tested.
+imported and the signed C8 engine is unchanged.
+[Exact-source CI passed](https://github.com/dragoshont/xodus-macos-app/actions/runs/37640727574),
+along with 684 native checks, including 77 game-operation checks. The owner
+independently admitted the signed UI-only package and freshly confirmed no game
+was running before authorizing normal Quit/replacement. All 21 installed files
+and strict signatures match admission. A full S4 rollback is retained; the
+profile was left untouched and the private installed list remained byte-identical through one
+ordinary Library reopen. No game operation or sign-in was automated by the app
+implementation/deployment lane. Separate owner live acceptance remains pending.
 
 **S4 PC Library (`7ec1daa`, admitted, installed and live-accepted):** a separate native
 Microsoft device-code sign-in reads the account's complete paged collection,
@@ -47,14 +53,14 @@ coverage comparison and accessibility-identifier follow-ups remain recorded
 in the owner's spec, not extra scope for this slice. It does not add installation, entitlement
 inference from history, or a backend/engine change.
 
-**Installed-game Play (introduced at `0926414`, retained in shipping `7ec1daa`):** main Library has an **Installed** section
+**Installed-game Play (introduced at `0926414`, retained in shipping `1463cdb`):** main Library has an **Installed** section
 above the separate account-bound PC shelf/sign-in prompt. Import an already-installed Xbox
 game folder, then explicitly select its executable Xodus launch script. The app
 reads `MicrosoftGame.config` locally and saves only the selected entry in a
 private, atomic local list. Play runs `/bin/bash <script> <runID>` with a minimal
 environment. Only one game session runs at a time; Launching becomes Playing
 while the script remains alive, and its exit ends the session. A failed exit
-shows its code and Try again. Quit does not stop the game. Remove deletes only
+shows its code and Try again. Quit does not stop the game. Remove from list deletes only
 the list entry, never the game, launch script or saves. These local imports are
 **Installed**, not Owned, and do not establish Store availability or entitlement.
 No backend, contract or signed engine change accompanies this interface.
