@@ -4,7 +4,7 @@ This is implementation work beyond the immutable foundation at `44d7338`. It is 
 
 ## Local imported-game Play
 
-### S4 owned PC Library (admitted and installed; live acceptance pending)
+### S4 owned PC Library (admitted, installed and live-accepted)
 
 This slice implements AC4.1–AC4.5 of the
 [remaining-work spec at fbf849d](https://github.com/dragoshont/xodus-macos/blob/fbf849d/docs/xodus/remaining-work-plan.md).
@@ -90,7 +90,21 @@ matched admission. No actual device-code, auth, owned-library, Import/Play, game
 or new screenshot request was automated by the implementation/deployment lane;
 ordinary anonymous startup catalog search remains unchanged.
 These are installed/startup observations, not user-present sign-in, PC shelf
-or gameplay proof. S4 stays open for Root's authorized live acceptance.
+or gameplay proof.
+
+**Separate Root live acceptance (2026-10-07):** the user completed the installed
+app's in-app device-code sign-in. Root observed Your PC games with a count of 13
+and real DisplayCatalog box art; Hogwarts was matched to Installed and showed
+the shared Play control, whose working launch was already accepted in S1/S2.
+Other titles showed Not installed; Refresh and Sign out were present.
+Root explicitly closed S4 with no blocking defect. This does not claim a new
+S4 game launch, an exercised sign-out/deletion, or exhaustive Windows Xbox
+Owned-view parity. Two non-blocking follow-ups are retained in the owner's spec:
+coverage comparison for omitted Owned-view entries and container accessibility
+identifiers overriding child button identifiers. No follow-up implementation
+was requested. No account identity, library title list, captured image or token
+is reproduced here. Runtime source, package, signed C8 and production pins
+remain unchanged.
 
 ### S1 artwork and Continue Playing (admitted, installed and live-accepted)
 

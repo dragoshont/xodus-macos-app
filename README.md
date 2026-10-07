@@ -2,7 +2,7 @@
 
 A native Mac launcher in development for legitimately entitled Xbox PC games, integrating with the Xodus management engine.
 
-**Current status: native development app, not a complete game launcher.** The default SwiftUI/AppKit app has a real bounded management client, isolated Microsoft Store sign-in integration, source-backed PC Game Pass discovery and Microsoft Store network search, edition detail and activity. A native folder picker also supports a read-only marker check in one explicitly selected game folder; observed header identifiers never become retail identity, registration or permission to launch. A packaged development build includes its matching engine and connects without Terminal setup; negotiated capabilities determine which actions work. Search coverage is explicitly partial, and public results never establish ownership. The admitted f30/d00 pair confirmed saved credentials after the user's native Keychain approval and completed one Halo authenticated read with `verified: true`; no repeat verification or ownership inference was made. Authoritative owned-PC inventory, an engine-backed installed-game registry, authorized game installation and certified gameplay remain implementation gaps. Saved sign-in is **not** proof of PC ownership or package access.
+**Current status: native development app, not a complete game launcher.** The default SwiftUI/AppKit app has a real bounded management client, isolated Microsoft Store sign-in integration, source-backed PC Game Pass discovery and Microsoft Store network search, edition detail and activity. A native folder picker also supports a read-only marker check in one explicitly selected game folder; observed header identifiers never become retail identity, registration or permission to launch. A packaged development build includes its matching engine and connects without Terminal setup; negotiated capabilities determine which actions work. Search coverage is explicitly partial, and public results never establish ownership. The admitted f30/d00 pair confirmed saved credentials after the user's native Keychain approval and completed one Halo authenticated read with `verified: true`; no repeat verification or ownership inference was made. S4 now has a live-accepted account-bound PC Library. Broader owned-PC coverage comparison, an engine-backed installed-game registry, authorized game installation and general gameplay certification remain gaps. Saved sign-in alone is **not** proof of PC ownership or package access.
 
 The original offline demonstration is **nonshipping only**. `XODUS_SHIPPING=1`
 compiles out its views, invented state, artwork, resources and check/export
@@ -10,7 +10,7 @@ entrypoints. Shipping screens use native setup/empty/loading/error states and
 actual public product data, not synthetic game illustrations. See
 [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
-**S4 PC Library (`7ec1daa`, admitted and installed; live acceptance pending):** a separate native
+**S4 PC Library (`7ec1daa`, admitted, installed and live-accepted):** a separate native
 Microsoft device-code sign-in reads the account's complete paged collection,
 then joins active, non-trial Game entries to exact Store products declaring
 `Windows.Desktop`. The Your PC games shelf never comes from Xbox activity or
@@ -24,13 +24,16 @@ Installed and Continue Playing remain above the shelf.
 the independently admitted signed package preserves C8 byte-for-byte. Normal
 Quit/replacement preserved the full S1 rollback, profile and private installed
 list; all 21 installed files and strict signatures matched admission. One
-ordinary Library startup was left open. Root-controlled user-present sign-in,
-actual PC shelf and imported-game Play evidence remain pending; no such action
-was automated for deployment. It does not add installation, entitlement
+ordinary Library startup was left open. Root separately confirmed user-completed
+in-app sign-in and 13 PC games with real Store art; Hogwarts matched Installed
+with the shared Play control already verified in S1/S2. Root closed S4.
+Those observations do not come from neutral or deployment checks. Owned-view
+coverage comparison and accessibility-identifier follow-ups remain recorded
+in the owner's spec, not extra scope for this slice. It does not add installation, entitlement
 inference from history, or a backend/engine change.
 
-**Installed-game Play (shipping `e401464`, initially admitted at `0926414`):** main Library has an **Installed** section
-above the unchanged owned-PC unavailable state. Import an already-installed Xbox
+**Installed-game Play (introduced at `0926414`, retained in shipping `7ec1daa`):** main Library has an **Installed** section
+above the separate account-bound PC shelf/sign-in prompt. Import an already-installed Xbox
 game folder, then explicitly select its executable Xodus launch script. The app
 reads `MicrosoftGame.config` locally and saves only the selected entry in a
 private, atomic local list. Play runs `/bin/bash <script> <runID>` with a minimal

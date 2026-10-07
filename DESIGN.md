@@ -38,7 +38,12 @@ complete filtered account collection; failed refresh retains only the previous
 complete shelf with a clear stale notice. Main search filters this PC shelf;
 Recent activity keeps its separate scope. This is a bounded adaptation of the
 approved Figma Library hierarchy/native tokens, not a new UI world, invented
-owned shelf or fixture source. Live installed acceptance remains pending.
+owned shelf or fixture source. Root separately closed live acceptance after
+user-completed device-code sign-in: 13 PC games with real Store box art,
+Hogwarts matched to Installed with shared Play, and Refresh/Sign out visible.
+This does not certify parity with every Windows Xbox Owned-view entry or
+complete accessibility coverage; those two non-blocking follow-ups remain
+in the owner's spec.
 
 **S1 installed Library refinement (admitted shipping `e401464`):** local tile art uses
 Square480, Square150, then StoreLogo from the imported folder's ShellVisuals,
