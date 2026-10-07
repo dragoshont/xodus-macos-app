@@ -201,12 +201,16 @@ struct PCGamesSnapshot: Sendable {
 
 struct PCGamesCollectionPage: Decodable, Sendable {
     struct Item: Decodable, Sendable {
-        let productId: String
-        let productKind: String
-        let status: String
+        let productId: String?
+        let productKind: String?
+        let status: String?
         let isTrial: Bool?
+        private let trialFieldUsable: Bool
 
-        var isCandidate: Bool { productKind == "Game" && status == "Active" && isTrial != true }
+        var isCandidate: Bool {
+            productKind == "Game" && status == "Active" && isTrial != true
+                && trialFieldUsable && productId?.isEmpty == false
+        }
 
         private enum CodingKeys: String, CodingKey {
             case productId, ProductId, productKind, status, isTrial
@@ -214,11 +218,13 @@ struct PCGamesCollectionPage: Decodable, Sendable {
 
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            productId = try container.decodeIfPresent(String.self, forKey: .productId)
-                ?? container.decode(String.self, forKey: .ProductId)
-            productKind = try container.decode(String.self, forKey: .productKind)
-            status = try container.decode(String.self, forKey: .status)
-            isTrial = try container.decodeIfPresent(Bool.self, forKey: .isTrial)
+            productId = (try? container.decode(String.self, forKey: .productId))
+                ?? (try? container.decode(String.self, forKey: .ProductId))
+            productKind = try? container.decode(String.self, forKey: .productKind)
+            status = try? container.decode(String.self, forKey: .status)
+            isTrial = try? container.decode(Bool.self, forKey: .isTrial)
+            trialFieldUsable = !container.contains(.isTrial)
+                || (try? container.decodeNil(forKey: .isTrial)) == true || isTrial != nil
         }
     }
     let items: [Item]
@@ -469,7 +475,7 @@ struct PCGamesClient: Sendable {
               claim.uhs == user.DisplayClaims.xui.first?.uhs else { throw PCGamesError.identityMismatch }
         guard let xid = claim.xid, !xid.isEmpty, xid.utf8.count <= 32,
               xid.utf8.allSatisfy({ (48...57).contains($0) }) else { throw PCGamesError.invalidResponse }
-        var candidates = Set<String>(), allIDs = Set<String>(), cursors = Set<String>()
+        var candidates = Set<String>(), candidateIDs = Set<String>(), cursors = Set<String>()
         var cursor: String?
         for index in 0..<Self.maximumPages {
             var body: [String: Any] = [
@@ -486,11 +492,9 @@ struct PCGamesClient: Sendable {
                 let page = try decode(PCGamesCollectionPage.self, result.data)
                 guard page.items.count <= 100 else { throw PCGamesError.invalidResponse }
                 for item in page.items {
-                    guard !item.productId.isEmpty, item.productId.utf8.count <= 128 else { throw PCGamesError.invalidResponse }
-                    allIDs.insert(item.productId)
-                    if item.isCandidate, Self.validProductID(item.productId) {
-                        candidates.insert(item.productId)
-                    }
+                    guard item.isCandidate, let id = item.productId else { continue }
+                    candidateIDs.insert(id)
+                    if Self.validProductID(id) { candidates.insert(id) }
                 }
                 cursor = page.continuationToken
                 if cursor == "" { cursor = nil }
@@ -530,6 +534,6 @@ struct PCGamesClient: Sendable {
             catch { throw PCGamesError.incompleteCatalog(start) }
         }
         return PCGamesSnapshot(games: games.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending },
-                               excludedCount: allIDs.count - games.count, updatedAt: Date())
+                               excludedCount: candidateIDs.count - games.count, updatedAt: Date())
     }
 }

@@ -36,7 +36,10 @@ fetch fails explicitly and cannot supply an empty or partial successful shelf.
 
 Only Game/Active/non-trial product IDs join to public DisplayCatalog in batches
 of at most 20. Products require exact `Windows.Desktop` package evidence.
-Missing/console/unresolved products are excluded and counted. Titles and
+Missing/console/unresolved candidate games are excluded and counted; Application,
+Durable, Pass, trial and inactive items do not inflate that count. Missing/odd
+item fields simply cannot establish a candidate; page structural failures remain
+explicit. Titles and
 BoxArt/Poster come only from the joined product; protocol-relative images use
 the existing exact-host/grammar validator and bounded memory-only artwork
 loader, without sending private authorization. Installed matches use exact

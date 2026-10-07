@@ -78,7 +78,7 @@ struct PCGamesView: View {
                     }
                     VStack(alignment: .leading, spacing: 6) {
                         if snapshot.excludedCount > 0 {
-                            Text("\(snapshot.excludedCount) items not shown (not for PC or unavailable)")
+                            Text("\(snapshot.excludedCount) games not shown (not for PC or unavailable)")
                         }
                         Text("Last updated \(Text(snapshot.updatedAt, style: .relative)) ago")
                         if library.error != nil { Text("Showing the last complete library.") }
@@ -106,7 +106,7 @@ struct PCGamesView: View {
         })) {
             VStack(alignment: .leading, spacing: 20) {
                 Text("Sign in to see your PC games").font(.title2.bold())
-                Text("Open Microsoft's sign-in page and enter this code. This sign-in is for your PC game library; it doesn't replace your game-service sign-in.")
+                Text("Open Microsoft's sign-in page and enter this code to see the PC games in your account.")
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 if let code = library.deviceCode {
                     Text(code.userCode).font(.largeTitle.monospaced().bold()).textSelection(.enabled)

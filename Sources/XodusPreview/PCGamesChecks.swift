@@ -86,15 +86,25 @@ enum PCGamesChecks {
               "S4: Approved ProductId fallback preserves exact ID without guessing")
         for invalid: [String: Any] in [
             [:], ["items": NSNull()], ["items": "unexpected"],
-            ["items": [["productId": first, "productKind": "Game", "status": "Active", "isTrial": "false"]]],
-            ["items": [["productId": first, "productKind": "Game"]]],
             ["items": [], "continuationToken": 1]
         ] {
             do {
                 _ = try JSONDecoder().decode(PCGamesCollectionPage.self, from: response(invalid).data)
-                check(false, "S4: Malformed required collection data is rejected")
-            } catch { check(true, "S4: Malformed required collection data is rejected") }
+                check(false, "S4: Malformed page structure is rejected")
+            } catch { check(true, "S4: Malformed page structure is rejected") }
         }
+        let incompleteItems = try response(["items": [
+            ["productId": first, "productKind": "Game"],
+            ["productId": first, "status": "Active"],
+            ["productKind": "Game", "status": "Active"],
+            ["productId": first, "productKind": 3, "status": "Active"],
+            ["productId": first, "productKind": "Game", "status": false],
+            ["productId": false, "productKind": "Game", "status": "Active"],
+            ["productId": first, "productKind": "Game", "status": "Active", "isTrial": "false"],
+            item(first)]])
+        let lenient = try JSONDecoder().decode(PCGamesCollectionPage.self, from: incompleteItems.data)
+        check(lenient.items.count == 8 && lenient.items.filter(\.isCandidate).count == 1,
+              "S4: Missing/odd third-party item fields are not candidates; one row cannot fail a valid page")
         let transport = PCGamesMockTransport(try authResponses() + [
             page([item(first), item(second, kind: "Application"), item(third, trial: true)], cursor: "neutral-next"),
             page([item(first), item("FIXTURE00004"), item("FIXTURE00005"), item("FIXTURE00006")]),
@@ -103,8 +113,8 @@ enum PCGamesChecks {
                                    catalogProduct("FIXTURE00005", platform: "windows.desktop")]])])
         let snapshot = try await PCGamesClient(transport: transport).library(
             accessToken: "neutral-access", market: "GB", language: "en-GB")
-        check(snapshot.games.map(\.id) == [first] && snapshot.excludedCount == 5,
-              "S4: Two pages join only exact PC packages, dedupe IDs and count filtered/console/missing products")
+        check(snapshot.games.map(\.id) == [first] && snapshot.excludedCount == 3,
+              "S4: Hidden count includes only active non-trial Game candidates, never other products or trials")
         check(snapshot.games.first?.artwork?.url == "https://store-images.s-microsoft.com/image/square",
               "S4: Square BoxArt is preferred and protocol-relative approved art uses the existing validator")
         let requests = await transport.requests
@@ -206,6 +216,12 @@ enum PCGamesChecks {
         let unresolvedRequests = await unresolved.requests
         check(unresolvedLibrary.games.isEmpty && unresolvedLibrary.excludedCount == 1 && unresolvedRequests.count == 4,
               "S4: Non-catalog Game IDs are counted unresolved; they never enter guessed catalog calls")
+        let incompleteTransport = PCGamesMockTransport(try authResponses() + [
+            incompleteItems, response(["Products": [catalogProduct(first)]])])
+        let incompleteShelf = try await PCGamesClient(transport: incompleteTransport).library(
+            accessToken: "neutral", market: "US", language: "en-US")
+        check(incompleteShelf.games.map(\.id) == [first] && incompleteShelf.excludedCount == 0,
+              "S4: Incomplete unrelated rows do not fail the joined shelf or inflate hidden-game count")
         for uri in ["//evil.invalid/image/square", "http://store-images.s-microsoft.com/image/square",
                     "//store-images.s-microsoft.com/image/a?token=secret", "//store-images.s-microsoft.com/image/../file",
                     "//store-images.s-microsoft.com@evil.invalid/image/a"] {
