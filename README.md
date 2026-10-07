@@ -10,7 +10,7 @@ entrypoints. Shipping screens use native setup/empty/loading/error states and
 actual public product data, not synthetic game illustrations. See
 [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
-**Phase 2 B5/B7/B8/B9 source qualified (not packaged or installed):** Account
+**Phase 2 B5/B7/B8/B9 (`fee7f5f`, admitted and installed; live acceptance partial):** Account
 shows cached PC Game Pass status and an explicit fenced Check. Active status
 enables a separate Game Pass shelf after Your PC games and the existing
 support-check/consent/Install flow on eligible Discover games. No subscription
@@ -19,8 +19,12 @@ Installed/Continue Playing action becomes Stop. The fixed private script must
 confirm that exact title stopped; a requested stop records normal session
 history without treating the launcher's exit code as a crash. Stop is disabled
 while in flight. Ordinary Quit still leaves a game running. C8 is unchanged;
-network-denied neutral suites and shipping-debug compilation pass, while
-exact-CI and independent admission/live gates remain.
+network-denied neutral suites, shipping-debug compilation and
+[exact-source CI](https://github.com/dragoshont/xodus-macos-app/actions/runs/37676485849)
+pass. The owner independently admitted the signed package before freshly
+authorizing normal Quit and replacement. Full `7c3c1f0` rollback, the untouched
+profile and byte-identical private installed-list permissions were preserved
+through one ordinary Library reopen.
 Private script entrypoints now use the separately installed self-contained
 `~/Library/Application Support/Xodus/Runtime/scripts/macos` directory; the
 runtime is not bundled into the app. One read-only startup check supplies
@@ -33,6 +37,12 @@ it only creates missing environments, starts a missing service, and never
 rebuilds existing title environments or touches saves.
 Unsupported consent hides download-size/future-download copy, while supported
 consent shows the backend's real download size when available.
+The owner observed cached Active status, all four Setup items, successful
+in-app Repair Xodus with refreshed readiness, and the Game Pass section header.
+Remaining shelf, Install, Play and Stop acceptance is blocked by the locked
+login Keychain and requires the user's native unlock; no app defect has been
+observed. Unlock is not automated and the live authorization dialog is left
+untouched. These observations do not establish completion of live acceptance.
 
 **Phase 2 B1/B2/B3 (`7c3c1f0`, admitted, installed and live-accepted):** Discover
 accepts verified PC Game Pass feed membership without requiring the separate
@@ -58,7 +68,10 @@ not general gameplay certification.
 access/migration is timeboxed to 2.5 hours and must qualify across two
 differently signed synthetic builds. One human migration approval is allowed.
 No new ACL, prompt-free claim or live credential mutation is part of the
-B5/B7/B8/B9 candidate; game-service credentials remain out of scope.
+B5/B7/B8/B9 package; game-service credentials remain out of scope.
+The separate B6 access policy remains unqualified. Native qualification is
+paused for the same human-only Keychain unlock; isolated synthetic preparation
+has not modified the live app-owned item.
 
 **S3/S5/S6 (`1463cdb`, admitted, installed and live-accepted):** the account area
 adds explicit game-service sign-in/status, separate from PC-library credentials.

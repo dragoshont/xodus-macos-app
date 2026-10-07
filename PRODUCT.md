@@ -35,10 +35,14 @@ Repair and save-preserving Uninstall are independently admitted, installed and
 owner-live-accepted in bounded title/flow tests. Discover/owned-first search and
 package-support checks are independently admitted, installed and owner-live-accepted
 at `7c3c1f0`. Game Pass subscription/shelf, self-contained script paths, Setup
-and Stop are the next source candidate, not installed evidence. Stable
+and Stop are admitted and installed at `fee7f5f`. Owner live acceptance is
+partial: cached status, Setup, successful Repair and the shelf header were
+observed; remaining title flows await the user's native login Keychain unlock.
+No app defect has been observed, and no unlock is automated. Stable
 app-owned Keychain ACL/migration is a separate approved, 2.5-hour next package
 with synthetic two-build qualification and one allowed human migration approval;
-no prompt-free replacement claim is made yet.
+no prompt-free replacement claim is made yet. B6 native qualification is
+paused at that human-authorization boundary; live credentials are untouched.
 No complete owned-view parity or general gameplay certification is
 claimed. Exact deployment and real provider evidence are recorded separately
 in [native integration](docs/NATIVE-INTEGRATION.md), never inferred from mocks.

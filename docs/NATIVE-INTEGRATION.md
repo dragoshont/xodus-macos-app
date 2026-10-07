@@ -4,7 +4,30 @@ This is implementation work beyond the immutable foundation at `44d7338`. It is 
 
 ## Local imported-game Play
 
-### Phase 2 B5/B7/B8/B9 (source qualified; no package/installed/live claim)
+### Phase 2 B5/B7/B8/B9 (admitted and installed; owner live acceptance partial)
+
+Frozen source is `fee7f5f186d402d2c08ca76dc9a50e638ba5c5e2`, tree
+`4363d81f0363e25982590f5fc23d6b64237d750a`.
+[Exact-source CI](https://github.com/dragoshont/xodus-macos-app/actions/runs/37676485849)
+passed. After independent source review, the one-use signed package retained
+the previously admitted C8 byte-for-byte. The owner independently verified
+the receipt, all 21 files and strict signatures, then freshly confirmed no
+game/launch/stream process and authorized normal Quit/replacement.
+
+Replacement preserved the full working `7c3c1f0` rollback, untouched profile
+and identical private installed-list bytes and permissions through one
+ordinary Library reopen. The admitted file inventory and strict signatures
+were rechecked on the installed bundle; its single app-owned engine and no
+helper were observed. No game operation, sign-in or private exporter was
+automated in deployment. Ordinary startup may perform its configured
+read-only Setup check.
+
+The owner separately observed cached Active status, the four Setup items,
+successful in-app Repair Xodus (status 0) with refreshed readiness, and the
+Library Game Pass section header. No app defect has been observed. Remaining
+shelf/Install/Play/Stop acceptance is blocked by the locked login Keychain:
+the app and game service cannot read credentials until the user unlocks it.
+The live native authorization dialog is not automated or dismissed.
 
 Account reads the private `compatibility/gamepass.json` cache with the existing
 0600/current-user/regular-file/no-symlink/64 KiB policy. Its minimal
@@ -31,7 +54,7 @@ shelf. Inactive/Unknown Discover retains Included with PC Game Pass without an
 Install action. The private backend gates actual licences/installation;
 cached status and feed membership are not independent title-license receipts.
 The owner's B4 licensing and Abiotic gameplay findings are backend evidence,
-not acceptance of this app candidate.
+not acceptance of this app package.
 
 B9 invokes only `private-xodus-stop.sh <generatedRunId> <launchedStoreId>` for
 the one live session launched by Xodus. No process scan or unrelated-game kill
@@ -97,8 +120,34 @@ types/privacy/removal, nonowned probe selection, strict result/status and
 single-mutation fences. Stop tests cover both receipt/exit orderings, a nonzero
 launcher exit, code 21/retry, false/mismatched/missing/conflicting results
 and session persistence. These are bounded fake scripts and fake sessions only.
-No live private script, sign-in, licence probe, game operation or installed-app
-replacement is authorized from this implementation lane.
+Those qualification checks do not run a live private script, sign-in, licence
+probe or game operation, and do not themselves authorize replacement.
+The separately authorized deployment and owner observations are recorded above.
+
+### Separate B6 Keychain qualification (human authorization hold)
+
+The approved 2.5-hour slice requires an explicit fixed-certificate-bound
+app-owned access policy, migration without deleting the existing credential,
+and qualification with two different signed synthetic builds. One human
+migration authorization is allowed; its required UI copy is
+Xodus needs one-time Keychain approval. The game service's item is out of scope.
+
+No policy is implemented or qualified yet. Two original synthetic probes have
+different binaries and the same fixed-certificate designated requirement.
+A no-UI legacy-fixture ACL edit timed out; that synthetic keychain was deleted
+and its original search-list metadata restored. A subsequent signer requested
+native login Keychain authorization and stopped before creating any test item.
+Only that signer's dialog was canceled, without a password or approval.
+The signing job was unloaded; the live app's later unlock dialog remains
+untouched. These are blockers, not evidence that migration or prompt-free
+replacement works.
+
+A modern-format, no-signing-key fixture is prepared but not executed; it
+reuses the signed probes and preauthorizes only their fixed-certificate role
+on synthetic data. Its source compilation is not native access qualification
+or proof of human migration. Further native B6 calls are paused until the
+user completes the actual Keychain unlock. No live app-owned or game-service
+item has been read or changed by this qualification lane.
 
 ### Phase 2 B1/B2/B3 (admitted, installed and owner-live-accepted)
 
