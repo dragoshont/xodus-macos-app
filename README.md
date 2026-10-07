@@ -39,10 +39,15 @@ Unsupported consent hides download-size/future-download copy, while supported
 consent shows the backend's real download size when available.
 The owner observed cached Active status, all four Setup items, successful
 in-app Repair Xodus with refreshed readiness, and the Game Pass section header.
-Remaining shelf, Install, Play and Stop acceptance is blocked by the locked
-login Keychain and requires the user's native unlock; no app defect has been
-observed. Unlock is not automated and the live authorization dialog is left
-untouched. These observations do not establish completion of live acceptance.
+The user subsequently unlocked the login Keychain, without automated approval,
+and the owner resumed live acceptance. Two defects were then observed: a
+Game Pass check could choose a feed title without a PC package and return
+Unknown, and Check game sign-in left Setup readiness stale. Their next-package
+source correction prefers PC catalog candidates, skips strict cached
+no-PC-package/package-type failures, tries at most three exact-ID probes only
+after null results, and refreshes Setup after successful sign-in checks.
+These corrections are not installed yet. Shelf, Install, Play and Stop
+acceptance remains separate from neutral qualification.
 
 **Phase 2 B1/B2/B3 (`7c3c1f0`, admitted, installed and live-accepted):** Discover
 accepts verified PC Game Pass feed membership without requiring the separate
@@ -69,9 +74,9 @@ access/migration is timeboxed to 2.5 hours and must qualify across two
 differently signed synthetic builds. One human migration approval is allowed.
 No new ACL, prompt-free claim or live credential mutation is part of the
 B5/B7/B8/B9 package; game-service credentials remain out of scope.
-The separate B6 access policy remains unqualified. Native qualification is
-paused for the same human-only Keychain unlock; isolated synthetic preparation
-has not modified the live app-owned item.
+The separate B6 access policy remains unqualified. Following the user's unlock,
+native qualification still awaits the owner's explicit safe GUI boundary.
+Isolated synthetic preparation has not modified the live app-owned item.
 
 **S3/S5/S6 (`1463cdb`, admitted, installed and live-accepted):** the account area
 adds explicit game-service sign-in/status, separate from PC-library credentials.

@@ -65,10 +65,12 @@ shows progress/error/Show log; missing game sign-in offers its existing action.
 Supported Install consent shows the real download size; unsupported consent
 shows only its reason, not unknown-size or future-download copy.
 The owner observed cached status, the Setup list, successful Repair with
-refreshed readiness and the Game Pass section header. The locked login
-Keychain blocks remaining live title flows pending a human-only native unlock.
-No authorization is automated or dismissed, and no prompt-free replacement
-claim is made for the separate, still-unqualified B6 policy.
+refreshed readiness and the Game Pass section header. After the user's native
+Keychain unlock, the owner found probe-selection and stale Setup-readiness
+defects. The next source correction keeps the same controls, bounds null-result
+probes to three, and refreshes Setup after a successful game-sign-in check.
+It is not installed. No authorization is automated, and no prompt-free
+replacement claim is made for the separate, still-unqualified B6 policy.
 
 **Phase 2 B1/B2/B3 (`7c3c1f0`, admitted, installed and live-accepted):** retain the existing native catalog grid and
 toolbar. A nonblank Discover search places Your games above Microsoft Store;

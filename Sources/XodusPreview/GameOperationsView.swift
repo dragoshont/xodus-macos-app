@@ -68,8 +68,9 @@ struct GamePassAccountView: View {
     @EnvironmentObject private var session: LiveSession
 
     private var probeID: String? {
-        GameOperationsController.gamePassProbe(discoveryIDs: session.gamePassProductIDs,
-                                               ownedGames: library.snapshot?.games)
+        GameOperationsController.gamePassProbes(discoveryProducts: session.gamePassProducts,
+                                                ownedGames: library.snapshot?.games,
+                                                compatibility: operations.compatibility).first
     }
 
     var body: some View {
@@ -79,7 +80,7 @@ struct GamePassAccountView: View {
                     .accessibilityIdentifier("xodus.gamePass.status")
                 Spacer()
                 Button("Check") {
-                    operations.checkGamePass(discoveryIDs: session.gamePassProductIDs,
+                    operations.checkGamePass(discoveryProducts: session.gamePassProducts,
                                              ownedGames: library.snapshot?.games)
                 }
                 .disabled(!operations.canStartMutation || operations.installConsent != nil

@@ -24,10 +24,31 @@ read-only Setup check.
 
 The owner separately observed cached Active status, the four Setup items,
 successful in-app Repair Xodus (status 0) with refreshed readiness, and the
-Library Game Pass section header. No app defect has been observed. Remaining
-shelf/Install/Play/Stop acceptance is blocked by the locked login Keychain:
-the app and game service cannot read credentials until the user unlocks it.
-The live native authorization dialog is not automated or dismissed.
+Library Game Pass section header. The locked login Keychain initially blocked
+title-flow acceptance. The user completed native unlock without automation;
+the owner resumed acceptance and found two defects described below.
+Remaining shelf/Install/Play/Stop outcomes are not inferred from deployment.
+
+#### Next-package live-acceptance corrections (not installed)
+
+The first nonowned feed title may lack a PC package. Explicit Game Pass Check
+now selects from retained validated feed products, preferring PC-candidate
+flags while preserving feed order. Fresh, strict private compatibility-cache
+reads exclude supported-false entries only when the reason contains
+no PC game package or package type, case insensitively. Other unsupported
+gameplay reasons do not imply an unusable licensing probe; malformed cache is
+an explicit support-detail error, never an exclusion.
+
+A null active result tries the next candidate, at most three commands total.
+Each uses a fresh generated run ID and validates its own exact probeProductId.
+False, malformed results, nonzero exits and other failures never retry.
+One mutation and Quit fence spans cache reads and every attempt. Exhausted
+null results remain Unknown; an all-excluded candidate set is visible recovery
+without running a script. No feed or cache evidence becomes ownership.
+
+Successful Check game sign-in also refreshes the already-started Setup check.
+If a read-only check is in flight, one follow-up is coalesced rather than
+discarding the refresh; no Repair or sign-in is started by this correction.
 
 Account reads the private `compatibility/gamepass.json` cache with the existing
 0600/current-user/regular-file/no-symlink/64 KiB policy. Its minimal
@@ -145,8 +166,9 @@ replacement works.
 A modern-format, no-signing-key fixture is prepared but not executed; it
 reuses the signed probes and preauthorizes only their fixed-certificate role
 on synthetic data. Its source compilation is not native access qualification
-or proof of human migration. Further native B6 calls are paused until the
-user completes the actual Keychain unlock. No live app-owned or game-service
+or proof of human migration. The user has since completed the actual Keychain
+unlock. Further native B6 calls await the owner's explicit safe shared-GUI
+boundary while it drives live acceptance. No live app-owned or game-service
 item has been read or changed by this qualification lane.
 
 ### Phase 2 B1/B2/B3 (admitted, installed and owner-live-accepted)

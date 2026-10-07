@@ -4,6 +4,7 @@ import Combine
 import Darwin
 import Foundation
 import SwiftUI
+import XodusManagement
 
 @MainActor
 enum GameOperationChecks {
@@ -114,6 +115,7 @@ enum GameOperationChecks {
         try script(.gamePassStatus, """
             r="$1"; product="$2"; receipts='\(paths.processed.path)'
             printf '%s\\n' "$#" "$r" "$product" > '\(root.path)/gamepass-arguments'
+            printf '%s\\n' "$r" "$product" >> '\(root.path)/gamepass-calls'
             printf 'Neutral Game Pass check\\n' > '\(paths.logs.path)'/"$r.stderr.log"
             mode="$(cat '\(root.path)/mode')"
             if [ "$mode" = passslow ]; then sleep 0.3; fi
@@ -121,6 +123,10 @@ enum GameOperationChecks {
             if [ "$mode" = passmissing ]; then exit 9; fi
             if [ "$mode" = passmismatch ]; then printf '0\\n' | publish "$receipts/$r.status"; exit 3; fi
             case "$mode" in passfalse) active=false;; passnull) active=null;; passtype) active=1;; *) active=true;; esac
+            if [ "$mode" = passretry ] || [ "$mode" = passretrywrong ]; then
+                if [ "$product" = FIXTURE00002 ]; then active=null; fi
+            fi
+            if [ "$mode" = passretrywrong ] && [ "$product" = FIXTURE00003 ]; then product=OTHER0000001; fi
             if [ "$mode" = passwrongid ]; then product=OTHER0000001; fi
             printf '{"active":%s,"probeProductId":"%s","checkedAt":"2026-10-07T00:00:00Z","extra":1}\\n' "$active" "$product" | publish "$receipts/$r.result.json"
             printf '0\\n' | publish "$receipts/$r.status"
@@ -275,18 +281,30 @@ enum GameOperationChecks {
         check(operations.gamePassStatus == nil && operations.gamePassError == nil,
               "B5 removed cache clears prior subscription evidence")
         let probeID = "FIXTURE00002"
-        let discoveryIDs: Set<String> = [game.id, probeID]
-        check(GameOperationsController.gamePassProbe(discoveryIDs: discoveryIDs, ownedGames: [game]) == probeID
-              && GameOperationsController.gamePassProbe(discoveryIDs: discoveryIDs, ownedGames: nil) == nil
-              && GameOperationsController.gamePassProbe(discoveryIDs: [game.id], ownedGames: [game]) == nil,
+        func discoveryProduct(_ id: String, pc: Bool = true) throws -> CatalogProduct {
+            try JSONDecoder().decode(CatalogProduct.self, from: Data("""
+                {"productID":"\(id)","title":"Neutral game","market":"US","language":"en-US",
+                "source":"MicrosoftGamePassSigls:v3","checkedAt":"2026-10-07T00:00:00Z",
+                "freshness":"current","editions":[],"pcCatalogCandidate":\(pc),
+                "artwork":[],"artworkStatus":"absent"}
+                """.utf8))
+        }
+        let discoveryProducts = try [discoveryProduct(game.id), discoveryProduct(probeID)]
+        func probes(_ products: [CatalogProduct], cache: [String: GameCompatibilityResult] = [:]) -> [String] {
+            GameOperationsController.gamePassProbes(discoveryProducts: products, ownedGames: [game], compatibility: cache)
+        }
+        check(probes(discoveryProducts) == [probeID]
+              && GameOperationsController.gamePassProbes(discoveryProducts: discoveryProducts,
+                                                          ownedGames: nil, compatibility: [:]).isEmpty
+              && probes([discoveryProducts[0]]).isEmpty,
               "B5 probe requires loaded ownership and a loaded, valid, nonowned discovery ID")
-        operations.checkGamePass(discoveryIDs: discoveryIDs, ownedGames: nil)
+        operations.checkGamePass(discoveryProducts: discoveryProducts, ownedGames: nil)
         check(operations.gamePassError != nil
               && !FileManager.default.fileExists(atPath: root.appendingPathComponent("gamepass-arguments").path),
               "B5 missing ownership cannot launch a subscription probe")
         for mode in ["passactive", "passfalse", "passnull", "passwrongid", "passtype", "pass11", "passmissing", "passmismatch"] {
             try writeMode(mode)
-            operations.checkGamePass(discoveryIDs: discoveryIDs, ownedGames: [game])
+            operations.checkGamePass(discoveryProducts: discoveryProducts, ownedGames: [game])
             await operations.waitForMutation()
             if mode == "passactive" {
                 check(operations.gamePassActive && operations.gamePassStatus?.probeProductId == probeID
@@ -303,11 +321,11 @@ enum GameOperationChecks {
                   "B5 joined probe releases the one-mutation and normal-Quit fences")
         }
         try writeMode("passslow")
-        operations.checkGamePass(discoveryIDs: discoveryIDs, ownedGames: [game])
+        operations.checkGamePass(discoveryProducts: discoveryProducts, ownedGames: [game])
         check(operations.gamePassBusy && installed.mutationActive && !operations.canQuit
               && !operations.canStartMutation && !operations.canSignIn && !operations.canCancel,
               "B5 explicit probe reserves the existing fence and cannot be cancelled as an installation")
-        operations.checkGamePass(discoveryIDs: discoveryIDs, ownedGames: [game])
+        operations.checkGamePass(discoveryProducts: discoveryProducts, ownedGames: [game])
         await operations.loadGamePassCache()
         await operations.waitForMutation()
         let passArguments = try String(contentsOf: root.appendingPathComponent("gamepass-arguments"), encoding: .utf8)
@@ -315,6 +333,64 @@ enum GameOperationChecks {
         check(passArguments.count == 3 && passArguments[0] == "2"
               && GameScriptPaths.validRunID(passArguments[1]) && passArguments[2] == probeID && operations.gamePassActive,
               "B5 script receives only generated runID and nonowned Store ID; cache cannot race the probe")
+        let later = try discoveryProduct("FIXTURE00003")
+        let fallback = try discoveryProduct("FIXTURE00004", pc: false)
+        let fourth = try discoveryProduct("FIXTURE00005")
+        let ranked = [fallback, discoveryProducts[0], later, discoveryProducts[1], later, fourth]
+        check(probes(ranked) == [later.id, probeID, fourth.id, fallback.id],
+              "B5 PC candidates take precedence while preserving feed order and exact-ID deduplication")
+        for reason in ["No PC game package is available.", "This game's PACKAGE TYPE isn't supported on Mac yet."] {
+            let unsupported = GameCompatibilityResult(storeId: later.id, packageBytes: nil, supported: false,
+                reason: reason, checkedAt: "2026-10-07T00:00:00Z")
+            check(probes(ranked, cache: [later.id: unsupported]) == [probeID, fourth.id, fallback.id],
+                  "B5 cached no-PC-package and package-type failures are skipped, case insensitively")
+        }
+        let otherUnsupported = GameCompatibilityResult(storeId: later.id, packageBytes: nil, supported: false,
+            reason: "This game needs Xbox features Xodus can't provide.", checkedAt: "2026-10-07T00:00:00Z")
+        check(probes(ranked, cache: [later.id: otherUnsupported]).first == later.id,
+              "B5 an unrelated gameplay compatibility failure does not eliminate a licensing probe")
+        let retryProducts = [discoveryProducts[1], later, fourth, fallback]
+        for (mode, expectedIDs) in [
+            ("passretry", [probeID, later.id]), ("passfalse", [probeID]),
+            ("passnull", [probeID, later.id, fourth.id]), ("passretrywrong", [probeID, later.id])
+        ] {
+            try privateFile(root.appendingPathComponent("gamepass-calls"), "")
+            try writeMode(mode)
+            operations.checkGamePass(discoveryProducts: retryProducts, ownedGames: [game])
+            await operations.waitForMutation()
+            let calls = try String(contentsOf: root.appendingPathComponent("gamepass-calls"), encoding: .utf8)
+                .split(separator: "\n").map(String.init)
+            check(stride(from: 1, to: calls.count, by: 2).map { calls[$0] } == expectedIDs
+                  && Set(stride(from: 0, to: calls.count, by: 2).map { calls[$0] }).count == expectedIDs.count,
+                  "B5 null-only retries stop at three with distinct generated run IDs; false/errors do not retry")
+            check(mode == "passretry" ? operations.gamePassActive
+                  : mode == "passretrywrong" ? operations.gamePassError != nil && operations.gamePassStatus == nil
+                  : !operations.gamePassActive && operations.gamePassError == nil,
+                  "B5 each retry strictly matches its own probe ID; exhausted null remains Unknown")
+            check(operations.canQuit && !installed.mutationActive,
+                  "B5 the entire bounded retry operation releases its single mutation fence")
+        }
+        let excludedCache = try paths.compatibilityFile(productID: probeID)
+        try privateFile(excludedCache, """
+            {"storeId":"\(probeID)","packageBytes":null,"supported":false,
+            "reason":"No PC game package is available.","checkedAt":"2026-10-07T00:00:00Z"}
+            """)
+        try privateFile(root.appendingPathComponent("gamepass-calls"), "")
+        try writeMode("passactive")
+        operations.checkGamePass(discoveryProducts: retryProducts, ownedGames: [game])
+        await operations.waitForMutation()
+        check(operations.gamePassStatus?.probeProductId == later.id,
+              "B5 explicit Check reads strict disk compatibility before selection even without tile loading")
+        operations.checkGamePass(discoveryProducts: [discoveryProducts[1]], ownedGames: [game])
+        await operations.waitForMutation()
+        check(operations.gamePassStatus == nil && operations.gamePassError != nil && operations.canQuit,
+              "B5 no eligible cached probe is a visible no-script failure, never Active")
+        try privateFile(excludedCache, #"{"supported":false,"reason":"no PC game package"}"#)
+        operations.checkGamePass(discoveryProducts: discoveryProducts, ownedGames: [game])
+        await operations.waitForMutation()
+        check(operations.gamePassStatus?.probeProductId == probeID && operations.compatibilityErrors[probeID] != nil,
+              "B5 malformed compatibility cache cannot silently exclude a probe")
+        try FileManager.default.removeItem(at: excludedCache)
         let setupData = """
             {"ready":true,"items":[{"id":"crossover","title":"CrossOver","ready":true,"fix":null},
             {"id":"environment","title":"Game environment","ready":true,"fix":null},
@@ -335,6 +411,7 @@ enum GameOperationChecks {
             catch { check(true, "B8 malformed setup cannot become Ready") }
         }
         try writeMode("setupnotready")
+        try FileManager.default.removeItem(at: signed)
         operations.checkSetupOnce()
         operations.checkSetupOnce()
         await operations.waitForSetup()
@@ -345,11 +422,30 @@ enum GameOperationChecks {
               && operations.setupNeedsAttention && operations.setupResult?.items.count == 4
               && operations.setupError == nil && !installed.mutationActive,
               "B8 startup performs one readonly check, reports unready items and never starts Repair or sign-in")
+        try privateFile(signed, "")
+        try writeMode("setupready")
         operations.refreshService()
         operations.repairSetup()
         check(operations.serviceBusy && !operations.setupRepairing,
               "B8 Repair cannot race an in-flight game-service status read")
         await operations.waitForService()
+        await operations.waitForSetup()
+        check(operations.serviceStatus?.signedIn == true && operations.setupResult?.needsSignIn == false
+              && !operations.setupNeedsAttention,
+              "B8 successful Check game sign-in refreshes Setup items and clears a stale setup banner")
+        let concurrentSetup = GameOperationsController(installed: installed, paths: paths)
+        let setupCallsBefore = try String(contentsOf: root.appendingPathComponent("setup-arguments"), encoding: .utf8)
+            .split(separator: "\n").count
+        try writeMode("setupslow")
+        concurrentSetup.checkSetupOnce()
+        concurrentSetup.refreshService()
+        await concurrentSetup.waitForService()
+        await concurrentSetup.waitForSetup()
+        let setupCallsAfter = try String(contentsOf: root.appendingPathComponent("setup-arguments"), encoding: .utf8)
+            .split(separator: "\n").count
+        check(setupCallsAfter == setupCallsBefore + 6 && concurrentSetup.setupResult?.needsSignIn == false
+              && !concurrentSetup.setupBusy && !concurrentSetup.setupNeedsAttention,
+              "B8 service success during an existing Setup check queues exactly one fresh readonly follow-up")
         try writeMode("setupslow")
         operations.repairSetup()
         check(operations.setupRepairing && installed.runtimeRepairActive && installed.mutationActive

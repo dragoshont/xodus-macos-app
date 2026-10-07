@@ -2,6 +2,7 @@
 import AppKit
 import Combine
 import Foundation
+import XodusManagement
 
 struct GameInstallConsent: Identifiable, Sendable {
     let id = UUID()
@@ -61,6 +62,7 @@ final class GameOperationsController: ObservableObject {
     private var gamePassGeneration = 0
     private var setupTask: Task<Void, Never>?
     private var setupCheckedOnce = false
+    private var setupRefreshPending = false
     private var restored = false
     private var terminating = false
     private var installedObservation: AnyCancellable?
@@ -144,6 +146,7 @@ final class GameOperationsController: ObservableObject {
                 guard outcome.code == 0, let data = outcome.result else { throw GameScriptError.failed(outcome.code) }
                 serviceStatus = try GameServiceStatus.parse(data)
                 serviceLog = nil
+                if serviceStatus?.signedIn == true, setupCheckedOnce { refreshSetup() }
             } catch {
                 guard !terminating else { return }
                 serviceStatus = nil
@@ -188,9 +191,22 @@ final class GameOperationsController: ObservableObject {
         }
     }
 
-    nonisolated static func gamePassProbe(discoveryIDs: Set<String>, ownedGames: [PCGame]?) -> String? {
-        guard let ownedGames else { return nil }
-        return discoveryIDs.subtracting(ownedGames.map(\.id)).filter(PCGamesClient.validProductID).sorted().first
+    nonisolated static func gamePassProbes(discoveryProducts: [CatalogProduct], ownedGames: [PCGame]?,
+                                           compatibility: [String: GameCompatibilityResult]) -> [String] {
+        guard let ownedGames else { return [] }
+        let ownedIDs = Set(ownedGames.map(\.id))
+        var seen = Set<String>()
+        let candidates = discoveryProducts.filter { product in
+            guard PCGamesClient.validProductID(product.id), !ownedIDs.contains(product.id),
+                  seen.insert(product.id).inserted else { return false }
+            if let cached = compatibility[product.id], !cached.supported, let reason = cached.reason {
+                let reason = reason.lowercased()
+                if reason.contains("no pc game package") || reason.contains("package type") { return false }
+            }
+            return true
+        }
+        return candidates.filter(\.pcCatalogCandidate).map(\.id)
+            + candidates.filter { !$0.pcCatalogCandidate }.map(\.id)
     }
 
     func loadGamePassCache() async {
@@ -217,9 +233,11 @@ final class GameOperationsController: ObservableObject {
         }
     }
 
-    func checkGamePass(discoveryIDs: Set<String>, ownedGames: [PCGame]?) {
+    func checkGamePass(discoveryProducts: [CatalogProduct], ownedGames: [PCGame]?) {
         guard canStartMutation, installConsent == nil, uninstallConsent == nil else { return }
-        guard let productID = Self.gamePassProbe(discoveryIDs: discoveryIDs, ownedGames: ownedGames) else {
+        let candidates = Self.gamePassProbes(discoveryProducts: discoveryProducts, ownedGames: ownedGames,
+                                            compatibility: [:])
+        guard !candidates.isEmpty else {
             gamePassError = "Load Discover and your PC library to check PC Game Pass."
             return
         }
@@ -230,7 +248,7 @@ final class GameOperationsController: ObservableObject {
         gamePassError = nil
         gamePassLog = nil
         gamePassFailureCode = nil
-        let runID = InstalledGamesController.runID()
+        var runID = InstalledGamesController.runID()
         gamePassTask = Task {
             defer {
                 gamePassBusy = false
@@ -238,14 +256,29 @@ final class GameOperationsController: ObservableObject {
                 installed.releaseMutation()
             }
             do {
-                let outcome = try await mutationRunner.run(command: .gamePassStatus, runID: runID, arguments: [productID])
-                gamePassLog = outcome.log
-                guard outcome.code == 0, let data = outcome.result else {
-                    gamePassFailureCode = outcome.code
-                    throw GameScriptError.failed(outcome.code)
+                for productID in candidates { await loadCompatibility(productID: productID) }
+                guard !terminating else { return }
+                let probes = Self.gamePassProbes(discoveryProducts: discoveryProducts, ownedGames: ownedGames,
+                                                compatibility: compatibility)
+                guard !probes.isEmpty else {
+                    gamePassStatus = nil
+                    gamePassFromCache = false
+                    gamePassError = "No suitable PC game is loaded to check PC Game Pass. Browse more games in Discover."
+                    return
                 }
-                gamePassStatus = try GamePassStatusResult.parse(data, productID: productID)
-                gamePassFromCache = false
+                for productID in probes.prefix(3) {
+                    runID = InstalledGamesController.runID()
+                    let outcome = try await mutationRunner.run(command: .gamePassStatus, runID: runID, arguments: [productID])
+                    gamePassLog = outcome.log
+                    guard outcome.code == 0, let data = outcome.result else {
+                        gamePassFailureCode = outcome.code
+                        throw GameScriptError.failed(outcome.code)
+                    }
+                    let result = try GamePassStatusResult.parse(data, productID: productID)
+                    gamePassStatus = result
+                    gamePassFromCache = false
+                    if result.active != nil || terminating { break }
+                }
             } catch {
                 gamePassStatus = nil
                 gamePassFromCache = false
@@ -285,13 +318,24 @@ final class GameOperationsController: ObservableObject {
     }
 
     private func refreshSetup() {
-        guard !setupBusy, !terminating else { return }
+        guard !terminating else { return }
+        if setupBusy {
+            if !setupRepairing { setupRefreshPending = true }
+            return
+        }
         setupBusy = true
         setupError = nil
         setupLog = nil
         let runID = InstalledGamesController.runID()
         setupTask = Task {
-            defer { setupBusy = false; setupTask = nil }
+            defer {
+                setupBusy = false
+                setupTask = nil
+                if setupRefreshPending {
+                    setupRefreshPending = false
+                    refreshSetup()
+                }
+            }
             do {
                 let outcome = try await setupRunner.run(command: .setup, runID: runID, arguments: ["check"])
                 setupLog = outcome.log
@@ -580,7 +624,9 @@ final class GameOperationsController: ObservableObject {
         await setupTask?.value
     }
     func waitForService() async { await serviceTask?.value }
-    func waitForSetup() async { await setupTask?.value }
+    func waitForSetup() async {
+        while let task = setupTask { await task.value }
+    }
     func beginTermination() { terminating = true }
     func resumeAfterTerminationRefusal() { terminating = false }
 
