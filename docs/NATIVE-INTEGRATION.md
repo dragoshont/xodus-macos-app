@@ -4,7 +4,103 @@ This is implementation work beyond the immutable foundation at `44d7338`. It is 
 
 ## Local imported-game Play
 
-### Phase 2 B1/B2/B3 (source candidate; no installed/live claim)
+### Phase 2 B5/B7/B8/B9 (source qualified; no package/installed/live claim)
+
+Account reads the private `compatibility/gamepass.json` cache with the existing
+0600/current-user/regular-file/no-symlink/64 KiB policy. Its minimal
+`{"active":true}` shape is supported; required active is boolean/null, never an
+integer/string/missing value. Optional probe/time metadata must parse if present.
+Missing, malformed and removed cache cannot become current subscription access.
+Saved cache provenance is visible. There is no subscription end date.
+
+Explicit Check chooses only a validated loaded Discover ID outside the loaded
+S4 owned set; no loaded ownership or eligible candidate means no probe.
+`private-xodus-gamepass-status.sh <generatedRunId> <productId>` shares the
+mutation fence and requires matching terminal status/process exit plus a strict
+result with boolean/null active, exact probeProductId and ISO checkedAt.
+Unknown/failure removes active access and exposes product recovery/Show log.
+Sign-in-required can invoke the existing explicit service sign-in; replacing
+game-service sign-in clears prior in-memory subscription evidence.
+
+Active status shows a distinct Library Game Pass shelf after Your PC games.
+The source is the same validated public Discover feed, retained across Store
+searches, bounded to 512 products and discarded on scope/revision/disconnect.
+Eligible Discover and shelf tiles share B3 check, protected consent, install
+validation and exact Installed Play matching. No ownership comes from that
+shelf. Inactive/Unknown Discover retains Included with PC Game Pass without an
+Install action. The private backend gates actual licences/installation;
+cached status and feed membership are not independent title-license receipts.
+The owner's B4 licensing and Abiotic gameplay findings are backend evidence,
+not acceptance of this app candidate.
+
+B9 invokes only `private-xodus-stop.sh <generatedRunId> <launchedStoreId>` for
+the one live session launched by Xodus. No process scan or unrelated-game kill
+is added. It reserves the existing mutation fence; the shared Installed,
+Continue Playing and exact matching-tile Play control becomes Stop, disabled
+with Stopping during the request. The script result must have the exact StoreId
+and stopped true. Code 21, false/mismatched result, missing/conflicting status
+or unsafe receipt is a visible failure with Show log, not Stopped.
+The launcher may exit before the script publishes its receipt; classification
+is held until confirmation. A confirmed requested Stop suppresses every
+launcher exit code, displays Stopped and retains the ordinary durable start /
+measured duration. Quit refuses to orphan an in-flight stop, but otherwise
+still leaves ordinary gameplay running. Both new script commands have a
+120-second observation deadline; installation still has no deadline.
+
+B7 changes only the fixed script directory to
+`~/Library/Application Support/Xodus/Runtime/scripts/macos`. Receipt, log,
+game, compatibility-cache, journal and registered launcher paths are unchanged.
+The owner assembles and installs that self-contained runtime separately;
+no engine, inventory, private scripts or game DLLs are bundled by this change.
+The admitted signed C8 engine remains byte-for-byte unchanged.
+
+B8 invokes only `private-xodus-setup.sh <generatedRunId> check|repair`, using
+the same private receipts, matching process exit/status and 120-second deadline.
+Ready is strictly boolean; items must contain exactly one crossover,
+environment, service and signin entry with bounded title/fix text and boolean
+readiness. Overall ready does not imply game sign-in. Unknown extra fields
+are ignored, while malformed required data and code 31 are visible errors.
+One read-only startup check runs once per app process, without Repair or
+sign-in. Reported unready/error state supplies a single Setup banner. Its
+focused Account route does not read unrelated launcher credentials.
+
+Explicit Repair Xodus uses the mutation fence, refuses tracked running games
+and pending consent, blocks every Play while repairing, and joins before
+normal Quit. Game-service status reads cannot race Repair in either direction.
+The owner confirms generated launcher files are rewritten in place; legacy
+launchers and the installed registry are untouched. Repair creates the shared
+XodusGameTemplate only when missing, starts the service only when absent, and
+creates an absent title environment from that template; it never rebuilds an
+existing title environment or touches saves. Both installed Runtime and dev
+scripts refuse Repair with code 22 when any launch/download process exists,
+including sessions outside the current app's tracker; check never refuses.
+The owner verified refusal with a running process and success while idle.
+The app displays Quit the running game or finish the download first.
+These are private-backend contract/evidence, not neutral app observations.
+The app only revalidates
+existing launcher availability, never invents or persists replacement paths.
+Successful explicit service sign-in refreshes Setup after the startup check.
+
+Unsupported Install/Repair consent no longer shows unknown download size or
+generic future-download copy. Supported consent retains the real packageBytes
+download size when supplied. Public detail directs eligible actions to Library
+or Discover without promoting its edition metadata to ownership or an installed
+edition.
+
+Mac network-denied qualification passed 2,978 management checks, 812 native
+session checks, 75 presentation checks and 29 portable packaging checks, plus
+shipping-debug compilation. Setup tests cover strict four-item parsing,
+exact check/repair arguments, once-only startup, mutual service-read/repair
+fences, code 22/31 and unsafe/missing/conflicting receipts, all-game launch
+blocking and byte-identical registry/history. Game Pass tests cover cache
+types/privacy/removal, nonowned probe selection, strict result/status and
+single-mutation fences. Stop tests cover both receipt/exit orderings, a nonzero
+launcher exit, code 21/retry, false/mismatched/missing/conflicting results
+and session persistence. These are bounded fake scripts and fake sessions only.
+No live private script, sign-in, licence probe, game operation or installed-app
+replacement is authorized from this implementation lane.
+
+### Phase 2 B1/B2/B3 (admitted, installed and owner-live-accepted)
 
 The owner-directed batch fixes PC Game Pass discovery, adds loaded-owned-first
 search and integrates the private package-support check without changing C8.
@@ -51,10 +147,38 @@ single-check fencing and cancellation. Mac network-denied qualification passed
 29 portable packaging checks, plus shipping-debug compilation. The final
 removed-cache regression passed in the 104-check focused operation suite with
 another successful shipping-debug build. These are synthetic checks only.
-Exact-source CI, independent source/package admission and owner live acceptance
-remain pending. The installed accepted `1463cdb` runtime is untouched. B5's
-subscription status and Game Pass shelf are agreed as the next package, not
-part of this candidate; no subscription expiry is inferred.
+Root source review was GREEN at `7c3c1f0` / tree `459a6012`.
+[Exact-source CI 37668302715](https://github.com/dragoshont/xodus-macos-app/actions/runs/37668302715)
+completed successfully at the full frozen head. Signed package `UcVKTf` contains
+21 files, verifies strict signatures and actual fixed-certificate leaf
+requirements, and preserves admitted C8 byte-for-byte. Its private receipt is
+15,182 bytes, SHA256
+`928e090219bfacd2a11212890a7bd8765f950c33f91f1ecf66c2fab02b241c4e`.
+Root independently admitted the combined package, freshly confirmed no game/
+launch/stream process and authorized normal Quit. Replacement retained the
+complete `1463cdb` rollback and untouched profile. All 21 installed files and
+strict signatures matched admission; the installed list stayed byte-identical
+with 0600 permissions through one ordinary Library reopen. No game operation
+or authentication was automated by this deployment lane.
+
+Root closed live acceptance on `7c3c1f0`: Discover showed 16 real-art PC
+Game Pass titles including A Way Out and Age of Empires II; Lara and Hogwarts
+search showed Owned with Play, while Celeste showed Owned with Install. Celeste
+support check displayed its exact unsupported reason with Install disabled.
+Those title/flow observations are not general gameplay certification.
+B5/B7/B8/B9 is the next separate package, excluded from this frozen source
+and artifact.
+
+### B6 app-owned Keychain follow-up (approved, not implemented here)
+
+The separate next package is timeboxed to 2.5 hours of B6 work: explicit
+ACL/partition policy anchored on the fixed-certificate designated requirement,
+plus migration of the existing Xodus Library item. One human authorization is
+acceptable and must be introduced as Xodus needs one-time Keychain approval.
+Qualification requires two differently signed synthetic builds; only qualified
+scope may freeze at the timebox, with the rest reported explicitly. The
+Xodus Service item remains outside this app lane. This candidate does not
+change live items, claim prompt-free access or weaken the signing requirement.
 
 ### S3/S5/S6 game operations (admitted, installed and live-accepted)
 

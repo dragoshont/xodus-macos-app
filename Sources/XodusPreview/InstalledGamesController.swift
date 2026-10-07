@@ -19,15 +19,21 @@ final class InstalledGamesController: ObservableObject {
     @Published private(set) var playErrors: [UUID: String] = [:]
     @Published private(set) var historyError: String?
     @Published private(set) var playLogs: [UUID: URL] = [:]
+    @Published private(set) var playNotices: [UUID: String] = [:]
+    @Published private(set) var stoppingGameID: UUID?
+    @Published private(set) var launchStarted = false
     @Published private(set) var launchableIDs: Set<UUID> = []
     @Published private(set) var mutationGameID: UUID?
     @Published private(set) var mutationActive = false
     @Published var serviceSignInActive = false
+    @Published var runtimeRepairActive = false
     var applicationTerminating = false
     private let store: InstalledGameStore
     private let launchingDuration: Duration
     private var playingTask: Task<Void, Never>?
     private var runToken: UUID?
+    private var stopToken: UUID?
+    private var stopConfirmed = false
     private var process: Process?
     private var sessionPersistence: Task<Void, Never>?
     private var runIDs: [UUID: String] = [:]
@@ -143,8 +149,8 @@ final class InstalledGamesController: ObservableObject {
     }
 
     func play(_ game: InstalledGame) async {
-        guard loaded, !editing, !choosing, runningGameID == nil, !applicationTerminating,
-              mutationGameID != game.id, !serviceSignInActive,
+        guard loaded, !editing, !choosing, runningGameID == nil, stoppingGameID == nil, !applicationTerminating,
+              mutationGameID != game.id, !serviceSignInActive, !runtimeRepairActive,
               games.contains(game) else { return }
         let token = UUID()
         runToken = token
@@ -152,6 +158,7 @@ final class InstalledGamesController: ObservableObject {
         playState = .launching
         playErrors[game.id] = nil
         playLogs[game.id] = nil
+        playNotices[game.id] = nil
         do {
             let environment = Self.launchEnvironment(ProcessInfo.processInfo.environment)
             let runID = Self.runID()
@@ -175,8 +182,8 @@ final class InstalledGamesController: ObservableObject {
                     Task { @MainActor [weak self] in
                         guard let self, self.runToken == token else { return }
                         self.recordSession(gameID: game.id, startedAt: startedAt, seconds: max(0, seconds))
-                        self.finished(token: token, gameID: game.id, status: status)
-                        if status != 0 { await self.findSessionLog(gameID: game.id, runID: runID) }
+                        let unexpected = self.finished(token: token, gameID: game.id, status: status)
+                        if unexpected { await self.findSessionLog(gameID: game.id, runID: runID) }
                     }
                 }
                 try child.run()
@@ -185,6 +192,7 @@ final class InstalledGamesController: ObservableObject {
             // A short-lived script can exit before the off-main launch returns.
             guard runToken == token else { return }
             process = child.0
+            launchStarted = true
             recordSession(gameID: game.id, startedAt: child.1, seconds: nil)
             playingTask = Task { [weak self] in
                 guard let self else { return }
@@ -202,15 +210,62 @@ final class InstalledGamesController: ObservableObject {
         }
     }
 
-    private func finished(token: UUID, gameID: UUID, status: Int32) {
-        guard runToken == token else { return }
+    @discardableResult private func finished(token: UUID, gameID: UUID, status: Int32) -> Bool {
+        guard runToken == token else { return false }
         playingTask?.cancel()
         playingTask = nil
         process = nil
         runToken = nil
         runningGameID = nil
         playState = nil
+        launchStarted = false
+        if stopToken == token {
+            // The launcher can exit before the stop script publishes its final receipt.
+            if stopConfirmed {
+                playNotices[gameID] = "Stopped"
+                stopToken = nil
+                stoppingGameID = nil
+            }
+            return false
+        }
         if status != 0 { playErrors[gameID] = "The game stopped unexpectedly (code \(status))." }
+        return status != 0
+    }
+
+    func canStop(_ game: InstalledGame) -> Bool {
+        loaded && !editing && !choosing && !mutationActive && !serviceSignInActive
+            && !applicationTerminating && stoppingGameID == nil && runningGameID == game.id
+            && launchStarted && process?.isRunning == true && games.contains(where: {
+                $0.id == game.id && $0.storeId == game.storeId && $0.launcher == game.launcher
+            })
+    }
+
+    func reserveStop(_ game: InstalledGame) throws -> UUID {
+        guard canStop(game), let token = runToken else { throw GameScriptError.busy }
+        mutationActive = true
+        mutationGameID = game.id
+        stoppingGameID = game.id
+        stopToken = token
+        stopConfirmed = false
+        playErrors[game.id] = nil
+        playLogs[game.id] = nil
+        playNotices[game.id] = nil
+        return token
+    }
+
+    func completeStop(token: UUID, gameID: UUID, error: String?, log: URL?) {
+        guard stopToken == token, stoppingGameID == gameID else { return }
+        stopConfirmed = error == nil
+        if let error {
+            playErrors[gameID] = error
+            playLogs[gameID] = log
+        } else if runToken != token {
+            playNotices[gameID] = "Stopped"
+        }
+        if error != nil || runToken != token {
+            stopToken = nil
+            stoppingGameID = nil
+        }
     }
 
     private func recordSession(gameID: UUID, startedAt: Date, seconds: Double?) {
@@ -240,6 +295,11 @@ final class InstalledGamesController: ObservableObject {
     }
 
     func waitForSessionPersistence() async { await sessionPersistence?.value }
+
+    func refreshAfterSetupRepair() async {
+        guard mutationActive, runtimeRepairActive else { return }
+        await refreshLaunchableGames()
+    }
 
     func reserveMutation(gameID: UUID?) throws {
         guard loaded, !editing, !choosing, !mutationActive, !serviceSignInActive, !applicationTerminating,

@@ -46,6 +46,14 @@ enum GameOperationChecks {
             throw GameScriptError.timeout
         }
         let runID = InstalledGamesController.runID()
+        let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+        let production = GameScriptPaths.production
+        check(production.scripts == home.appendingPathComponent("Library/Application Support/Xodus/Runtime/scripts/macos")
+              && production.processed == home.appendingPathComponent("Library/Application Support/XodusRemote/processed")
+              && production.logs == home.appendingPathComponent("Library/Logs/XodusRemote")
+              && production.games == home.appendingPathComponent("Games/Xodus")
+              && production.journal == home.appendingPathComponent("Library/Application Support/Xodus/game-operation.json"),
+              "B7 changes only the fixed script directory; receipts, logs, games and journal stay unchanged")
         check(GameScriptPaths.validRunID(runID), "S3/S5/S6 run IDs use the existing generated-only contract")
         for value in ["../status", "xodus-20260101T010101Z-AAAAAAAA", runID + "/../other", "custom-run"] {
             do { _ = try paths.receipt(value, suffix: "status"); check(false, "Receipt paths reject nongenerated IDs") }
@@ -103,6 +111,56 @@ enum GameOperationChecks {
             printf '{"storeId":"%s","packageBytes":3200000000,"supported":%s,"reason":%s,"checkedAt":"2026-10-07T00:00:00Z","extra":"ignored"}\\n' "$product" "$supported" "$reason" | publish "$receipts/$r.result.json"
             printf '0\\n' | publish "$receipts/$r.status"
             """)
+        try script(.gamePassStatus, """
+            r="$1"; product="$2"; receipts='\(paths.processed.path)'
+            printf '%s\\n' "$#" "$r" "$product" > '\(root.path)/gamepass-arguments'
+            printf 'Neutral Game Pass check\\n' > '\(paths.logs.path)'/"$r.stderr.log"
+            mode="$(cat '\(root.path)/mode')"
+            if [ "$mode" = passslow ]; then sleep 0.3; fi
+            if [ "$mode" = pass11 ]; then printf '11\\n' | publish "$receipts/$r.status"; exit 11; fi
+            if [ "$mode" = passmissing ]; then exit 9; fi
+            if [ "$mode" = passmismatch ]; then printf '0\\n' | publish "$receipts/$r.status"; exit 3; fi
+            case "$mode" in passfalse) active=false;; passnull) active=null;; passtype) active=1;; *) active=true;; esac
+            if [ "$mode" = passwrongid ]; then product=OTHER0000001; fi
+            printf '{"active":%s,"probeProductId":"%s","checkedAt":"2026-10-07T00:00:00Z","extra":1}\\n' "$active" "$product" | publish "$receipts/$r.result.json"
+            printf '0\\n' | publish "$receipts/$r.status"
+            """)
+        try script(.stop, """
+            r="$1"; product="$2"; receipts='\(paths.processed.path)'
+            printf '%s\\n' "$#" "$r" "$product" > '\(root.path)/stop-arguments'
+            printf 'Neutral Stop log\\n' > '\(paths.logs.path)'/"$r.stderr.log"
+            mode="$(cat '\(root.path)/mode')"
+            if [ "$mode" = stop21 ]; then printf '21\\n' | publish "$receipts/$r.status"; exit 21; fi
+            kill -TERM "$(cat '\(root.path)/launcher-pid')" || exit 22
+            if [ "$mode" = stopafter ]; then sleep 0.4; fi
+            if [ "$mode" = stopmissing ]; then exit 9; fi
+            if [ "$mode" = stopmismatch ]; then printf '0\\n' | publish "$receipts/$r.status"; exit 3; fi
+            stopped=true
+            if [ "$mode" = stopfalse ]; then stopped=false; fi
+            if [ "$mode" = stopwrongid ]; then product=OTHER0000001; fi
+            printf '{"storeId":"%s","stopped":%s,"extra":1}\\n' "$product" "$stopped" | publish "$receipts/$r.result.json"
+            printf '0\\n' | publish "$receipts/$r.status"
+            """)
+        try script(.setup, """
+            r="$1"; action="$2"; receipts='\(paths.processed.path)'
+            printf '%s\\n' "$#" "$r" "$action" >> '\(root.path)/setup-arguments'
+            printf 'Neutral setup log\\n' > '\(paths.logs.path)'/"$r.stderr.log"
+            mode="$(cat '\(root.path)/mode')"
+            if [ "$mode" = setupslow ]; then sleep 0.3; fi
+            if [ "$mode" = setup31 ]; then printf '31\\n' | publish "$receipts/$r.status"; exit 31; fi
+            if [ "$mode" = setup22 ]; then printf '22\\n' | publish "$receipts/$r.status"; exit 22; fi
+            if [ "$mode" = setupmissing ]; then exit 9; fi
+            if [ "$mode" = setupmismatch ]; then printf '0\\n' | publish "$receipts/$r.status"; exit 3; fi
+            if [ "$mode" = setupbad ]; then
+                printf '{"ready":true,"items":[]}\\n' | publish "$receipts/$r.result.json"
+            else
+                ready=true; environment=true; fix=null
+                if [ "$mode" = setupnotready ]; then ready=false; environment=false; fix='"Repair the game environment."'; fi
+                if [ -f '\(signed.path)' ]; then signin=true; signinfix=null; else signin=false; signinfix='"Sign in for games."'; fi
+                printf '{"ready":%s,"items":[{"id":"crossover","title":"CrossOver","ready":true,"fix":null},{"id":"environment","title":"Game environment","ready":%s,"fix":%s},{"id":"service","title":"Game service","ready":true,"fix":null},{"id":"signin","title":"Game sign-in","ready":%s,"fix":%s}],"extra":1}\\n' "$ready" "$environment" "$fix" "$signin" "$signinfix" | publish "$receipts/$r.result.json"
+            fi
+            printf '0\\n' | publish "$receipts/$r.status"
+            """)
         let launcher = root.appendingPathComponent("fixture launcher.sh")
         try privateFile(launcher, "#!/bin/bash\nsleep 1\nexit 0\n", mode: 0o700)
         try script(.install, """
@@ -146,7 +204,9 @@ enum GameOperationChecks {
         let installed = InstalledGamesController(store: store, launchingDuration: .milliseconds(50))
         let operations = GameOperationsController(installed: installed, paths: paths)
         check(operations.serviceStatus == nil && !operations.serviceBusy && operations.operation == nil
-              && !FileManager.default.fileExists(atPath: paths.journal.path),
+              && operations.gamePassStatus == nil && !operations.gamePassActive
+              && installed.stoppingGameID == nil && operations.setupResult == nil && !operations.setupBusy
+              && !operations.setupNeedsAttention && !FileManager.default.fileExists(atPath: paths.journal.path),
               "S3/S5/S6 construction performs no script, credential or journal I/O")
         await installed.load()
         var installedNotifications = 0
@@ -191,6 +251,141 @@ enum GameOperationChecks {
         try FileManager.default.createDirectory(at: paths.compatibility, withIntermediateDirectories: false,
                                                 attributes: [.posixPermissions: 0o700])
         let cached = try paths.compatibilityFile(productID: game.id)
+        for (text, expected) in [(#"{"active":true}"#, Optional(true)), (#"{"active":false}"#, Optional(false)),
+                                 (#"{"active":null}"#, Optional<Bool>.none)] {
+            try privateFile(paths.gamePassStatus, text)
+            await operations.loadGamePassCache()
+            check(operations.gamePassStatus?.active == expected && operations.gamePassFromCache
+                  && operations.gamePassError == nil && operations.gamePassActive == (expected == true),
+                  "B5 minimal private cache distinguishes Active, Not active and Unknown without a script")
+        }
+        for text in ["{}", #"{"active":1}"#, #"{"active":true,"checkedAt":"invalid"}"#,
+                     #"{"active":true,"probeProductId":"../escape"}"#] {
+            try privateFile(paths.gamePassStatus, text)
+            await operations.loadGamePassCache()
+            check(!operations.gamePassActive && operations.gamePassStatus == nil && operations.gamePassError != nil,
+                  "B5 malformed cache is explicit Unknown, never subscription access")
+        }
+        try privateFile(paths.gamePassStatus, #"{"active":true}"#, mode: 0o644)
+        await operations.loadGamePassCache()
+        check(!operations.gamePassActive && operations.gamePassError != nil,
+              "B5 nonprivate cache cannot authorize Game Pass Install")
+        try FileManager.default.removeItem(at: paths.gamePassStatus)
+        await operations.loadGamePassCache()
+        check(operations.gamePassStatus == nil && operations.gamePassError == nil,
+              "B5 removed cache clears prior subscription evidence")
+        let probeID = "FIXTURE00002"
+        let discoveryIDs: Set<String> = [game.id, probeID]
+        check(GameOperationsController.gamePassProbe(discoveryIDs: discoveryIDs, ownedGames: [game]) == probeID
+              && GameOperationsController.gamePassProbe(discoveryIDs: discoveryIDs, ownedGames: nil) == nil
+              && GameOperationsController.gamePassProbe(discoveryIDs: [game.id], ownedGames: [game]) == nil,
+              "B5 probe requires loaded ownership and a loaded, valid, nonowned discovery ID")
+        operations.checkGamePass(discoveryIDs: discoveryIDs, ownedGames: nil)
+        check(operations.gamePassError != nil
+              && !FileManager.default.fileExists(atPath: root.appendingPathComponent("gamepass-arguments").path),
+              "B5 missing ownership cannot launch a subscription probe")
+        for mode in ["passactive", "passfalse", "passnull", "passwrongid", "passtype", "pass11", "passmissing", "passmismatch"] {
+            try writeMode(mode)
+            operations.checkGamePass(discoveryIDs: discoveryIDs, ownedGames: [game])
+            await operations.waitForMutation()
+            if mode == "passactive" {
+                check(operations.gamePassActive && operations.gamePassStatus?.probeProductId == probeID
+                      && operations.gamePassError == nil && !operations.gamePassFromCache,
+                      "B5 validated live receipt alone refreshes Active")
+            } else if mode == "passfalse" || mode == "passnull" {
+                check(!operations.gamePassActive && operations.gamePassError == nil,
+                      "B5 inactive/unknown receipt disables subscription access without inventing expiry")
+            } else {
+                check(!operations.gamePassActive && operations.gamePassError != nil && operations.gamePassLog != nil,
+                      "B5 wrong identity/type/status or failed probe yields Unknown and Show log")
+            }
+            check(!installed.mutationActive && operations.canQuit,
+                  "B5 joined probe releases the one-mutation and normal-Quit fences")
+        }
+        try writeMode("passslow")
+        operations.checkGamePass(discoveryIDs: discoveryIDs, ownedGames: [game])
+        check(operations.gamePassBusy && installed.mutationActive && !operations.canQuit
+              && !operations.canStartMutation && !operations.canSignIn && !operations.canCancel,
+              "B5 explicit probe reserves the existing fence and cannot be cancelled as an installation")
+        operations.checkGamePass(discoveryIDs: discoveryIDs, ownedGames: [game])
+        await operations.loadGamePassCache()
+        await operations.waitForMutation()
+        let passArguments = try String(contentsOf: root.appendingPathComponent("gamepass-arguments"), encoding: .utf8)
+            .split(separator: "\n").map(String.init)
+        check(passArguments.count == 3 && passArguments[0] == "2"
+              && GameScriptPaths.validRunID(passArguments[1]) && passArguments[2] == probeID && operations.gamePassActive,
+              "B5 script receives only generated runID and nonowned Store ID; cache cannot race the probe")
+        let setupData = """
+            {"ready":true,"items":[{"id":"crossover","title":"CrossOver","ready":true,"fix":null},
+            {"id":"environment","title":"Game environment","ready":true,"fix":null},
+            {"id":"service","title":"Game service","ready":true,"fix":null},
+            {"id":"signin","title":"Game sign-in","ready":false,"fix":"Sign in for games."}],"extra":1}
+            """
+        let setup = try GameSetupResult.parse(Data(setupData.utf8))
+        check(setup.ready && setup.needsSignIn && setup.orderedItems.map(\.id) == GameSetupResult.Item.ID.allCases,
+              "B8 setup readiness and sign-in stay independent; every required item is displayed in stable order")
+        for invalid in [
+            setupData.replacingOccurrences(of: "\"id\":\"environment\"", with: "\"id\":\"crossover\""),
+            setupData.replacingOccurrences(of: "\"id\":\"service\"", with: "\"id\":\"unknown\""),
+            setupData.replacingOccurrences(of: "\"ready\":true", with: "\"ready\":1"),
+            setupData.replacingOccurrences(of: "\"title\":\"CrossOver\"", with: "\"title\":\"\""),
+            #"{"ready":true,"items":[]}"#
+        ] {
+            do { _ = try GameSetupResult.parse(Data(invalid.utf8)); check(false, "B8 malformed setup cannot become Ready") }
+            catch { check(true, "B8 malformed setup cannot become Ready") }
+        }
+        try writeMode("setupnotready")
+        operations.checkSetupOnce()
+        operations.checkSetupOnce()
+        await operations.waitForSetup()
+        let firstSetupArguments = try String(contentsOf: root.appendingPathComponent("setup-arguments"), encoding: .utf8)
+            .split(separator: "\n").map(String.init)
+        check(firstSetupArguments.count == 3 && firstSetupArguments[0] == "2"
+              && GameScriptPaths.validRunID(firstSetupArguments[1]) && firstSetupArguments[2] == "check"
+              && operations.setupNeedsAttention && operations.setupResult?.items.count == 4
+              && operations.setupError == nil && !installed.mutationActive,
+              "B8 startup performs one readonly check, reports unready items and never starts Repair or sign-in")
+        operations.refreshService()
+        operations.repairSetup()
+        check(operations.serviceBusy && !operations.setupRepairing,
+              "B8 Repair cannot race an in-flight game-service status read")
+        await operations.waitForService()
+        try writeMode("setupslow")
+        operations.repairSetup()
+        check(operations.setupRepairing && installed.runtimeRepairActive && installed.mutationActive
+              && !operations.canQuit && !operations.canStartMutation && !operations.canSignIn,
+              "B8 explicit Repair reserves the shared mutation, all-game launch, service restart and Quit fences")
+        operations.refreshService()
+        check(!operations.serviceBusy, "B8 game-service reads cannot race an environment rebuild")
+        operations.repairSetup()
+        await operations.waitForSetup()
+        check(operations.setupResult?.ready == true && !operations.setupNeedsAttention
+              && !installed.runtimeRepairActive && !installed.mutationActive && operations.canQuit,
+              "B8 joined Repair reports only its strict readiness result and releases all fences")
+        for mode in ["setup22", "setup31", "setupbad", "setupmissing", "setupmismatch"] {
+            try writeMode(mode)
+            operations.repairSetup()
+            await operations.waitForSetup()
+            check(operations.setupError != nil && operations.setupLog != nil && operations.setupNeedsAttention
+                  && operations.setupResult == nil && !installed.runtimeRepairActive && operations.canQuit,
+                  "B8 code22/31 or invalid/missing/conflicting receipt cannot claim Ready and exposes Show log")
+            if mode == "setup22" {
+                check(operations.setupError == "Quit the running game or finish the download first.",
+                      "B8 backend running-game/download refusal preserves its actionable copy")
+            }
+        }
+        check(operations.setupError == GameScriptError.statusMismatch.localizedDescription,
+              "B8 conflicting process/status results remain explicit, not readiness defaults")
+        let setupValidation = GameScriptRunner(paths: paths)
+        for arguments in [[], ["install"], ["check", "repair"], ["../repair"]] {
+            do {
+                _ = try await setupValidation.run(command: .setup, runID: InstalledGamesController.runID(), arguments: arguments)
+                check(false, "B8 only check or repair is accepted before any script launch")
+            } catch { check(true, "B8 only check or repair is accepted before any script launch") }
+        }
+        try writeMode("setupready")
+        operations.repairSetup()
+        await operations.waitForSetup()
         try privateFile(cached, compatibilityData)
         await operations.loadCompatibility(productID: game.id)
         check(operations.compatibility[game.id] == compatible
@@ -298,6 +493,9 @@ enum GameOperationChecks {
         await installed.play(imported)
         check(installed.runningGameID == imported.id && !operations.canSignIn,
               "S3 game-service restart is disabled while a game is running")
+        check(!operations.canRepairSetup, "B8 environment recreation is disabled for every tracked running game")
+        operations.repairSetup()
+        check(!operations.setupRepairing, "B8 cannot reset the environment underneath a running title")
         await operations.prepareInstall(game, repairing: imported)
         operations.prepareUninstall(imported)
         check(operations.installConsent == nil && operations.uninstallConsent == nil,
@@ -315,6 +513,67 @@ enum GameOperationChecks {
         check(installed.games.first?.id == played.id && installed.games.first?.lastPlayedAt == history
               && installed.games.first?.lastSessionSeconds == played.lastSessionSeconds,
               "S6 repair preserves registration identity and own-session history")
+        let registryBeforeSetup = try Data(contentsOf: root.appendingPathComponent("registry/installed-games.json"))
+        try writeMode("setupslow")
+        operations.repairSetup()
+        guard let launchDuringRepair = installed.games.first else { throw GameScriptError.invalidReceipt }
+        await installed.play(launchDuringRepair)
+        check(installed.runningGameID == nil && installed.runtimeRepairActive,
+              "B8 no game can start while the shared environment is being rebuilt")
+        await operations.waitForSetup()
+        check(try Data(contentsOf: root.appendingPathComponent("registry/installed-games.json")) == registryBeforeSetup
+              && installed.launchableIDs.contains(played.id) && installed.games.first?.lastPlayedAt == history,
+              "B8 repair revalidates unchanged launcher paths without rewriting registration or history")
+        try privateFile(launcher, """
+            #!/bin/bash
+            trap 'exit 9' TERM
+            printf '%s\\n' "$$" > '\(root.path)/launcher-pid'
+            printf 'Neutral launcher exit\\n' > '\(paths.logs.path)'/"$1.stderr.log"
+            for i in $(seq 1 40); do sleep 0.05; done
+            exit 9
+
+            """, mode: 0o700)
+        for mode in ["stopbefore", "stopafter", "stop21", "stopwrongid", "stopfalse", "stopmissing", "stopmismatch"] {
+            try writeMode(mode)
+            guard let candidate = installed.games.first else { throw GameScriptError.invalidReceipt }
+            await installed.play(candidate)
+            try await wait { FileManager.default.fileExists(atPath: root.appendingPathComponent("launcher-pid").path) }
+            check(installed.canStop(candidate) && operations.canQuit,
+                  "B9 only a live Xodus-launched session can Stop; ordinary gameplay Quit is unchanged")
+            operations.stop(candidate)
+            check(installed.stoppingGameID == candidate.id && installed.mutationActive
+                  && !installed.canStop(candidate) && !operations.canQuit,
+                  "B9 Stop is disabled in flight, reserves one mutation and joins before Quit")
+            operations.stop(candidate)
+            await operations.waitForMutation()
+            if mode == "stop21" {
+                check(installed.playErrors[candidate.id] == GameScriptError.failed(21).localizedDescription
+                      && installed.playLogs[candidate.id] != nil && installed.runningGameID == candidate.id,
+                      "B9 no-environment receipt is a visible failure, not a fabricated stopped session")
+                try writeMode("stopbefore")
+                operations.stop(candidate)
+                await operations.waitForMutation()
+            }
+            try await wait { installed.runningGameID == nil }
+            await installed.waitForSessionPersistence()
+            if ["stopbefore", "stopafter", "stop21"].contains(mode) {
+                check(installed.playErrors[candidate.id] == nil && installed.playLogs[candidate.id] == nil
+                      && installed.playNotices[candidate.id] == "Stopped",
+                      "B9 confirmed Stop suppresses any launcher exit code, before or after its receipt")
+            } else {
+                check(installed.playErrors[candidate.id] != nil && installed.playNotices[candidate.id] == nil,
+                      "B9 mismatched/false/missing stop evidence never becomes success")
+            }
+            check(installed.games.first?.lastSessionSeconds.map { $0 >= 0 } == true
+                  && installed.stoppingGameID == nil && !installed.mutationActive && operations.canQuit,
+                  "B9 ended sessions retain ordinary measured history and release every stop fence")
+            try FileManager.default.removeItem(at: root.appendingPathComponent("launcher-pid"))
+        }
+        let stopArguments = try String(contentsOf: root.appendingPathComponent("stop-arguments"), encoding: .utf8)
+            .split(separator: "\n").map(String.init)
+        check(stopArguments.count == 3 && stopArguments[0] == "2"
+              && GameScriptPaths.validRunID(stopArguments[1]) && stopArguments[2] == game.id,
+              "B9 script receives exactly generated runID and the launched Store ID")
         try writeMode("preservefail")
         guard let repaired = installed.games.first else { throw GameScriptError.invalidReceipt }
         operations.prepareUninstall(repaired)
@@ -438,6 +697,13 @@ enum GameOperationChecks {
             host.layoutSubtreeIfNeeded()
             check(host.frame.width == width && NSApplication.shared.windows.count == windows,
                   "S5 native progress/recovery lays out without presenting a window or starting a script")
+            let setupHost = NSHostingView(rootView: GameSetupView(operations: recovered))
+            setupHost.sizingOptions = []
+            setupHost.frame = CGRect(x: 0, y: 0, width: width, height: 400)
+            setupHost.layoutSubtreeIfNeeded()
+            check(setupHost.window == nil && NSApplication.shared.windows.count == windows
+                  && recovered.setupResult == nil && !recovered.setupBusy,
+                  "B8 setup layout itself never runs a check, repair, sign-in or window presentation")
         }
         installed.releaseMutation()
     }

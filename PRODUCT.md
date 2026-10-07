@@ -28,7 +28,22 @@ Develop and verify native code on the user's Mac over trusted SSH, using isolate
 
 **Not promised in v1:** social features, achievements, cloud saves, checkout, cloud gaming, DLC management, all-PC-title support or a arbitrary runtime selector. Discover does not claim purchasability or ownership.
 
-**Today:** native development app with a real management-process client, capability-gated account UI, partial public catalog and durable catalog-activity integration. A separate Swift native authentication host is source-implemented and checked with neutral fixtures, but not paired/deployed or proven against the provider. Sign-in and deployment are paused. Real provider interoperability is recorded separately in [native integration](docs/NATIVE-INTEGRATION.md), never inferred from mock checks. Owned-PC inventory, game installation and gameplay remain unavailable. An explicit offline `--fixture` mode retains the original demonstration; its non-durable jobs and invented titles never become live evidence.
+**Today:** a native development app with a real management client, paired native
+authentication, public catalog, account-bound PC Library and a separate
+explicit activity scope. Installed Play and game-service sign-in, Install,
+Repair and save-preserving Uninstall are independently admitted, installed and
+owner-live-accepted in bounded title/flow tests. Discover/owned-first search and
+package-support checks are independently admitted, installed and owner-live-accepted
+at `7c3c1f0`. Game Pass subscription/shelf, self-contained script paths, Setup
+and Stop are the next source candidate, not installed evidence. Stable
+app-owned Keychain ACL/migration is a separate approved, 2.5-hour next package
+with synthetic two-build qualification and one allowed human migration approval;
+no prompt-free replacement claim is made yet.
+No complete owned-view parity or general gameplay certification is
+claimed. Exact deployment and real provider evidence are recorded separately
+in [native integration](docs/NATIVE-INTEGRATION.md), never inferred from mocks.
+An explicit nonshipping `--fixture` mode retains the original demonstration;
+its non-durable jobs and invented titles never become live evidence.
 
 **User-decided:** original app code/docs/art use GPL-3.0-only, matching the user's stated Xodus licensing intent without assuming an "or later" grant.
 

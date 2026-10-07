@@ -21,6 +21,7 @@ struct GameCompatibilityBadge: View {
 
 struct GameServiceAccountView: View {
     @ObservedObject var operations: GameOperationsController
+    @ObservedObject var library: PCGamesController
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -32,7 +33,7 @@ struct GameServiceAccountView: View {
                 .accessibilityIdentifier("xodus.games.accountStatus")
             HStack {
                 Button("Check game sign-in") { operations.refreshService() }
-                    .disabled(operations.serviceBusy)
+                    .disabled(operations.serviceBusy || operations.setupRepairing)
                     .accessibilityIdentifier("xodus.games.checkSignIn")
                 if operations.serviceStatus?.signedIn != true {
                     Button("Sign in for games") { operations.signInForGames() }
@@ -51,6 +52,59 @@ struct GameServiceAccountView: View {
                 if operations.serviceLog != nil {
                     Button("Show log") { operations.showServiceLog() }
                         .accessibilityIdentifier("xodus.games.signInLog")
+                }
+            }
+            Divider()
+            GamePassAccountView(operations: operations, library: library)
+            Divider()
+            GameSetupView(operations: operations)
+        }
+    }
+}
+
+struct GamePassAccountView: View {
+    @ObservedObject var operations: GameOperationsController
+    @ObservedObject var library: PCGamesController
+    @EnvironmentObject private var session: LiveSession
+
+    private var probeID: String? {
+        GameOperationsController.gamePassProbe(discoveryIDs: session.gamePassProductIDs,
+                                               ownedGames: library.snapshot?.games)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(operations.gamePassLabel)
+                    .accessibilityIdentifier("xodus.gamePass.status")
+                Spacer()
+                Button("Check") {
+                    operations.checkGamePass(discoveryIDs: session.gamePassProductIDs,
+                                             ownedGames: library.snapshot?.games)
+                }
+                .disabled(!operations.canStartMutation || operations.installConsent != nil
+                    || operations.uninstallConsent != nil || probeID == nil)
+                .accessibilityLabel("Check PC Game Pass")
+                .accessibilityIdentifier("xodus.gamePass.check")
+                if operations.gamePassBusy { ProgressView().controlSize(.small) }
+            }
+            if operations.gamePassFromCache {
+                Text("Saved status on this Mac. Check to refresh.").font(.callout).foregroundStyle(.secondary)
+            }
+            if probeID == nil {
+                Text("Load your PC library and browse Discover to check PC Game Pass.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+            if let error = operations.gamePassError {
+                Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if operations.gamePassFailureCode == 11 {
+                    Button("Sign in for games") { operations.signInForGames() }
+                        .disabled(!operations.canSignIn)
+                }
+                if operations.gamePassLog != nil {
+                    Button("Show log") { operations.showGamePassLog() }
+                        .accessibilityIdentifier("xodus.gamePass.showLog")
                 }
             }
         }
@@ -136,9 +190,11 @@ struct GameInstallConsentView: View {
                 Label(result.explanation, systemImage: result.supported ? "checkmark.circle" : "exclamationmark.circle")
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("xodus.install.compatibility")
-                if let bytes = result.packageBytes {
-                    Text("\(GameOperationProgressView.bytes(bytes)) download").foregroundStyle(.secondary)
-                } else { Text("Size shown when download starts").foregroundStyle(.secondary) }
+                if result.supported {
+                    if let bytes = result.packageBytes {
+                        Text("\(GameOperationProgressView.bytes(bytes)) download").foregroundStyle(.secondary)
+                    } else { Text("Size shown when download starts").foregroundStyle(.secondary) }
+                }
             } else if let error = consent.checkError {
                 Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -150,10 +206,12 @@ struct GameInstallConsentView: View {
                 }
                 if operations.log != nil { Button("Show log") { operations.showLog() } }
             }
-            Text(consent.installedID == nil
-                 ? "The game will be downloaded and set up for this Mac. Some PC packages aren't supported yet."
-                 : "Xodus checks for changed or missing files in this folder. Your saves and installed entry are kept.")
-                .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if consent.compatibility?.supported == true {
+                Text(consent.installedID == nil
+                     ? "The game will be downloaded and set up for this Mac. Some PC packages aren't supported yet."
+                     : "Xodus checks for changed or missing files in this folder. Your saves and installed entry are kept.")
+                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
             HStack {
                 Spacer()
                 Button("Cancel") { Task { await operations.cancelInstallConsent() } }.keyboardShortcut(.cancelAction)

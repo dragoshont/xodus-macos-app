@@ -3,13 +3,16 @@ import Darwin
 import Foundation
 
 enum GameScriptCommand: String, Codable, Sendable {
-    case serviceStatus, serviceSignIn, check, install, uninstall
+    case serviceStatus, serviceSignIn, check, gamePassStatus, stop, setup, install, uninstall
 
     var file: String {
         switch self {
         case .serviceStatus: "private-xodus-service-status.sh"
         case .serviceSignIn: "private-xodus-service-signin.sh"
         case .check: "private-xodus-check.sh"
+        case .gamePassStatus: "private-xodus-gamepass-status.sh"
+        case .stop: "private-xodus-stop.sh"
+        case .setup: "private-xodus-setup.sh"
         case .install: "private-xodus-install.sh"
         case .uninstall: "private-xodus-uninstall.sh"
         }
@@ -22,14 +25,14 @@ enum GameScriptError: Error, LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .unavailable: "This Mac isn't ready for game installation or sign-in. Check Xodus setup and try again."
+        case .unavailable: "This Mac isn't ready for this game operation. Check Xodus setup and try again."
         case .invalidReceipt: "Xodus couldn't confirm how the operation finished. Your installed list wasn't changed. Check the log before trying again."
         case .missingStatus: "The operation stopped without a result. Your installed list wasn't changed. Check the log before trying again."
         case .statusMismatch: "The operation returned conflicting results. Your installed list wasn't changed. Check the log before trying again."
         case .invalidProgress: "Download progress couldn't be read. The operation is stopping; partial files are kept."
         case .storage: "Xodus couldn't save the operation details. Check access to Application Support and try again."
         case .busy: "Wait for the current game or operation to finish."
-        case .timeout: "The game check or sign-in didn't finish. Try checking again."
+        case .timeout: "The operation didn't finish. Check the log before trying again."
         case .invalidDestination: "The game folder isn't safe to use. Choose a different installation or check Xodus setup."
         case .failed(let code):
             switch code {
@@ -38,6 +41,9 @@ enum GameScriptError: Error, LocalizedError, Equatable {
             case 12: "This game's package isn't supported on Mac yet."
             case 13: "The download couldn't be verified. Try installing again."
             case 14: "Installation cancelled. Partial files are kept; installing again resumes the download."
+            case 21: "Xodus couldn't find a running environment for this game. Check the log."
+            case 22: "Quit the running game or finish the download first."
+            case 31: "Xodus couldn't create the game environment. Check the log and try Repair Xodus again."
             default: "The operation couldn't finish (code \(code)). Check the log and try again."
             }
         }
@@ -101,9 +107,13 @@ struct GameCompatibilityResult: Decodable, Equatable, Sendable {
         supported ? "Plays on Mac" : reason ?? "This game isn't supported on Mac yet."
     }
     var checkedDate: Date? {
+        Self.parseDate(checkedAt)
+    }
+
+    static func parseDate(_ value: String) -> Date? {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: checkedAt) ?? ISO8601DateFormatter().date(from: checkedAt)
+        return formatter.date(from: value) ?? ISO8601DateFormatter().date(from: value)
     }
 
     static func parse(_ data: Data, productID: String) throws -> Self {
@@ -119,6 +129,43 @@ struct GameCompatibilityResult: Decodable, Equatable, Sendable {
     }
 }
 
+struct GamePassStatusResult: Decodable, Equatable, Sendable {
+    let active: Bool?
+    let probeProductId: String?
+    let checkedAt: String?
+
+    private enum CodingKeys: String, CodingKey { case active, probeProductId, checkedAt }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        active = try values.decode(Bool?.self, forKey: .active)
+        probeProductId = try values.decodeIfPresent(String.self, forKey: .probeProductId)
+        checkedAt = try values.decodeIfPresent(String.self, forKey: .checkedAt)
+    }
+
+    static func parse(_ data: Data, productID: String? = nil) throws -> Self {
+        let value = try JSONDecoder().decode(Self.self, from: data)
+        guard value.probeProductId.map(PCGamesClient.validProductID) ?? true,
+              value.checkedAt.map({ $0.utf8.count <= 64 && GameCompatibilityResult.parseDate($0) != nil }) ?? true,
+              productID.map({ PCGamesClient.validProductID($0) && value.probeProductId == $0
+                  && value.checkedAt != nil }) ?? true else { throw GameScriptError.invalidReceipt }
+        return value
+    }
+}
+
+struct GameStopResult: Decodable, Sendable {
+    let storeId: String
+    let stopped: Bool
+
+    static func parse(_ data: Data, productID: String) throws -> Self {
+        let value = try JSONDecoder().decode(Self.self, from: data)
+        guard PCGamesClient.validProductID(productID), value.storeId == productID, value.stopped else {
+            throw GameScriptError.invalidReceipt
+        }
+        return value
+    }
+}
+
 struct GameScriptPaths: Sendable {
     let scripts: URL
     let processed: URL
@@ -126,6 +173,7 @@ struct GameScriptPaths: Sendable {
     let games: URL
     let journal: URL
     var compatibility: URL { processed.deletingLastPathComponent().appendingPathComponent("compatibility") }
+    var gamePassStatus: URL { compatibility.appendingPathComponent("gamepass.json") }
 
     func compatibilityFile(productID: String) throws -> URL {
         guard PCGamesClient.validProductID(productID) else { throw GameScriptError.invalidReceipt }
@@ -134,7 +182,7 @@ struct GameScriptPaths: Sendable {
 
     static var production: Self {
         let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
-        return Self(scripts: home.appendingPathComponent("src/xodus-macos-private-ai/scripts/macos"),
+        return Self(scripts: home.appendingPathComponent("Library/Application Support/Xodus/Runtime/scripts/macos"),
                     processed: home.appendingPathComponent("Library/Application Support/XodusRemote/processed"),
                     logs: home.appendingPathComponent("Library/Logs/XodusRemote"),
                     games: home.appendingPathComponent("Games/Xodus"),
@@ -275,7 +323,11 @@ actor GameScriptRunner {
                 throw GameScriptError.invalidDestination
             }
             try GameScriptFiles.checkPath(URL(fileURLWithPath: arguments[1]), allowMissing: command == .install)
-        } else if command == .check {
+        } else if command == .setup {
+            guard arguments.count == 1, ["check", "repair"].contains(arguments[0]) else {
+                throw GameScriptError.invalidReceipt
+            }
+        } else if [.check, .gamePassStatus, .stop].contains(command) {
             guard arguments.count == 1, PCGamesClient.validProductID(arguments[0]) else {
                 throw GameScriptError.invalidReceipt
             }
@@ -310,7 +362,7 @@ actor GameScriptRunner {
         process = child
         if cancellationRequested, child.isRunning { child.terminate() }
         let deadline = ContinuousClock.now.advanced(by: command == .serviceStatus ? .seconds(30)
-            : command == .check ? .seconds(120) : .seconds(1800))
+            : [.check, .gamePassStatus, .stop, .setup].contains(command) ? .seconds(120) : .seconds(1800))
         var lastProgress: GameScriptProgress?
         var observationError: GameScriptError?
         while child.isRunning {
@@ -325,7 +377,7 @@ actor GameScriptRunner {
                     if child.isRunning { child.terminate() }
                 }
             }
-            if command == .serviceStatus || command == .serviceSignIn || command == .check {
+            if [.serviceStatus, .serviceSignIn, .check, .gamePassStatus, .stop, .setup].contains(command) {
                 if ContinuousClock.now >= deadline, observationError == nil {
                     observationError = .timeout
                     if child.isRunning { child.terminate() }
@@ -352,7 +404,7 @@ actor GameScriptRunner {
             let value = try GameScriptProgress.parse(data)
             if value.phase == .failed { await progress(value) }
         }
-        let result = code == 0 && (command == .install || command == .serviceStatus || command == .check)
+        let result = code == 0 && [.install, .serviceStatus, .check, .gamePassStatus, .stop, .setup].contains(command)
             ? try GameScriptFiles.read(paths.receipt(runID, suffix: "result.json")) : nil
         return GameScriptOutcome(code: code, result: result, log: GameScriptFiles.log(runID: runID, paths: paths))
     }

@@ -24,7 +24,7 @@ struct InstalledGamesView: View {
                                 Text("Last played \(Text(date, style: .relative)) ago")
                                     .font(.callout).foregroundStyle(.secondary)
                             }
-                            InstalledPlayButton(library: library, game: game)
+                            InstalledPlayButton(library: library, operations: operations, game: game)
                             playError(game)
                         }
                         .padding(24).frame(maxWidth: .infinity, alignment: .leading)
@@ -71,7 +71,7 @@ struct InstalledGamesView: View {
                         Text(game.title).font(.headline).fixedSize(horizontal: false, vertical: true)
                         Spacer()
                         InstalledGameActions(library: library, operations: operations, game: game)
-                        InstalledPlayButton(library: library, game: game)
+                        InstalledPlayButton(library: library, operations: operations, game: game)
                     }
                     playError(game)
                 }
@@ -103,29 +103,40 @@ struct InstalledPlayError: View {
                 .accessibilityIdentifier("xodus.installed.playError")
             if library.playLogs[game.id] != nil {
                 Button("Show log") { library.showLog(for: game) }
-                    .accessibilityLabel("Show \(game.title) launch log in Finder")
+                    .accessibilityLabel("Show \(game.title) log in Finder")
                     .accessibilityIdentifier("xodus.installed.showLog")
             }
+        } else if let notice = library.playNotices[game.id] {
+            Text(notice).font(.callout).foregroundStyle(.secondary)
+                .accessibilityIdentifier("xodus.installed.playResult")
         }
     }
 }
 
 struct InstalledPlayButton: View {
     @ObservedObject var library: InstalledGamesController
+    @ObservedObject var operations: GameOperationsController
     let game: InstalledGame
 
+    private var canStop: Bool {
+        (library.runningGameID == game.id && library.launchStarted) || library.stoppingGameID == game.id
+    }
+
     var body: some View {
-        Button(library.runningGameID == game.id
-               ? (library.playState == .launching ? "Launching" : "Playing")
+        Button(canStop ? "Stop" : library.runningGameID == game.id ? "Launching"
                : library.playErrors[game.id] == nil ? "Play" : "Try again") {
-            Task { await library.play(game) }
+            if canStop { operations.stop(game) }
+            else { Task { await library.play(game) } }
         }
         .buttonStyle(.borderedProminent)
-        .disabled(library.runningGameID != nil || library.editing || library.choosing
-                  || library.mutationGameID == game.id || library.serviceSignInActive)
-        .accessibilityLabel(library.runningGameID == game.id
-            ? "\(game.title) is \(library.playState == .launching ? "launching" : "playing")"
-            : "Play \(game.title)")
-        .accessibilityIdentifier("xodus.installed.play")
+        .disabled(canStop ? !library.canStop(game) || !operations.canStartMutation
+                  : library.runningGameID != nil || library.stoppingGameID != nil || library.editing || library.choosing
+                  || library.mutationGameID == game.id || library.serviceSignInActive || library.runtimeRepairActive)
+        .accessibilityLabel(canStop ? "Stop \(game.title)" : "Play \(game.title)")
+        .accessibilityValue(library.stoppingGameID == game.id ? "Stopping" : "")
+        .accessibilityIdentifier(canStop ? "xodus.installed.stop" : "xodus.installed.play")
+        if library.stoppingGameID == game.id {
+            ProgressView("Stopping").controlSize(.small)
+        }
     }
 }

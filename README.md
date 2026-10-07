@@ -10,7 +10,31 @@ entrypoints. Shipping screens use native setup/empty/loading/error states and
 actual public product data, not synthetic game illustrations. See
 [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
-**Phase 2 B1/B2/B3 source candidate (not yet admitted or installed):** Discover
+**Phase 2 B5/B7/B8/B9 source qualified (not packaged or installed):** Account
+shows cached PC Game Pass status and an explicit fenced Check. Active status
+enables a separate Game Pass shelf after Your PC games and the existing
+support-check/consent/Install flow on eligible Discover games. No subscription
+end date is inferred. While an Xodus-launched game is running, the shared
+Installed/Continue Playing action becomes Stop. The fixed private script must
+confirm that exact title stopped; a requested stop records normal session
+history without treating the launcher's exit code as a crash. Stop is disabled
+while in flight. Ordinary Quit still leaves a game running. C8 is unchanged;
+network-denied neutral suites and shipping-debug compilation pass, while
+exact-CI and independent admission/live gates remain.
+Private script entrypoints now use the separately installed self-contained
+`~/Library/Application Support/Xodus/Runtime/scripts/macos` directory; the
+runtime is not bundled into the app. One read-only startup check supplies
+four Setup items and, when needed, one Xodus needs setup banner. Repair Xodus
+is explicit and fenced against tracked gameplay, concurrent mutations,
+service sign-in/status and Quit; generated launchers are revalidated at their
+existing paths without changing the installed list. The backend also refuses
+repair while any launch/download process exists, including untracked sessions;
+it only creates missing environments, starts a missing service, and never
+rebuilds existing title environments or touches saves.
+Unsupported consent hides download-size/future-download copy, while supported
+consent shows the backend's real download size when available.
+
+**Phase 2 B1/B2/B3 (`7c3c1f0`, admitted, installed and live-accepted):** Discover
 accepts verified PC Game Pass feed membership without requiring the separate
 Store PC-candidate flag. Store search remains strict. Search shows matching
 titles from the loaded PC library first, reuses its Play/Install controls and
@@ -19,8 +43,22 @@ only loaded library/feed evidence. Install consent checks package support before
 enabling Install and shows the reported download size or unsupported reason.
 Private cached check results provide Mac-support badges without running a
 check. These labels are not general gameplay certification. C8 is unchanged.
-Mac neutral suites and shipping-debug compilation pass; exact-source CI and
-independent admission are required before replacement and owner live acceptance.
+Mac neutral suites, shipping-debug compilation and
+[exact-source CI](https://github.com/dragoshont/xodus-macos-app/actions/runs/37668302715)
+pass. The source-reviewed signed package preserves admitted C8 byte-for-byte.
+Independent combined admission and fresh game-ended/normal-Quit authority
+preceded replacement. Full `1463cdb` rollback, the untouched profile and
+byte-identical private installed list were retained through an ordinary
+Library reopen. The owner accepted Discover's 16 real-art Game Pass titles,
+owned-first Lara/Hogwarts Play and Celeste Install, and Celeste's exact
+unsupported reason with Install disabled. These are bounded live observations,
+not general gameplay certification.
+
+**B6 is a separate approved next package:** stable app-owned Keychain
+access/migration is timeboxed to 2.5 hours and must qualify across two
+differently signed synthetic builds. One human migration approval is allowed.
+No new ACL, prompt-free claim or live credential mutation is part of the
+B5/B7/B8/B9 candidate; game-service credentials remain out of scope.
 
 **S3/S5/S6 (`1463cdb`, admitted, installed and live-accepted):** the account area
 adds explicit game-service sign-in/status, separate from PC-library credentials.
@@ -171,7 +209,8 @@ Engine-owned/installed Library enumeration remains unavailable: the installed sn
 response, not a durable registry or scan of this Mac. It never proves that no
 games are installed. A selected-folder marker check is separate from ownership,
 game-file integrity and permission to play. Technical metadata stays in
-contextual information disclosures. No Install action is offered. The separate
+contextual information disclosures. This engine enumeration does not supply
+an Install action. The separate
 local Installed list above enables Play only through an explicitly imported
 working launch script, not through the engine's empty registry.
 

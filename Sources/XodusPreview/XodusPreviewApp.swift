@@ -23,7 +23,7 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
             if !closed, gameOperations?.canQuit == false {
                 let alert = NSAlert()
                 alert.messageText = "Wait before quitting Xodus"
-                alert.informativeText = "Wait for installation, repair, removal or sign-in to finish. You can cancel an installation first."
+                alert.informativeText = "Wait for the current game operation to finish. You can cancel an installation first."
                 alert.addButton(withTitle: "Keep Xodus open")
                 alert.runModal()
             }

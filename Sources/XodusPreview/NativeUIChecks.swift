@@ -201,6 +201,16 @@ enum NativeUIChecks {
         check(account.window == nil && NSApplication.shared.windows.count == windows
               && session.authentication == nil && !session.accountBusy && !session.signInPending,
               "Lean Account and live-data layouts create no window or credential request")
+        state.showingSetup = true
+        let setupAccount = NSHostingView(rootView: LiveAccountView(refreshStatusOnAppear: false)
+            .environmentObject(state).environmentObject(session))
+        setupAccount.sizingOptions = []
+        setupAccount.frame = CGRect(x: 0, y: 0, width: 480, height: 280)
+        setupAccount.layoutSubtreeIfNeeded()
+        check(setupAccount.window == nil && NSApplication.shared.windows.count == windows
+              && state.gameOperations.setupResult == nil && !state.gameOperations.setupBusy
+              && session.authentication == nil && !session.accountBusy,
+              "Setup-focused Account allocates native controls without unrelated credentials, scripts or windows")
     }
 
     static func checkMainLibraryWithHistory(session: LiveSession, check: (Bool, String) -> Void) {

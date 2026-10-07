@@ -44,6 +44,7 @@ final class LiveSession: ObservableObject {
     @Published private(set) var discoveryFailures: [DiscoveryFailure] = []
     @Published private(set) var discoveryCheckedAt: String?
     @Published private(set) var gamePassProductIDs = Set<String>()
+    @Published private(set) var gamePassProducts: [CatalogProduct] = []
     @Published var selectedProduct: CatalogProduct?
     @Published var errorMessage: String?
     @Published var catalogError: String?
@@ -377,11 +378,11 @@ final class LiveSession: ObservableObject {
         let access = Set(product.editions.map(\.entitlement.kind))
         let compatibility = Set(product.editions.map(\.compatibility.kind))
         if access == [.unknown] && compatibility == [.unknown] {
-            return "Access and Mac compatibility haven't been checked. Install and Play aren't available yet."
+            return "Catalog metadata doesn't verify access or Mac compatibility. Use Library or Discover for Install and Play."
         }
         let accessLabel = access.count == 1 ? product.editions[0].entitlement.kind.label : "Varies by edition"
         let compatibilityLabel = compatibility.count == 1 ? product.editions[0].compatibility.kind.label : "Varies by edition"
-        return "Access: \(accessLabel). Mac compatibility: \(compatibilityLabel). Install and Play aren't available yet."
+        return "Catalog access: \(accessLabel). Catalog Mac compatibility: \(compatibilityLabel). Use Library or Discover for Install and Play."
     }
     var catalogNotice: String? {
         if catalogStopped { return "Search stopped." }
@@ -759,6 +760,7 @@ final class LiveSession: ObservableObject {
         discoveryCheckedAt = nil
         discoveryRevision = nil
         gamePassProductIDs = []
+        gamePassProducts = []
         gamePassRevision = nil
         diagnosticPreview = nil
         diagnosticPreviewing = false
@@ -1264,6 +1266,10 @@ final class LiveSession: ObservableObject {
 
     private func applyDiscoveryPage(_ page: CatalogDiscovery, request: CatalogRequest) throws {
         try page.validatePublicScope(market: request.market, language: request.language, limit: 16)
+        let retainedIDs = gamePassRevision == page.corpusRevision ? gamePassProductIDs : []
+        guard retainedIDs.union(page.products.map(\.id)).count <= 512 else {
+            throw ManagementError.backendError("REVISION_CONFLICT", retryable: true)
+        }
         let existingIDs = Set(products.map(\.id) + discoveryFailures.map(\.id))
         let incomingIDs = Set(page.products.map(\.id) + page.failures.map(\.id))
         if request.more {
@@ -1284,8 +1290,12 @@ final class LiveSession: ObservableObject {
         cacheRevision = nil
         if gamePassRevision != page.corpusRevision {
             gamePassProductIDs = []
+            gamePassProducts = []
             gamePassRevision = page.corpusRevision
         }
+        let incoming = Dictionary(uniqueKeysWithValues: page.products.map { ($0.id, $0) })
+        gamePassProducts = gamePassProducts.map { incoming[$0.id] ?? $0 }
+            + page.products.filter { !gamePassProductIDs.contains($0.id) }
         gamePassProductIDs.formUnion(page.products.map(\.id))
     }
 
@@ -1298,6 +1308,7 @@ final class LiveSession: ObservableObject {
         cacheRevision = nil
         discoveryRevision = nil
         gamePassProductIDs = []
+        gamePassProducts = []
         gamePassRevision = nil
         discoveryFailures = []
         discoveryCheckedAt = nil

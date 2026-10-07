@@ -20,6 +20,17 @@ final class GameOperationsController: ObservableObject {
     @Published private(set) var serviceSigningIn = false
     @Published private(set) var serviceError: String?
     @Published private(set) var serviceLog: URL?
+    @Published private(set) var gamePassStatus: GamePassStatusResult?
+    @Published private(set) var gamePassBusy = false
+    @Published private(set) var gamePassError: String?
+    @Published private(set) var gamePassFailureCode: Int?
+    @Published private(set) var gamePassLog: URL?
+    @Published private(set) var gamePassFromCache = false
+    @Published private(set) var setupResult: GameSetupResult?
+    @Published private(set) var setupBusy = false
+    @Published private(set) var setupRepairing = false
+    @Published private(set) var setupError: String?
+    @Published private(set) var setupLog: URL?
     @Published var installConsent: GameInstallConsent?
     @Published var uninstallConsent: InstalledGame?
     @Published private(set) var preparingConsent = false
@@ -39,16 +50,24 @@ final class GameOperationsController: ObservableObject {
     private let paths: GameScriptPaths
     private let mutationRunner: GameScriptRunner
     private let serviceRunner: GameScriptRunner
+    private let setupRunner: GameScriptRunner
     private let journal: GameOperationJournal
     private var mutationTask: Task<Void, Never>?
     private var serviceTask: Task<Void, Never>?
     private var compatibilityTask: Task<Void, Never>?
     private var compatibilityRunID: String?
+    private var gamePassTask: Task<Void, Never>?
+    private var stopTask: Task<Void, Never>?
+    private var gamePassGeneration = 0
+    private var setupTask: Task<Void, Never>?
+    private var setupCheckedOnce = false
     private var restored = false
     private var terminating = false
     private var installedObservation: AnyCancellable?
 
-    var isBusy: Bool { operation != nil || checkingCompatibility }
+    var isBusy: Bool {
+        operation != nil || checkingCompatibility || gamePassBusy || setupBusy || installed.stoppingGameID != nil
+    }
     var canSignIn: Bool {
         !serviceBusy && !isBusy && !recoveryRequired && !installed.mutationActive
             && installed.runningGameID == nil && !terminating
@@ -57,16 +76,29 @@ final class GameOperationsController: ObservableObject {
         !isBusy && !recoveryRequired && !installed.mutationActive && !serviceSigningIn && !preparingConsent && installed.loaded
             && !installed.editing && !installed.choosing && !terminating
     }
-    var canQuit: Bool { mutationTask == nil && compatibilityTask == nil && !serviceSigningIn }
+    var canQuit: Bool {
+        mutationTask == nil && compatibilityTask == nil && gamePassTask == nil && stopTask == nil
+            && setupTask == nil && !serviceSigningIn
+    }
     var canConfirmInstall: Bool {
         canStartMutation && installConsent?.compatibility?.supported == true
     }
     var canCancel: Bool {
-        operation?.kind != .uninstall && isBusy && !recoveryRequired && !cancelling
+        operation != nil && operation?.kind != .uninstall && !recoveryRequired && !cancelling
     }
     var serviceLabel: String {
         serviceStatus?.signedIn == true ? "Signed in for games"
             : serviceStatus == nil ? "Game sign-in hasn't been checked" : "Sign in for games"
+    }
+    var gamePassActive: Bool { gamePassStatus?.active == true }
+    var setupNeedsAttention: Bool { setupResult?.ready == false || setupError != nil }
+    var canRepairSetup: Bool {
+        canStartMutation && !serviceBusy && installed.runningGameID == nil
+            && installConsent == nil && uninstallConsent == nil
+    }
+    var gamePassLabel: String {
+        gamePassStatus?.active == true ? "PC Game Pass: Active"
+            : gamePassStatus?.active == false ? "PC Game Pass: Not active" : "PC Game Pass: Unknown"
     }
 
     init(installed: InstalledGamesController, paths: GameScriptPaths = .production) {
@@ -74,6 +106,7 @@ final class GameOperationsController: ObservableObject {
         self.paths = paths
         mutationRunner = GameScriptRunner(paths: paths)
         serviceRunner = GameScriptRunner(paths: paths)
+        setupRunner = GameScriptRunner(paths: paths)
         journal = GameOperationJournal(file: paths.journal)
         installedObservation = installed.objectWillChange.sink { [weak self] in
             self?.objectWillChange.send()
@@ -99,7 +132,7 @@ final class GameOperationsController: ObservableObject {
     }
 
     func refreshService() {
-        guard !serviceBusy, !terminating else { return }
+        guard !serviceBusy, !setupRepairing, !terminating else { return }
         serviceBusy = true
         serviceError = nil
         let runID = InstalledGamesController.runID()
@@ -122,6 +155,9 @@ final class GameOperationsController: ObservableObject {
 
     func signInForGames() {
         guard canSignIn else { return }
+        gamePassGeneration += 1
+        gamePassStatus = nil
+        gamePassFromCache = false
         serviceBusy = true
         serviceSigningIn = true
         installed.serviceSignInActive = true
@@ -143,10 +179,164 @@ final class GameOperationsController: ObservableObject {
                 let value = try GameServiceStatus.parse(data)
                 guard value.signedIn else { throw GameScriptError.failed(11) }
                 serviceStatus = value
+                if setupCheckedOnce { refreshSetup() }
             } catch {
                 serviceStatus = nil
                 serviceError = Self.message(error)
                 serviceLog = await scriptLog(runID)
+            }
+        }
+    }
+
+    nonisolated static func gamePassProbe(discoveryIDs: Set<String>, ownedGames: [PCGame]?) -> String? {
+        guard let ownedGames else { return nil }
+        return discoveryIDs.subtracting(ownedGames.map(\.id)).filter(PCGamesClient.validProductID).sorted().first
+    }
+
+    func loadGamePassCache() async {
+        guard !gamePassBusy, !terminating else { return }
+        gamePassGeneration += 1
+        let generation = gamePassGeneration
+        let paths = paths
+        do {
+            let result = try await Task.detached {
+                guard let data = try GameScriptFiles.read(paths.gamePassStatus, missingAllowed: true) else {
+                    return Optional<GamePassStatusResult>.none
+                }
+                return try GamePassStatusResult.parse(data)
+            }.value
+            guard generation == gamePassGeneration, !terminating else { return }
+            gamePassStatus = result
+            gamePassFromCache = result != nil
+            gamePassError = nil
+        } catch {
+            guard generation == gamePassGeneration, !terminating else { return }
+            gamePassStatus = nil
+            gamePassFromCache = false
+            gamePassError = "PC Game Pass status couldn't be read. Check it again."
+        }
+    }
+
+    func checkGamePass(discoveryIDs: Set<String>, ownedGames: [PCGame]?) {
+        guard canStartMutation, installConsent == nil, uninstallConsent == nil else { return }
+        guard let productID = Self.gamePassProbe(discoveryIDs: discoveryIDs, ownedGames: ownedGames) else {
+            gamePassError = "Load Discover and your PC library to check PC Game Pass."
+            return
+        }
+        do { try installed.reserveMutation(gameID: nil) }
+        catch { gamePassError = Self.message(error); return }
+        gamePassGeneration += 1
+        gamePassBusy = true
+        gamePassError = nil
+        gamePassLog = nil
+        gamePassFailureCode = nil
+        let runID = InstalledGamesController.runID()
+        gamePassTask = Task {
+            defer {
+                gamePassBusy = false
+                gamePassTask = nil
+                installed.releaseMutation()
+            }
+            do {
+                let outcome = try await mutationRunner.run(command: .gamePassStatus, runID: runID, arguments: [productID])
+                gamePassLog = outcome.log
+                guard outcome.code == 0, let data = outcome.result else {
+                    gamePassFailureCode = outcome.code
+                    throw GameScriptError.failed(outcome.code)
+                }
+                gamePassStatus = try GamePassStatusResult.parse(data, productID: productID)
+                gamePassFromCache = false
+            } catch {
+                gamePassStatus = nil
+                gamePassFromCache = false
+                gamePassError = Self.message(error)
+                gamePassLog = await scriptLog(runID)
+            }
+        }
+    }
+
+    func stop(_ game: InstalledGame) {
+        guard canStartMutation, installConsent == nil, uninstallConsent == nil else { return }
+        let token: UUID
+        do { token = try installed.reserveStop(game) }
+        catch { self.error = Self.message(error); return }
+        let runID = InstalledGamesController.runID()
+        stopTask = Task {
+            defer {
+                stopTask = nil
+                installed.releaseMutation()
+            }
+            do {
+                let outcome = try await mutationRunner.run(command: .stop, runID: runID, arguments: [game.storeId])
+                guard outcome.code == 0, let data = outcome.result else { throw GameScriptError.failed(outcome.code) }
+                _ = try GameStopResult.parse(data, productID: game.storeId)
+                installed.completeStop(token: token, gameID: game.id, error: nil, log: nil)
+            } catch {
+                installed.completeStop(token: token, gameID: game.id, error: Self.message(error),
+                                       log: await scriptLog(runID))
+            }
+        }
+    }
+
+    func checkSetupOnce() {
+        guard !setupCheckedOnce, !terminating else { return }
+        setupCheckedOnce = true
+        refreshSetup()
+    }
+
+    private func refreshSetup() {
+        guard !setupBusy, !terminating else { return }
+        setupBusy = true
+        setupError = nil
+        setupLog = nil
+        let runID = InstalledGamesController.runID()
+        setupTask = Task {
+            defer { setupBusy = false; setupTask = nil }
+            do {
+                let outcome = try await setupRunner.run(command: .setup, runID: runID, arguments: ["check"])
+                setupLog = outcome.log
+                guard outcome.code == 0, let data = outcome.result else { throw GameScriptError.failed(outcome.code) }
+                setupResult = try GameSetupResult.parse(data)
+            } catch {
+                setupResult = nil
+                setupError = Self.message(error)
+                setupLog = await scriptLog(runID)
+            }
+        }
+    }
+
+    func repairSetup() {
+        guard canRepairSetup else { return }
+        do { try installed.reserveMutation(gameID: nil) }
+        catch { setupError = Self.message(error); return }
+        installed.runtimeRepairActive = true
+        setupBusy = true
+        setupRepairing = true
+        setupError = nil
+        setupLog = nil
+        serviceStatus = nil
+        gamePassGeneration += 1
+        gamePassStatus = nil
+        gamePassFromCache = false
+        let runID = InstalledGamesController.runID()
+        setupTask = Task {
+            defer {
+                setupBusy = false
+                setupRepairing = false
+                setupTask = nil
+                installed.runtimeRepairActive = false
+                installed.releaseMutation()
+            }
+            do {
+                let outcome = try await mutationRunner.run(command: .setup, runID: runID, arguments: ["repair"])
+                setupLog = outcome.log
+                guard outcome.code == 0, let data = outcome.result else { throw GameScriptError.failed(outcome.code) }
+                setupResult = try GameSetupResult.parse(data)
+                await installed.refreshAfterSetupRepair()
+            } catch {
+                setupResult = nil
+                setupError = Self.message(error)
+                setupLog = await scriptLog(runID)
             }
         }
     }
@@ -380,11 +570,17 @@ final class GameOperationsController: ObservableObject {
 
     func showLog() { if let log { NSWorkspace.shared.activateFileViewerSelecting([log]) } }
     func showServiceLog() { if let serviceLog { NSWorkspace.shared.activateFileViewerSelecting([serviceLog]) } }
+    func showGamePassLog() { if let gamePassLog { NSWorkspace.shared.activateFileViewerSelecting([gamePassLog]) } }
+    func showSetupLog() { if let setupLog { NSWorkspace.shared.activateFileViewerSelecting([setupLog]) } }
     func waitForMutation() async {
         await compatibilityTask?.value
         await mutationTask?.value
+        await gamePassTask?.value
+        await stopTask?.value
+        await setupTask?.value
     }
     func waitForService() async { await serviceTask?.value }
+    func waitForSetup() async { await setupTask?.value }
     func beginTermination() { terminating = true }
     func resumeAfterTerminationRefusal() { terminating = false }
 

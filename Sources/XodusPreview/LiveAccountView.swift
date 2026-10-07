@@ -22,86 +22,102 @@ struct LiveAccountView: View {
         AccountSheetLayout(showsHeader: false) {
             EmptyView()
         } content: {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack(spacing: 12) {
-                    Image(systemName: "person.crop.circle").font(.largeTitle).foregroundStyle(.secondary)
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(session.accountNoticeTitle).font(.title2.bold())
-                            .accessibilityIdentifier("xodus.account.status")
-                    }
-                    Spacer()
-                    if session.accountBusy || session.signInPending { ProgressView().controlSize(.small) }
+            if state.showingSetup {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Xodus setup").font(.title2.bold())
+                    GameSetupView(operations: state.gameOperations)
                 }
-                Text(session.accountMessage)
-                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("xodus.account.statusExplanation")
-                GameServiceAccountView(operations: state.gameOperations)
-                Divider()
-                if let error = session.accountError {
-                    Label(error, systemImage: "exclamationmark.circle")
-                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("xodus.account.error")
-                }
-                if let summary = session.accountFailureSummary {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("Last sign-in error").font(.headline)
-                        Text(summary).fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("xodus.account.failureSummary")
-                        if let observation = session.accountFailureObservation {
-                            Text(observation).fixedSize(horizontal: false, vertical: true)
-                                .accessibilityIdentifier("xodus.account.failureObservation")
+            } else {
+                VStack(alignment: .leading, spacing: 20) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "person.crop.circle").font(.largeTitle).foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(session.accountNoticeTitle).font(.title2.bold())
+                                .accessibilityIdentifier("xodus.account.status")
                         }
+                        Spacer()
+                        if session.accountBusy || session.signInPending { ProgressView().controlSize(.small) }
                     }
-                    .foregroundStyle(.secondary).textSelection(.enabled)
-                }
-                if session.isReady && !session.supports(.authBegin) {
-                    Text("Sign-in isn't available in this build.").foregroundStyle(.secondary)
-                }
-                DisclosureGroup("Account info") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(session.accountExplanation)
-                        Text("Credentials stay in the native Keychain.")
-                        Text("macOS may ask for Keychain access again after an app update. Respond in its permission window; a new Microsoft sign-in is not required to check saved sign-in.")
+                    Text(session.accountMessage)
+                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("xodus.account.statusExplanation")
+                    GameServiceAccountView(operations: state.gameOperations, library: state.pcGames)
+                    Divider()
+                    if let error = session.accountError {
+                        Label(error, systemImage: "exclamationmark.circle")
+                            .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("xodus.account.error")
                     }
-                    .foregroundStyle(.secondary).textSelection(.enabled).padding(.top, 12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    if let summary = session.accountFailureSummary {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("Last sign-in error").font(.headline)
+                            Text(summary).fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("xodus.account.failureSummary")
+                            if let observation = session.accountFailureObservation {
+                                Text(observation).fixedSize(horizontal: false, vertical: true)
+                                    .accessibilityIdentifier("xodus.account.failureObservation")
+                            }
+                        }
+                        .foregroundStyle(.secondary).textSelection(.enabled)
+                    }
+                    if session.isReady && !session.supports(.authBegin) {
+                        Text("Sign-in isn't available in this build.").foregroundStyle(.secondary)
+                    }
+                    DisclosureGroup("Account info") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(session.accountExplanation)
+                            Text("Credentials stay in the native Keychain.")
+                            Text("macOS may ask for Keychain access again after an app update. Respond in its permission window; a new Microsoft sign-in is not required to check saved sign-in.")
+                        }
+                        .foregroundStyle(.secondary).textSelection(.enabled).padding(.top, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
             }
         } actions: {
-            AccountActionsLayout(layoutDirection: layoutDirection) {
-                Button(session.signInPending ? "Cancel sign-in" : "Close") {
-                    Task {
-                        let cancelling = session.signInPending
-                        if cancelling { await session.cancelSignIn() }
-                        if !session.signInPending,
-                           !cancelling || session.authentication?.flow?.state != .completed { dismiss() }
+            if state.showingSetup {
+                AccountActionsLayout(layoutDirection: layoutDirection) {
+                    Button("Close", action: dismiss.callAsFunction).keyboardShortcut(.cancelAction)
+                    Button("Back to Account") { state.showingSetup = false }
+                        .accessibilityIdentifier("xodus.setup.back")
+                }
+            } else {
+                AccountActionsLayout(layoutDirection: layoutDirection) {
+                    Button(session.signInPending ? "Cancel sign-in" : "Close") {
+                        Task {
+                            let cancelling = session.signInPending
+                            if cancelling { await session.cancelSignIn() }
+                            if !session.signInPending,
+                               !cancelling || session.authentication?.flow?.state != .completed { dismiss() }
+                        }
+                    }
+                    .keyboardShortcut(.cancelAction).disabled(session.accountBusy)
+                    .accessibilityLabel(session.signInPending ? "Cancel sign-in" : "Close account")
+                    .accessibilityIdentifier(session.signInPending ? "xodus.account.cancelSignIn" : "xodus.account.close")
+                    if session.isReady {
+                        Button("Check status") { Task { await session.refreshAccount() } }
+                            .disabled(session.accountBusy)
+                            .accessibilityLabel("Check account status")
+                            .accessibilityIdentifier("xodus.account.checkStatus")
+                    } else { Button("Settings", action: openSettings.callAsFunction) }
+                    if session.needsAccountDisconnect {
+                        Button(session.currentCredentialState == .expired ? "Disconnect expired sign-in" : "Sign out") {
+                            interaction.confirmingSignOut = true
+                        }
+                            .disabled(!session.canDisconnectAccount)
+                    } else {
+                        Button("Sign in with Microsoft") { Task { await session.beginSignIn() } }
+                            .disabled(!session.canSignIn)
+                            .accessibilityIdentifier("xodus.account.signIn")
+                            .buttonStyle(.borderedProminent)
                     }
                 }
-                .keyboardShortcut(.cancelAction).disabled(session.accountBusy)
-                .accessibilityLabel(session.signInPending ? "Cancel sign-in" : "Close account")
-                .accessibilityIdentifier(session.signInPending ? "xodus.account.cancelSignIn" : "xodus.account.close")
-                if session.isReady {
-                    Button("Check status") { Task { await session.refreshAccount() } }
-                        .disabled(session.accountBusy)
-                        .accessibilityLabel("Check account status")
-                        .accessibilityIdentifier("xodus.account.checkStatus")
-                } else { Button("Settings", action: openSettings.callAsFunction) }
-                if session.needsAccountDisconnect {
-                    Button(session.currentCredentialState == .expired ? "Disconnect expired sign-in" : "Sign out") {
-                        interaction.confirmingSignOut = true
-                    }
-                        .disabled(!session.canDisconnectAccount)
-                } else {
-                    Button("Sign in with Microsoft") { Task { await session.beginSignIn() } }
-                        .disabled(!session.canSignIn)
-                        .accessibilityIdentifier("xodus.account.signIn")
-                        .buttonStyle(.borderedProminent)
-                }
+                .controlSize(.regular)
             }
-            .controlSize(.regular)
         }
-        .task {
+        .task(id: state.showingSetup) {
+            guard !state.showingSetup else { return }
 #if !XODUS_SHIPPING
             if !refreshStatusOnAppear { return }
 #endif
@@ -155,7 +171,7 @@ struct LiveSettingsView: View {
             }
             RuntimeProviderSection(settings: state.runtimeSettings, backendPath: session.backendPath)
             Section("Account") {
-                GameServiceAccountView(operations: state.gameOperations)
+                GameServiceAccountView(operations: state.gameOperations, library: state.pcGames)
                 LabeledContent("Status", value: session.accountLabel)
                 Button("Open account") { state.showingAccount = true }
                 DisclosureGroup("Account info") { Text(session.accountExplanation).foregroundStyle(.secondary) }

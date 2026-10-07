@@ -33,7 +33,7 @@ struct LiveProductView: View {
                         }
                         Spacer()
                     }
-                    Text("Install and Play aren't available yet.")
+                    Text(session.productSummary(product))
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     DisclosureGroup("Catalog info") {
                         VStack(alignment: .leading, spacing: 18) {
@@ -50,7 +50,7 @@ struct LiveProductView: View {
                                     Text("Access: \(edition.entitlement.source)")
                                     Text("PC package: \(edition.installability.reason ?? "No package authorization established.")")
                                     Text("Compatibility: \(edition.compatibility.source)")
-                                    Text("This Mac: installed-game listing isn't available. A selected-folder marker check doesn't identify this edition or prove installation.")
+                                    Text("This Mac: catalog metadata doesn't identify an installed edition. Library uses a separate local Installed list; a selected-folder marker check doesn't register a game.")
                                     Divider()
                                 }
                             }

@@ -34,6 +34,10 @@ struct LiveRootView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
+                GameSetupBannerView(operations: state.gameOperations) {
+                    state.showingSetup = !session.signInPending
+                    state.showingAccount = true
+                }
                 if state.destination == .library { library }
                 else if state.destination == .discover { catalog }
                 else { LiveActivityView(operations: state.gameOperations) }
@@ -60,6 +64,8 @@ struct LiveRootView: View {
             if startupAllowed {
                 await state.installedGames.load()
                 await state.gameOperations.restore()
+                await state.gameOperations.loadGamePassCache()
+                state.gameOperations.checkSetupOnce()
             }
         }
         .task {
@@ -76,7 +82,7 @@ struct LiveRootView: View {
             catch { return }
             await session.refreshCatalog(state.query)
         }
-        .sheet(isPresented: $state.showingAccount) {
+        .sheet(isPresented: $state.showingAccount, onDismiss: { state.showingSetup = false }) {
 #if !XODUS_SHIPPING
             LiveAccountView(refreshStatusOnAppear: !PreviewExporter.liveDataRequested)
 #else
@@ -108,6 +114,9 @@ struct LiveRootView: View {
                             query: scopedQuery, allowsStartupTasks: startupAllowed,
                             browse: { state.navigate(.discover) },
                             recentActivity: { state.openRecentActivity() })
+                GamePassLibraryView(library: state.pcGames, installed: state.installedGames,
+                                    operations: state.gameOperations, query: scopedQuery,
+                                    allowsStartupTasks: startupAllowed)
             }
             if !state.showsRecentActivity {
                 DisclosureGroup("Library details") {
@@ -257,6 +266,10 @@ struct LiveCatalogView: View {
                         if let game = results.ownedGame(for: product.id) {
                             PCGameTile(game: game, installed: installed, operations: operations,
                                        allowsArtworkLoading: allowsArtworkLoading, badge: .owned)
+                        } else if results.badge(for: product.id) == .gamePass, operations.gamePassActive {
+                            PCGameTile(game: PCGame(product: product), installed: installed, operations: operations,
+                                       allowsArtworkLoading: allowsArtworkLoading, badge: .gamePass,
+                                       viewDetails: { session.selectedProduct = product })
                         } else {
                             storeTile(product, badge: results.badge(for: product.id))
                         }
@@ -311,6 +324,9 @@ struct LiveCatalogView: View {
                     }
                     GameCompatibilityBadge(operations: operations, productID: product.id,
                                            allowsLoading: allowsArtworkLoading)
+                    if badge == .gamePass {
+                        Text("Included with PC Game Pass").font(.callout).foregroundStyle(.secondary)
+                    }
                     if product.freshness == "cached" {
                         Text("Offline details").font(.caption).foregroundStyle(.secondary)
                     }

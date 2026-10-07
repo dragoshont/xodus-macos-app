@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import SwiftUI
+import XodusManagement
 
 struct PCGamesView: View {
     @ObservedObject var library: PCGamesController
@@ -125,6 +126,7 @@ struct PCGameTile: View {
     @ObservedObject var operations: GameOperationsController
     var allowsArtworkLoading = true
     var badge: CatalogAccessBadge?
+    var viewDetails: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -139,7 +141,7 @@ struct PCGameTile: View {
             }
             GameCompatibilityBadge(operations: operations, productID: game.id, allowsLoading: allowsArtworkLoading)
             if let match = PCGamesController.installedMatch(game, in: installed.games) {
-                InstalledPlayButton(library: installed, game: match)
+                InstalledPlayButton(library: installed, operations: operations, game: match)
                 InstalledPlayError(library: installed, game: match)
             } else {
                 Text("Not installed").font(.callout).foregroundStyle(.secondary)
@@ -148,8 +150,16 @@ struct PCGameTile: View {
                     .accessibilityLabel("Install \(game.title)")
                     .accessibilityIdentifier("xodus.pcGames.install")
             }
+            if let viewDetails { Button("View game", action: viewDetails) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
+    }
+}
+
+extension PCGame {
+    init(product: CatalogProduct) {
+        self.init(id: product.id, title: product.title,
+                  artwork: CatalogArtworkReference.preferred(in: product.artwork, roles: [.boxArt, .poster, .tile, .hero]))
     }
 }

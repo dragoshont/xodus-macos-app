@@ -518,16 +518,19 @@ enum NativeChecks {
             let feedIDs = Set(feed.products.map(\.id))
             check(!feedIDs.isEmpty && feed.catalogError == nil
                   && feed.products.allSatisfy { !$0.pcCatalogCandidate }
-                  && feed.gamePassProductIDs == feedIDs,
+                  && feed.gamePassProductIDs == feedIDs && Set(feed.gamePassProducts.map(\.id)) == feedIDs,
                   "B1/B2: A 16-result discovery request accepts false flags and records only validated feed products")
             await feed.refreshCatalog("neutral")
-            check(feed.gamePassProductIDs == feedIDs && feed.catalogCorpus == "publicMicrosoftStoreSearch"
+            check(feed.gamePassProductIDs == feedIDs && Set(feed.gamePassProducts.map(\.id)) == feedIDs
+                  && feed.catalogCorpus == "publicMicrosoftStoreSearch"
                   && feed.catalogError == nil,
                   "B2: Searching Store preserves loaded Game Pass IDs without promoting failures or ownership")
             feed.market = "GB"
-            check(feed.gamePassProductIDs.isEmpty, "B2: Market/language scope changes clear Game Pass evidence")
+            check(feed.gamePassProductIDs.isEmpty && feed.gamePassProducts.isEmpty,
+                  "B2/B5: Market/language scope changes clear Game Pass IDs and shelf products")
             await feed.disconnect()
-            check(feed.gamePassProductIDs.isEmpty, "B2: Disconnection discards the in-memory feed evidence")
+            check(feed.gamePassProductIDs.isEmpty && feed.gamePassProducts.isEmpty,
+                  "B2/B5: Disconnection discards the in-memory feed and shelf evidence")
 
             let publicCatalog = session("publiccapture")
             await publicCatalog.connect()
@@ -548,8 +551,8 @@ enum NativeChecks {
                   && publicCatalog.installedSnapshot?.installations.isEmpty == true,
                   "Catalog notInstalled and a constant-empty response never become a Mac inventory claim")
             check(publicCatalog.productSummary(product) ==
-                  "Access and Mac compatibility haven't been checked. Install and Play aren't available yet.",
-                  "Multi-edition public detail has one truthful combined status without repeated unknown rows")
+                  "Catalog metadata doesn't verify access or Mac compatibility. Use Library or Discover for Install and Play.",
+                  "Multi-edition public detail separates catalog evidence from eligible Library and Discover actions")
             NativeUIChecks.checkLiveLayouts(session: publicCatalog, check: check)
             await publicCatalog.disconnect()
 

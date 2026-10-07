@@ -32,6 +32,14 @@ final class ShippingChecks: XCTestCase {
         check(state.gameOperations.serviceStatus == nil && !state.gameOperations.serviceBusy
               && state.gameOperations.operation == nil && !state.installedGames.mutationActive,
               "Shipping game operations start without private-script, credential or mutation activity")
+        check(state.gameOperations.gamePassStatus == nil && !state.gameOperations.gamePassBusy
+              && !state.gameOperations.gamePassActive && session.gamePassProducts.isEmpty
+              && state.installedGames.stoppingGameID == nil && state.installedGames.playNotices.isEmpty,
+              "Shipping Game Pass and Stop start without cached access, catalog, process or success evidence")
+        check(state.gameOperations.setupResult == nil && !state.gameOperations.setupBusy
+              && !state.gameOperations.setupNeedsAttention && !state.installedGames.runtimeRepairActive
+              && !state.showingSetup,
+              "Shipping setup starts unchecked, without a script, repair or invented readiness")
         let results = CatalogSearchResults(query: "neutral", ownedGames: [], storeProducts: [], gamePassProductIDs: [])
         check(results.ownedMatches.isEmpty && results.storeProducts.isEmpty
               && results.badge(for: "FIXTURE00001") == nil && session.gamePassProductIDs.isEmpty

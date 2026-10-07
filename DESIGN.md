@@ -47,7 +47,25 @@ bounded title/flow evidence, not complete accessibility or gameplay certificatio
 
 ## Actual native implementation
 
-**Phase 2 B1/B2/B3 candidate:** retain the existing native catalog grid and
+**Phase 2 B5/B7/B8/B9 candidate:** retain the same native grid and controls. A separate
+Game Pass shelf follows Your PC games only with active service-owned status;
+its tiles share Installed matching and the protected support-check/Install
+flow. Account adds a quiet PC Game Pass status and explicit Check with honest
+saved-status provenance, Unknown/failure and prerequisite states. No expiry,
+ownership promotion or new navigation is invented. The shared Installed /
+Continue Playing / matching-tile control becomes Stop only for the session
+Xodus launched. Its disabled in-flight state and Stopping indicator are shared
+across every surface; confirmed completion says Stopped rather than showing
+a crash/retry. Ordinary gameplay Quit is unchanged. Source qualification and
+owner live acceptance are separate gates; none is implied here.
+Account also lists the four backend Setup items as Ready or their fix text.
+One quiet Xodus needs setup banner links to a focused Setup sheet without
+reading unrelated launcher credentials. Repair Xodus is explicit, fenced and
+shows progress/error/Show log; missing game sign-in offers its existing action.
+Supported Install consent shows the real download size; unsupported consent
+shows only its reason, not unknown-size or future-download copy.
+
+**Phase 2 B1/B2/B3 (`7c3c1f0`, admitted, installed and live-accepted):** retain the existing native catalog grid and
 toolbar. A nonblank Discover search places Your games above Microsoft Store;
 local loaded-title matches remain visible even when Store results fail or omit
 them. Owned tiles share the PC-library tile and its exact Installed Play match
@@ -57,7 +75,9 @@ Cached Plays on Mac / Not supported on Mac labels come only from private
 bounded check receipts. Install/Repair consent shows Checking this game while
 the fenced script runs, then real download size and support/reason before
 enabling its default action. Cancel joins the check without installing.
-No live visual/interaction acceptance is claimed for this candidate.
+The owner accepted real-art Discover including the previously rejected feed
+members, owned-first Play/Install search and unsupported Celeste consent.
+The copy refinement above follows that live acceptance; it is not yet deployed.
 
 **S4 PC Library (admitted and installed `7ec1daa`):** the existing native Library retains Continue Playing
 and Installed above a distinct Your PC games shelf. Signed out, one native
