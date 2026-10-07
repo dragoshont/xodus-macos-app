@@ -49,6 +49,25 @@ without reading/uploading its contents. RunIDs/log locations remain in memory,
 clear on retry/removal and do not become registry or diagnostic payloads.
 Neutral fake scripts check existing/missing log actions and path refusal.
 
+Frozen source `e4014647328654c4c8688ca5954b5b3f5dfd162e` (tree
+`78d5b8b0cea272ce0fdaaba21d899c9c6aefd853`) passed 558 native session,
+75 presentation and 29 portable checks on the user's Mac with outbound
+networking denied, plus a shipping Debug build. Exact-source
+[CI 37610002150](https://github.com/dragoshont/xodus-macos-app/actions/runs/37610002150)
+also passed, including Release ShippingChecks and shipping resource exclusions.
+These are neutral/source evidence, not real game-art/session evidence.
+
+The matching `tmzPp3` package is staged, **not installed**. Its receipt SHA256 is
+`fcb0d45ea18e0156a144dfdf52b0bd3f4bb715a7b252d7aaf86cac7a7f01e815`,
+13,887 bytes, covering 21 files. Local fixed app/helper/engine signature checks
+passed; the signed C8 engine is byte-for-byte preserved from admitted
+`0926414`/`18uWwt`. Independent Root admission and confirmation that the live
+game has ended are separate requirements before normal Quit/replacement.
+The staged installer cannot proceed without both. Existing app, game, profile
+and credentials remain untouched. S1 remains open until the admitted app shows
+Hogwarts tile art and a post-install user/Root-launched session supplies its
+Continue Playing splash; CI/package alone do not close the spec.
+
 Main Library offers an Installed section independently of owned-PC inventory,
 which remains unavailable. The user chooses one game folder and then one
 executable working Xodus launch script through native file panels. The folder
