@@ -99,7 +99,7 @@ struct LiveRootView: View {
                                       findInStore: { state.findInStore($0, session: session) })
                     .accessibilityIdentifier("xodus.library.recentActivity")
             } else {
-                InstalledGamesView(library: state.installedGames)
+                InstalledGamesView(library: state.installedGames, allowsArtworkLoading: startupAllowed)
                 ContentUnavailableView {
                     Label(session.libraryTitle, systemImage: "gamecontroller")
                 } description: {

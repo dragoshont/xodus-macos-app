@@ -24,6 +24,15 @@ No backend, contract or signed engine change accompanies this interface.
 Hogwarts Legacy's live test is separately user-controlled; neutral checks never
 launch a real game.
 
+**S1 source candidate:** imported tiles use bounded local PNG/JPEG art from
+MicrosoftGame.config. The newest recorded Xodus-launched imported game supplies
+a Continue Playing splash card, publisher and relative last-played date, sharing
+the list's Play state. Session start/duration stay in the private local list;
+old entries still load. Nonzero sessions offer Show log only for an existing
+generated-session stderr file. This is not Xbox activity, ownership or network
+artwork. The currently running app/game will not be replaced until the session
+has ended and the staged package is admitted.
+
 Exact-source [CI passed](https://github.com/dragoshont/xodus-macos-app/actions/runs/37603065132).
 The independently admitted package was installed after normal Quit, preserving
 a complete working 2d rollback, the profile and older rollbacks. All 21 installed

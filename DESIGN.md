@@ -25,6 +25,22 @@ visually confirmed.
 
 ## Actual native implementation
 
+**S1 installed Library refinement (source candidate):** local tile art uses
+Square480, Square150, then StoreLogo from the imported folder's ShellVisuals,
+with the existing 60-point square geometry and system-symbol fallback.
+Continue Playing appears above Installed only for the newest recorded
+Xodus-launched imported game whose folder/script are available. Its splash
+(tile fallback) leads a native 12-point-radius hero; title, optional publisher,
+relative last-played date and the shared Play control sit on system material
+below the image so contrast is independent of the artwork. This preserves the
+approved Figma Library's artwork-first hierarchy and native composition without
+copying its invented shelves, ownership labels, artwork or custom toolbar.
+The hero and list share one process state/error/one-session guard. Art is
+decorative; hero content and title-specific controls remain independently
+accessible. No motion, personal-history read or network artwork request is
+added. Missing art is silent; session-history save failure is a quiet
+product message and never prevents play/termination state updates.
+
 **Installed-game Play (admitted shipping `0926414`):** the non-activity Library begins with
 an Installed section, separate from the unchanged owned-PC unavailable state.
 User-imported entries use their config display name and a restrained system

@@ -3,9 +3,39 @@ import SwiftUI
 
 struct InstalledGamesView: View {
     @ObservedObject var library: InstalledGamesController
+    var allowsArtworkLoading = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
+            if let game = library.continuingGame {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Continue Playing").font(.title2.bold())
+                    VStack(alignment: .leading, spacing: 0) {
+                        InstalledArtworkView(game: game, splash: true, allowsLoading: allowsArtworkLoading)
+                            .frame(height: 260)
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(game.title).font(.largeTitle.bold())
+                                .fixedSize(horizontal: false, vertical: true)
+                            if let publisher = game.publisher {
+                                Text(publisher).foregroundStyle(.secondary)
+                            }
+                            if let date = game.lastPlayedAt {
+                                Text("Last played \(Text(date, style: .relative)) ago")
+                                    .font(.callout).foregroundStyle(.secondary)
+                            }
+                            InstalledPlayButton(library: library, game: game)
+                            playError(game)
+                        }
+                        .padding(24).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.regularMaterial)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("Continue Playing, \(game.title)")
+                    .accessibilityIdentifier("xodus.installed.continuePlaying")
+                }
+                .padding(.bottom, 10)
+            }
             HStack {
                 Text("Installed").font(.title.bold())
                 Spacer()
@@ -21,6 +51,10 @@ struct InstalledGamesView: View {
                         .accessibilityIdentifier("xodus.installed.retryLoad")
                 }
             }
+            if let error = library.historyError {
+                Text(error).font(.callout).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("xodus.installed.historyError")
+            }
             if library.loading {
                 ProgressView("Loading installed games").controlSize(.small)
             } else if library.loaded, library.games.isEmpty {
@@ -31,10 +65,9 @@ struct InstalledGamesView: View {
             ForEach(library.games) { game in
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 16) {
-                        Image(systemName: "gamecontroller")
-                            .font(.title).foregroundStyle(.secondary)
+                        InstalledArtworkView(game: game, allowsLoading: allowsArtworkLoading)
                             .frame(width: 60, height: 60)
-                            .accessibilityHidden(true)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                         Text(game.title).font(.headline).fixedSize(horizontal: false, vertical: true)
                         Spacer()
                         Button(role: .destructive) { Task { await library.remove(game) } } label: {
@@ -45,23 +78,9 @@ struct InstalledGamesView: View {
                         .help("Remove from list. Game files are kept.")
                         .accessibilityLabel("Remove \(game.title) from list")
                         .accessibilityIdentifier("xodus.installed.remove")
-                        Button(library.runningGameID == game.id
-                               ? (library.playState == .launching ? "Launching" : "Playing")
-                               : library.playErrors[game.id] == nil ? "Play" : "Try again") {
-                            Task { await library.play(game) }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(library.runningGameID != nil || library.editing || library.choosing)
-                        .accessibilityLabel(library.runningGameID == game.id
-                            ? "\(game.title) is \(library.playState == .launching ? "launching" : "playing")"
-                            : "Play \(game.title)")
-                        .accessibilityIdentifier("xodus.installed.play")
+                        InstalledPlayButton(library: library, game: game)
                     }
-                    if let error = library.playErrors[game.id] {
-                        Text(error).font(.callout).foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("xodus.installed.playError")
-                    }
+                    playError(game)
                 }
                 .accessibilityElement(children: .contain)
                 Divider()
@@ -74,5 +93,37 @@ struct InstalledGamesView: View {
         Button("Import installed Xbox game") { Task { await library.chooseGame() } }
             .disabled(!library.loaded || library.editing || library.choosing)
             .accessibilityIdentifier("xodus.installed.import")
+    }
+
+    @ViewBuilder private func playError(_ game: InstalledGame) -> some View {
+        if let error = library.playErrors[game.id] {
+            Text(error).font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("xodus.installed.playError")
+            if library.playLogs[game.id] != nil {
+                Button("Show log") { library.showLog(for: game) }
+                    .accessibilityLabel("Show \(game.title) launch log in Finder")
+                    .accessibilityIdentifier("xodus.installed.showLog")
+            }
+        }
+    }
+}
+
+private struct InstalledPlayButton: View {
+    @ObservedObject var library: InstalledGamesController
+    let game: InstalledGame
+
+    var body: some View {
+        Button(library.runningGameID == game.id
+               ? (library.playState == .launching ? "Launching" : "Playing")
+               : library.playErrors[game.id] == nil ? "Play" : "Try again") {
+            Task { await library.play(game) }
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(library.runningGameID != nil || library.editing || library.choosing)
+        .accessibilityLabel(library.runningGameID == game.id
+            ? "\(game.title) is \(library.playState == .launching ? "launching" : "playing")"
+            : "Play \(game.title)")
+        .accessibilityIdentifier("xodus.installed.play")
     }
 }

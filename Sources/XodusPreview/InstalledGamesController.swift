@@ -17,16 +17,32 @@ final class InstalledGamesController: ObservableObject {
     @Published private(set) var runningGameID: UUID?
     @Published private(set) var playState: InstalledGamePlayState?
     @Published private(set) var playErrors: [UUID: String] = [:]
+    @Published private(set) var historyError: String?
+    @Published private(set) var playLogs: [UUID: URL] = [:]
+    @Published private(set) var launchableIDs: Set<UUID> = []
     var applicationTerminating = false
     private let store: InstalledGameStore
     private let launchingDuration: Duration
     private var playingTask: Task<Void, Never>?
     private var runToken: UUID?
     private var process: Process?
+    private var sessionPersistence: Task<Void, Never>?
+    private var runIDs: [UUID: String] = [:]
+    private let logDirectory: URL
 
-    init(store: InstalledGameStore = InstalledGameStore(), launchingDuration: Duration = .seconds(5)) {
+    var continuingGame: InstalledGame? {
+        games.filter { $0.lastPlayedAt != nil && launchableIDs.contains($0.id) }
+            .max {
+                if $0.lastPlayedAt == $1.lastPlayedAt { return $0.id.uuidString < $1.id.uuidString }
+                return ($0.lastPlayedAt ?? .distantPast) < ($1.lastPlayedAt ?? .distantPast)
+            }
+    }
+
+    init(store: InstalledGameStore = InstalledGameStore(), launchingDuration: Duration = .seconds(5),
+         logDirectory: URL = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Logs/XodusRemote")) {
         self.store = store
         self.launchingDuration = launchingDuration
+        self.logDirectory = logDirectory
     }
 
     func load() async {
@@ -37,6 +53,7 @@ final class InstalledGamesController: ObservableObject {
             games = try await store.load()
             loaded = true
             error = nil
+            await refreshLaunchableGames()
         } catch { self.error = InstalledGameError.invalidRegistry.localizedDescription }
     }
 
@@ -50,18 +67,19 @@ final class InstalledGamesController: ObservableObject {
                 try InstalledGameFiles.checkLauncher(launcher)
                 return config
             }.value
-            let game = InstalledGame(id: games.first(where: { $0.folder == folder.path })?.id ?? UUID(),
+            let previous = games.first(where: { $0.folder == folder.path })
+            let game = InstalledGame(id: previous?.id ?? UUID(),
                 title: metadata.title, identityName: metadata.identityName, version: metadata.version,
-                storeId: metadata.storeId, folder: folder.path, launcher: launcher.path, importedAt: Date())
+                storeId: metadata.storeId, folder: folder.path, launcher: launcher.path, importedAt: Date(),
+                publisher: metadata.publisher)
             guard runningGameID != game.id else {
                 error = "Wait for this game to finish before changing its launch script."
                 return
             }
-            var updated = games.filter { $0.folder != game.folder }
-            updated.append(game)
-            try await store.save(updated)
-            games = updated
+            let updated = try await store.upsert(game)
+            applySavedGames(updated)
             error = nil
+            await refreshLaunchableGames()
         } catch {
             self.error = (error as? InstalledGameError)?.localizedDescription
                 ?? InstalledGameError.storage.localizedDescription
@@ -100,11 +118,13 @@ final class InstalledGamesController: ObservableObject {
         guard loaded, !editing, !choosing, !applicationTerminating, runningGameID != game.id else { return }
         editing = true
         defer { editing = false }
-        let updated = games.filter { $0.id != game.id }
         do {
-            try await store.save(updated)
-            games = updated
+            let updated = try await store.remove(id: game.id)
+            applySavedGames(updated)
+            launchableIDs.remove(game.id)
             playErrors[game.id] = nil
+            playLogs[game.id] = nil
+            runIDs[game.id] = nil
             error = nil
         } catch { self.error = InstalledGameError.storage.localizedDescription }
     }
@@ -124,6 +144,16 @@ final class InstalledGamesController: ObservableObject {
         return environment
     }
 
+    static func sessionLog(runID: String, directory: URL) -> URL? {
+        guard runID.range(of: #"^xodus-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$"#,
+                          options: .regularExpression) == runID.startIndex..<runID.endIndex else { return nil }
+        return directory.appendingPathComponent(runID + ".stderr.log")
+    }
+
+    func showLog(for game: InstalledGame) {
+        if let url = playLogs[game.id] { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+    }
+
     func play(_ game: InstalledGame) async {
         guard loaded, !editing, !choosing, runningGameID == nil, !applicationTerminating,
               games.contains(game) else { return }
@@ -132,9 +162,11 @@ final class InstalledGamesController: ObservableObject {
         runningGameID = game.id
         playState = .launching
         playErrors[game.id] = nil
+        playLogs[game.id] = nil
         do {
             let environment = Self.launchEnvironment(ProcessInfo.processInfo.environment)
             let runID = Self.runID()
+            runIDs[game.id] = runID
             let child = try await Task.detached(priority: .userInitiated) { [weak self] in
                 try InstalledGameFiles.checkFolder(URL(fileURLWithPath: game.folder))
                 try InstalledGameFiles.checkLauncher(URL(fileURLWithPath: game.launcher))
@@ -145,27 +177,38 @@ final class InstalledGamesController: ObservableObject {
                 child.standardInput = FileHandle.nullDevice
                 child.standardOutput = FileHandle.nullDevice
                 child.standardError = FileHandle.nullDevice
+                let startedAt = Date()
+                let startedClock = ContinuousClock.now
                 child.terminationHandler = { [weak self] value in
                     let status = value.terminationStatus
-                    Task { @MainActor [weak self] in self?.finished(token: token, gameID: game.id, status: status) }
+                    let duration = startedClock.duration(to: .now).components
+                    let seconds = Double(duration.seconds) + Double(duration.attoseconds) / 1e18
+                    Task { @MainActor [weak self] in
+                        guard let self, self.runToken == token else { return }
+                        self.recordSession(gameID: game.id, startedAt: startedAt, seconds: max(0, seconds))
+                        self.finished(token: token, gameID: game.id, status: status)
+                        if status != 0 { await self.findSessionLog(gameID: game.id, runID: runID) }
+                    }
                 }
                 try child.run()
-                return child
+                return (child, startedAt)
             }.value
             // A short-lived script can exit before the off-main launch returns.
             guard runToken == token else { return }
-            process = child
+            process = child.0
+            recordSession(gameID: game.id, startedAt: child.1, seconds: nil)
             playingTask = Task { [weak self] in
                 guard let self else { return }
                 do { try await Task.sleep(for: self.launchingDuration) }
                 catch { return }
-                if self.runToken == token, child.isRunning { self.playState = .playing }
+                if self.runToken == token, child.0.isRunning { self.playState = .playing }
             }
         } catch {
             if runToken == token {
                 finished(token: token, gameID: game.id, status: 0)
                 playErrors[game.id] = (error as? InstalledGameError)?.localizedDescription
                     ?? InstalledGameError.launch.localizedDescription
+                if error is InstalledGameError { launchableIDs.remove(game.id) }
             }
         }
     }
@@ -179,5 +222,70 @@ final class InstalledGamesController: ObservableObject {
         runningGameID = nil
         playState = nil
         if status != 0 { playErrors[gameID] = "The game stopped unexpectedly (code \(status))." }
+    }
+
+    private func recordSession(gameID: UUID, startedAt: Date, seconds: Double?) {
+        guard let index = games.firstIndex(where: { $0.id == gameID }) else { return }
+        games[index].lastPlayedAt = startedAt
+        games[index].lastSessionSeconds = seconds
+        let previous = sessionPersistence
+        let store = store
+        sessionPersistence = Task { [weak self] in
+            await previous?.value
+            do {
+                try await store.recordSession(id: gameID, startedAt: startedAt, seconds: seconds)
+                self?.historyError = nil
+            } catch {
+                self?.historyError = "Your play history couldn't be saved. You can keep playing."
+            }
+        }
+    }
+
+    private func findSessionLog(gameID: UUID, runID: String) async {
+        guard let url = Self.sessionLog(runID: runID, directory: logDirectory) else { return }
+        let exists = await Task.detached(priority: .utility) {
+            let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            return values?.isRegularFile == true && values?.isSymbolicLink != true
+        }.value
+        if exists, runIDs[gameID] == runID, playErrors[gameID] != nil { playLogs[gameID] = url }
+    }
+
+    func waitForSessionPersistence() async { await sessionPersistence?.value }
+
+    private func applySavedGames(_ saved: [InstalledGame]) {
+        games = saved.map { entry in
+            guard let current = games.first(where: { $0.id == entry.id }),
+                  let date = current.lastPlayedAt, entry.lastPlayedAt.map({ date >= $0 }) ?? true else {
+                return entry
+            }
+            var merged = entry
+            merged.lastPlayedAt = date
+            merged.lastSessionSeconds = current.lastSessionSeconds
+            return merged
+        }
+    }
+
+    private func refreshLaunchableGames() async {
+        let entries = games
+        let result = await Task.detached(priority: .utility) {
+            var launchable: Set<UUID> = []
+            var publishers: [UUID: String] = [:]
+            for game in entries {
+                let folder = URL(fileURLWithPath: game.folder)
+                if game.publisher == nil, let publisher = (try? MicrosoftGameConfig.read(folder: folder))?.publisher {
+                    publishers[game.id] = publisher
+                }
+                do {
+                    try InstalledGameFiles.checkFolder(folder)
+                    try InstalledGameFiles.checkLauncher(URL(fileURLWithPath: game.launcher))
+                    launchable.insert(game.id)
+                } catch { continue }
+            }
+            return (launchable, publishers)
+        }.value
+        launchableIDs = result.0.intersection(games.map(\.id))
+        for index in games.indices where games[index].publisher == nil {
+            games[index].publisher = result.1[games[index].id]
+        }
     }
 }

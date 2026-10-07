@@ -11,6 +11,9 @@ struct InstalledGame: Codable, Equatable, Identifiable, Sendable {
     let folder: String
     let launcher: String
     let importedAt: Date
+    var publisher: String? = nil
+    var lastPlayedAt: Date? = nil
+    var lastSessionSeconds: Double? = nil
 }
 
 enum InstalledGameError: Error, LocalizedError {
@@ -33,6 +36,9 @@ struct MicrosoftGameConfig: Equatable, Sendable {
     let version: String
     let storeId: String
     let title: String
+    let publisher: String?
+    let tileArt: [String]
+    let splashArt: String?
 
     static func read(folder: URL) throws -> Self {
         try InstalledGameFiles.checkFolder(folder)
@@ -66,7 +72,15 @@ struct MicrosoftGameConfig: Equatable, Sendable {
             $0.count <= 512 && !$0.unicodeScalars.contains { CharacterSet.controlCharacters.contains($0) }
         }) else { throw InstalledGameError.invalidConfig }
         return Self(identityName: identity, version: version, storeId: storeId,
-                    title: reader.title.flatMap { $0.isEmpty ? nil : $0 } ?? identity)
+                    title: reader.title.flatMap { $0.isEmpty ? nil : $0 } ?? identity,
+                    publisher: reader.visuals["PublisherDisplayName"].flatMap {
+                        $0.isEmpty || $0.count > 512 || $0.unicodeScalars.contains(where: {
+                            CharacterSet.controlCharacters.contains($0)
+                        }) ? nil : $0
+                    },
+                    tileArt: ["Square480x480Logo", "Square150x150Logo", "StoreLogo"].compactMap {
+                        reader.visuals[$0]
+                    }, splashArt: reader.visuals["SplashScreenImage"])
     }
 }
 
@@ -77,6 +91,7 @@ private final class ConfigReader: NSObject, XMLParserDelegate {
     var title: String?
     var storeId: String?
     var invalid = false
+    var visuals: [String: String] = [:]
     private var path: [String] = []
     private var text = ""
 
@@ -91,7 +106,8 @@ private final class ConfigReader: NSObject, XMLParserDelegate {
             version = attributes["Version"]?.trimmingCharacters(in: .whitespacesAndNewlines)
         }
         if path == ["Game", "ShellVisuals"] {
-            if title != nil { invalid = true }
+            if !visuals.isEmpty { invalid = true }
+            visuals = attributes
             title = attributes["DefaultDisplayName"]?.trimmingCharacters(in: .whitespacesAndNewlines)
         }
         if path == ["Game", "StoreId"] { text = "" }
@@ -171,7 +187,9 @@ actor InstalledGameStore {
         let games = try JSONDecoder().decode([InstalledGame].self, from: data)
         guard Set(games.map(\.id)).count == games.count, Set(games.map(\.folder)).count == games.count,
               games.allSatisfy({ !$0.title.isEmpty && !$0.identityName.isEmpty && !$0.version.isEmpty
-                  && !$0.storeId.isEmpty && $0.folder.hasPrefix("/") && $0.launcher.hasPrefix("/") }) else {
+                  && !$0.storeId.isEmpty && $0.folder.hasPrefix("/") && $0.launcher.hasPrefix("/")
+                  && ($0.lastSessionSeconds.map { $0.isFinite && $0 >= 0 } ?? true)
+                  && ($0.lastPlayedAt.map { $0.timeIntervalSince1970.isFinite } ?? true) }) else {
             throw InstalledGameError.invalidRegistry
         }
         return games
@@ -202,5 +220,34 @@ actor InstalledGameStore {
             }
             throw error
         }
+    }
+
+    func upsert(_ game: InstalledGame) throws -> [InstalledGame] {
+        var games = try load()
+        var updated = game
+        if let previous = games.first(where: { $0.id == game.id }) {
+            updated.lastPlayedAt = previous.lastPlayedAt
+            updated.lastSessionSeconds = previous.lastSessionSeconds
+        }
+        games.removeAll { $0.folder == game.folder }
+        games.append(updated)
+        try save(games)
+        return games
+    }
+
+    func remove(id: UUID) throws -> [InstalledGame] {
+        var games = try load()
+        games.removeAll { $0.id == id }
+        try save(games)
+        return games
+    }
+
+    func recordSession(id: UUID, startedAt: Date, seconds: Double?) throws {
+        var games = try load()
+        guard let index = games.firstIndex(where: { $0.id == id }),
+              games[index].lastPlayedAt.map({ $0 <= startedAt }) ?? true else { return }
+        games[index].lastPlayedAt = startedAt
+        games[index].lastSessionSeconds = seconds
+        try save(games)
     }
 }

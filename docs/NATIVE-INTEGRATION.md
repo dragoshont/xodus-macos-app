@@ -4,6 +4,51 @@ This is implementation work beyond the immutable foundation at `44d7338`. It is 
 
 ## Local imported-game Play
 
+### S1 artwork and Continue Playing (source candidate)
+
+This slice implements AC1.1–AC1.6 of the
+[published remaining-work spec](https://github.com/dragoshont/xodus-macos/blob/dragoshont-heroic-xbox-integration/docs/xodus/remaining-work-plan.md).
+Tile preference is ShellVisuals Square480x480Logo, Square150x150Logo, StoreLogo;
+hero preference is SplashScreenImage then the same tile order. Windows
+backslashes are parsed as relative separators. Component-by-component `openat`
+with no-follow directory/file descriptors rejects traversal, absolute/drive
+paths and symlinks, including swapped components. Only regular PNG/JPEG files
+up to 8 MiB and 16,000,000 decoded pixels are accepted. Tile/splash decoding is
+off-main and downsampled to 480/1920 pixels; cache is bounded memory-only.
+Missing/unreadable/invalid optional art silently retains the system symbol.
+No real game art is copied into the repository, fixtures or shipping resources.
+
+Publisher and nullable lastPlayedAt/lastSessionSeconds extend the local JSON
+without making new keys required for old entries. Artwork is re-derived from
+the selected folder's config, not stored as remote/provider identity. Successful
+script start records lastPlayedAt; script exit records monotonic process
+duration, including fast and nonzero exits. Failed startup records neither.
+Actor mutations merge history with import/remove rather than overwriting it
+with stale list snapshots. Async persistence failure never delays clearing the
+active session; one quiet error says history couldn't be saved.
+
+Only the newest recorded imported game with a locally available folder and
+executable script can supply Continue Playing. It never consumes Xbox activity.
+The native hero includes decorative splash/tile art, title, optional publisher,
+relative last played and the exact shared Play/Launching/Playing/retry action.
+It does not add entitlement, Store, compatibility or engine-registry claims.
+
+Neutral checks use tiny synthetic PNGs and fake scripts for ordered art
+fallback, contained paths/symlink refusal, byte/pixel bounds, downsampling,
+legacy decoding, persisted own-session lifetime, history-save failure,
+concurrent import preservation and hero ordering/launchability. Real-product
+closure still requires an admitted installation, Hogwarts artwork observation
+and one user/Root-controlled post-install session. The running game and app
+must not be interrupted; CI/package alone do not close that gate.
+
+The user-directed AC2.3 addition shares this batch: a nonzero session exposes
+Show log only when its generated-runID stderr file exists in
+`~/Library/Logs/XodusRemote`. The fixed suffix is `.stderr.log`; paths never
+come from script output or arbitrary input. Finder reveals the selected file
+without reading/uploading its contents. RunIDs/log locations remain in memory,
+clear on retry/removal and do not become registry or diagnostic payloads.
+Neutral fake scripts check existing/missing log actions and path refusal.
+
 Main Library offers an Installed section independently of owned-PC inventory,
 which remains unavailable. The user chooses one game folder and then one
 executable working Xodus launch script through native file panels. The folder
