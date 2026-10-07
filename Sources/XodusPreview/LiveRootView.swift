@@ -40,7 +40,7 @@ struct LiveRootView: View {
             VStack(alignment: .leading, spacing: 28) {
                 if state.destination == .library { library }
                 else if state.destination == .discover { catalog }
-                else { LiveActivityView() }
+                else { LiveActivityView(operations: state.gameOperations) }
             }
             .padding(30)
         }
@@ -266,7 +266,7 @@ struct LiveRootView: View {
 }
 
 struct LiveActivityView: View {
-    @EnvironmentObject private var state: AppState
+    @ObservedObject var operations: GameOperationsController
     @EnvironmentObject private var session: LiveSession
 
     var body: some View {
@@ -278,7 +278,7 @@ struct LiveActivityView: View {
                     Task { await session.refreshActivity() }
                 }.disabled(!session.supports(.jobs) || session.activity.isReconciling)
             }
-            GameOperationProgressView(operations: state.gameOperations)
+            GameOperationProgressView(operations: operations)
             if let notice = session.activityNotice {
                 Label(notice, systemImage: "exclamationmark.circle")
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -288,7 +288,7 @@ struct LiveActivityView: View {
                       systemImage: "arrow.clockwise").foregroundStyle(.secondary)
             }
             if session.activity.jobs.isEmpty {
-                if !state.gameOperations.isBusy && state.gameOperations.error == nil && state.gameOperations.notice == nil {
+                if !operations.isBusy && operations.error == nil && operations.notice == nil {
                     ContentUnavailableView("No downloads yet", systemImage: "arrow.down.circle",
                         description: Text("Choose Install on a game in your PC Library."))
                         .frame(maxWidth: .infinity, minHeight: 240)

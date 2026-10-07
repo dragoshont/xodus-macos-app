@@ -67,6 +67,13 @@ registration metadata. Exact frozen-source CI, package admission and owner live
 acceptance remain pending. The installed S4 app and its profile/list are
 unchanged.
 
+The subsequent observation-only correction makes Downloads itself observe
+operation state (so its empty state disappears during work) and forwards
+Installed-state changes to computed service/consent controls. Its focused
+operation suite passed 77 checks and shipping-debug compilation. The initial
+frozen batch also passed exact-source CI; the corrected source requires its own
+exact CI and package admission.
+
 ### S4 owned PC Library (admitted, installed and live-accepted)
 
 This slice implements AC4.1–AC4.5 of the

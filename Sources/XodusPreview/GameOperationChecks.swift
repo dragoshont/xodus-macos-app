@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import AppKit
+import Combine
 import Darwin
 import Foundation
 import SwiftUI
@@ -128,6 +129,13 @@ enum GameOperationChecks {
               && !FileManager.default.fileExists(atPath: paths.journal.path),
               "S3/S5/S6 construction performs no script, credential or journal I/O")
         await installed.load()
+        var installedNotifications = 0
+        let observation = operations.objectWillChange.sink { installedNotifications += 1 }
+        installed.serviceSignInActive = true
+        installed.serviceSignInActive = false
+        check(installedNotifications >= 2,
+              "S3/S5 installed-state changes invalidate computed game-service and consent controls")
+        observation.cancel()
         await operations.restore()
         operations.refreshService()
         await operations.waitForService()

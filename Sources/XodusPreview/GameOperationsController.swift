@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import AppKit
+import Combine
 import Foundation
 
 struct GameInstallConsent: Identifiable, Sendable {
@@ -38,6 +39,7 @@ final class GameOperationsController: ObservableObject {
     private var serviceTask: Task<Void, Never>?
     private var restored = false
     private var terminating = false
+    private var installedObservation: AnyCancellable?
 
     var isBusy: Bool { operation != nil }
     var canSignIn: Bool {
@@ -63,6 +65,9 @@ final class GameOperationsController: ObservableObject {
         mutationRunner = GameScriptRunner(paths: paths)
         serviceRunner = GameScriptRunner(paths: paths)
         journal = GameOperationJournal(file: paths.journal)
+        installedObservation = installed.objectWillChange.sink { [weak self] in
+            self?.objectWillChange.send()
+        }
     }
 
     func restore() async {
