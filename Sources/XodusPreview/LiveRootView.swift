@@ -20,10 +20,6 @@ struct LiveRootView: View {
         allowsStartupTasks && !CommandLine.arguments.contains("--export-live") && !PreviewExporter.liveDataRequested
 #endif
     }
-    private var canRefreshCatalog: Bool {
-        session.isReady && (session.supports(.search)
-            || (scopedQuery.isEmpty ? session.supports(.discover) : session.supports(.query)))
-    }
     private var searchEnabled: Bool {
         state.destination == .discover
             || (state.destination == .library && !state.showsRecentActivity)
@@ -32,7 +28,7 @@ struct LiveRootView: View {
     private var searchPlaceholder: String {
         state.destination == .library ? (state.showsRecentActivity ? "Search recent activity" : "Search your PC games")
             : state.destination == .downloads ? "Search Library or Discover"
-            : session.supports(.query) ? "Search Microsoft Store games" : "Search checked catalog"
+            : session.supports(.query) ? "Search your games and Microsoft Store" : "Search your games and checked catalog"
     }
 
     var body: some View {
@@ -175,12 +171,42 @@ struct LiveRootView: View {
         }
     }
     private var catalog: some View {
+        LiveCatalogView(library: state.pcGames, installed: state.installedGames,
+                        operations: state.gameOperations, query: scopedQuery,
+                        allowsArtworkLoading: startupAllowed, clearSearch: { state.query = "" })
+    }
+}
+
+struct LiveCatalogView: View {
+    @ObservedObject var library: PCGamesController
+    @ObservedObject var installed: InstalledGamesController
+    @ObservedObject var operations: GameOperationsController
+    @EnvironmentObject private var session: LiveSession
+    @Environment(\.openSettings) private var openSettings
+    let query: String
+    var allowsArtworkLoading = true
+    let clearSearch: () -> Void
+
+    private var results: CatalogSearchResults {
+        CatalogSearchResults(query: query, ownedGames: library.snapshot?.games ?? [],
+            storeProducts: session.catalogMatches(query: query) ? session.products : [],
+            gamePassProductIDs: session.gamePassProductIDs)
+    }
+
+    private var canRefresh: Bool {
+        session.isReady && (session.supports(.search)
+            || (query.isEmpty ? session.supports(.discover) : session.supports(.query)))
+    }
+    private var columns: [GridItem] { [GridItem(.adaptive(minimum: 180, maximum: 240), spacing: 24)] }
+
+    var body: some View {
+        let results = self.results
         VStack(alignment: .leading, spacing: 18) {
             HStack {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(scopedQuery.isEmpty ? "Store games" : session.catalogTitle).font(.largeTitle.bold())
-                    Text(scopedQuery.isEmpty ? "Find your next PC game."
-                         : "Results for \"\(scopedQuery)\"")
+                    Text(query.isEmpty ? "Store games" : "Search results").font(.largeTitle.bold())
+                    Text(query.isEmpty ? "Find your next PC game."
+                         : "Results for \"\(query)\"")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -188,64 +214,69 @@ struct LiveRootView: View {
                     ProgressView().controlSize(.small)
                     Button("Stop search") { session.stopCatalogSearch() }
                 }
-                Button("Refresh") { Task { await session.refreshCatalog(state.query) } }
-                    .disabled(session.searching || !canRefreshCatalog)
+                Button("Refresh") { Task { await session.refreshCatalog(query) } }
+                    .disabled(session.searching || !canRefresh)
+            }
+            if !results.ownedMatches.isEmpty {
+                Text("Your games").font(.title2.bold())
+                if library.error != nil || library.busy {
+                    Text("Showing your last complete PC library.").font(.callout).foregroundStyle(.secondary)
+                }
+                LazyVGrid(columns: columns, spacing: 28) {
+                    ForEach(results.ownedMatches) { game in
+                        PCGameTile(game: game, installed: installed, operations: operations,
+                                   allowsArtworkLoading: allowsArtworkLoading, badge: .owned)
+                    }
+                }
+            }
+            if !query.isEmpty {
+                Text("Microsoft Store").font(.title2.bold())
+                if library.snapshot == nil {
+                    Text("Load your PC library in Library to include your games in search.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
             }
             if let notice = session.catalogNotice {
                 Label(notice, systemImage: session.catalogStopped ? "pause.circle" : "exclamationmark.circle")
                     .foregroundStyle(.secondary)
             }
-            if session.products.isEmpty {
+            if results.storeProducts.isEmpty && results.ownedMatches.isEmpty {
                 ContentUnavailableView {
                     Label(session.catalogEmptyTitle,
                           systemImage: "magnifyingglass")
                 } description: {
-                    Text(session.catalogMessage(query: scopedQuery, canRefresh: canRefreshCatalog))
+                    Text(session.catalogMessage(query: query, canRefresh: canRefresh))
                 } actions: {
                     if !session.isReady { Button("Settings", action: openSettings.callAsFunction) }
-                    if !state.query.isEmpty { Button("Clear search") { state.query = "" } }
+                    if !query.isEmpty { Button("Clear search", action: clearSearch) }
                 }
                 .frame(maxWidth: .infinity, minHeight: 220)
-            } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 180, maximum: 240), spacing: 24)], spacing: 28) {
-                    ForEach(session.products) { product in
-                        Button { session.selectedProduct = product } label: {
-                            VStack(alignment: .leading, spacing: 12) {
-                                CatalogArtworkView(reference: CatalogArtworkReference.preferred(
-                                    in: product.artwork, roles: [.boxArt, .poster, .tile, .hero]),
-                                    status: product.artworkStatus, contentMode: .fit)
-                                    .aspectRatio(1, contentMode: .fit)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text(product.title).font(.headline).foregroundStyle(.primary)
-                                        .lineLimit(2).frame(minHeight: 40, alignment: .topLeading)
-                                    if product.freshness == "cached" {
-                                        Text("Offline details").font(.caption).foregroundStyle(.secondary)
-                                    }
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
+            } else if !results.storeProducts.isEmpty {
+                LazyVGrid(columns: columns, spacing: 28) {
+                    ForEach(results.storeProducts) { product in
+                        if let game = results.ownedGame(for: product.id) {
+                            PCGameTile(game: game, installed: installed, operations: operations,
+                                       allowsArtworkLoading: allowsArtworkLoading, badge: .owned)
+                        } else {
+                            storeTile(product, badge: results.badge(for: product.id))
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("\(product.title). View game. Access not checked.")
                     }
                 }
+            } else if !session.searching && session.catalogError == nil {
+                Text("No additional Store matches.").foregroundStyle(.secondary)
             }
-            if session.nextCursor != nil {
+            if session.nextCursor != nil, session.catalogMatches(query: query) {
                 Button("More games") {
-                    Task { await session.refreshCatalog(state.query, more: true) }
+                    Task { await session.refreshCatalog(query, more: true) }
                 }
                     .disabled(!session.canLoadMoreCatalog)
-                    .accessibilityElement(children: .ignore)
                     .accessibilityLabel("Load more catalog results")
                     .accessibilityIdentifier("xodus.catalog.loadMore")
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityAction { Task { await session.refreshCatalog(state.query, more: true) } }
             }
             DisclosureGroup("Catalog info") {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Public catalog, not your library. Coverage is partial.")
+                    Text("Owned comes from your loaded PC library. Game Pass means a game appeared in the loaded PC Game Pass feed, not that your account has access.")
+                    Text("Public catalog coverage is partial. Mac compatibility hasn't been checked.")
                     Text("\(session.market) / \(session.language)")
                     if let checked = session.discoveryCheckedAt { Text("Checked \(checked)") }
                     Text(session.catalogCorpus == "publicMicrosoftStoreSearch"
@@ -262,6 +293,34 @@ struct LiveRootView: View {
                 .padding(.top, 12)
             }
         }
+    }
+
+    private func storeTile(_ product: CatalogProduct, badge: CatalogAccessBadge?) -> some View {
+        Button { session.selectedProduct = product } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                CatalogArtworkView(reference: allowsArtworkLoading ? CatalogArtworkReference.preferred(
+                    in: product.artwork, roles: [.boxArt, .poster, .tile, .hero]) : nil,
+                    status: product.artworkStatus, contentMode: .fit)
+                    .aspectRatio(1, contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(product.title).font(.headline).foregroundStyle(.primary)
+                        .lineLimit(2).frame(minHeight: 40, alignment: .topLeading)
+                    if let badge {
+                        Text(badge.rawValue).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    }
+                    GameCompatibilityBadge(operations: operations, productID: product.id,
+                                           allowsLoading: allowsArtworkLoading)
+                    if product.freshness == "cached" {
+                        Text("Offline details").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(product.title). \(badge?.rawValue ?? "Access not checked"). \(operations.compatibility[product.id]?.badge ?? "Mac compatibility not checked"). View game.")
     }
 }
 

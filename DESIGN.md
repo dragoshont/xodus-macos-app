@@ -47,6 +47,18 @@ bounded title/flow evidence, not complete accessibility or gameplay certificatio
 
 ## Actual native implementation
 
+**Phase 2 B1/B2/B3 candidate:** retain the existing native catalog grid and
+toolbar. A nonblank Discover search places Your games above Microsoft Store;
+local loaded-title matches remain visible even when Store results fail or omit
+them. Owned tiles share the PC-library tile and its exact Installed Play match
+or protected Install flow. Quiet semantic-text Owned/Game Pass badges describe
+their separate evidence; no Xbox-green identity or new navigation is added.
+Cached Plays on Mac / Not supported on Mac labels come only from private
+bounded check receipts. Install/Repair consent shows Checking this game while
+the fenced script runs, then real download size and support/reason before
+enabling its default action. Cancel joins the check without installing.
+No live visual/interaction acceptance is claimed for this candidate.
+
 **S4 PC Library (admitted and installed `7ec1daa`):** the existing native Library retains Continue Playing
 and Installed above a distinct Your PC games shelf. Signed out, one native
 unavailable-content prompt offers Sign in, Browse games and Recent activity.

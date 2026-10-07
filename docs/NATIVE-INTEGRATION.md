@@ -4,6 +4,58 @@ This is implementation work beyond the immutable foundation at `44d7338`. It is 
 
 ## Local imported-game Play
 
+### Phase 2 B1/B2/B3 (source candidate; no installed/live claim)
+
+The owner-directed batch fixes PC Game Pass discovery, adds loaded-owned-first
+search and integrates the private package-support check without changing C8.
+Only a page validated as `pcGamePassDiscovery` / `MicrosoftGamePassSigls:v3`
+may use feed membership instead of `pcCatalogCandidate`. Market, language,
+resolved language, source, artwork, editions, unknown entitlement, IDs/cursor,
+pagination and revision checks remain. Cache/network Store search stays strict.
+Discovery requests 16 items; validated feed IDs survive Store searches in
+memory, but reset on feed revision, scope change or disconnection.
+
+Search matches loaded S4 titles by case-insensitive substring before Store
+results and deduplicates exact product IDs, never title/edition guesses.
+Owned takes label precedence over Game Pass. Both labels require their own
+loaded evidence; Game Pass does not imply an account subscription or ownership.
+The search view observes the PC library, Installed and game-operation
+controllers directly and shares the existing tile/Play/Install controls.
+It neither loads personal data automatically nor infers ownership from activity.
+
+`private-xodus-check.sh <generatedRunId> <productId>` uses the existing fixed
+script, private atomic receipt and matching process-exit/status contract.
+The result requires the requested StoreId, nonnegative/null packageBytes,
+boolean supported, bounded optional product reason and ISO checkedAt. Extra
+fields are ignored. Consent remains visible while checking, disables Install
+until supported and displays the real size or unknown-size copy. Unsupported
+and failed checks never launch installation. One check shares the mutation,
+service-restart and normal-Quit fence; explicit Cancel joins its owned script.
+No game files are downloaded by this check according to the backend contract.
+
+Tile/search badges read only
+`~/Library/Application Support/XodusRemote/compatibility/<StoreId>.json`,
+with the same 0600, current-user, regular-file, no-symlink and 64 KiB bounds.
+Missing cache means no support badge; malformed/nonprivate cache is a quiet
+explicit error. Cache reads never invoke a script. Package support is not a
+certification that every title or gameplay path works. An install failure with
+code 12 refreshes that bounded private cache and prefers its unsupported product
+reason. If unavailable, the runner reads its bounded terminal failed-progress
+message after the child has exited, then falls back to specific unsupported copy.
+
+Neutral fixtures cover the false discovery flag while preserving strict
+Store checks, local matching/deduplication/badge provenance/Installed matches,
+private cached support results, consent check failures, unsupported reasons,
+single-check fencing and cancellation. Mac network-denied qualification passed
+2,978 management checks, 722 native session checks, 75 presentation checks and
+29 portable packaging checks, plus shipping-debug compilation. The final
+removed-cache regression passed in the 104-check focused operation suite with
+another successful shipping-debug build. These are synthetic checks only.
+Exact-source CI, independent source/package admission and owner live acceptance
+remain pending. The installed accepted `1463cdb` runtime is untouched. B5's
+subscription status and Game Pass shelf are agreed as the next package, not
+part of this candidate; no subscription expiry is inferred.
+
 ### S3/S5/S6 game operations (admitted, installed and live-accepted)
 
 This app-only batch implements the approved

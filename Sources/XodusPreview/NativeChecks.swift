@@ -512,6 +512,23 @@ enum NativeChecks {
                   "Successful continuation retains earlier failures without ownership promotion")
             await discovery.disconnect()
 
+            let feed = session("discoverypcflag")
+            await feed.connect()
+            await feed.refreshCatalog("")
+            let feedIDs = Set(feed.products.map(\.id))
+            check(!feedIDs.isEmpty && feed.catalogError == nil
+                  && feed.products.allSatisfy { !$0.pcCatalogCandidate }
+                  && feed.gamePassProductIDs == feedIDs,
+                  "B1/B2: A 16-result discovery request accepts false flags and records only validated feed products")
+            await feed.refreshCatalog("neutral")
+            check(feed.gamePassProductIDs == feedIDs && feed.catalogCorpus == "publicMicrosoftStoreSearch"
+                  && feed.catalogError == nil,
+                  "B2: Searching Store preserves loaded Game Pass IDs without promoting failures or ownership")
+            feed.market = "GB"
+            check(feed.gamePassProductIDs.isEmpty, "B2: Market/language scope changes clear Game Pass evidence")
+            await feed.disconnect()
+            check(feed.gamePassProductIDs.isEmpty, "B2: Disconnection discards the in-memory feed evidence")
+
             let publicCatalog = session("publiccapture")
             await publicCatalog.connect()
             await publicCatalog.refreshCatalog("Halo")

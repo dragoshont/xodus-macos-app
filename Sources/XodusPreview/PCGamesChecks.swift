@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import Foundation
+import AppKit
+import SwiftUI
+import XodusManagement
 
 private actor PCGamesMockTransport: PCGamesTransport {
     var responses: [PCGamesHTTPResponse]
@@ -352,5 +355,53 @@ enum PCGamesChecks {
         check(PCGamesController.installedMatch(snapshot.games[0], in: [imported])?.id == imported.id
               && PCGamesController.installedMatch(PCGame(id: second, title: imported.title, artwork: nil), in: [imported]) == nil,
               "S4: Installed Play matches exact StoreId, never title/history/platform guesses")
+        let harbor = PCGame(id: first, title: "Neutral Harbor", artwork: nil)
+        let ridge = PCGame(id: second, title: "Neutral Ridge", artwork: nil)
+        func publicProduct(_ id: String, title: String) throws -> CatalogProduct {
+            try JSONDecoder().decode(CatalogProduct.self, from: response([
+                "productID": id, "title": title, "market": "US", "language": "en-US",
+                "source": "syntheticPublicSource", "checkedAt": "2026-01-01T00:00:00Z",
+                "freshness": "live", "editions": [], "pcCatalogCandidate": true,
+                "artwork": [], "artworkStatus": "absent"]).data)
+        }
+        let duplicate = try publicProduct(first, title: "Neutral Harbor Store")
+        let storeOnly = try publicProduct(third, title: "Neutral Harbor Sequel")
+        let joined = CatalogSearchResults(query: "  hArBoR  ", ownedGames: [harbor, ridge],
+            storeProducts: [duplicate, storeOnly], gamePassProductIDs: [first, third])
+        check(joined.ownedMatches.map(\.id) == [harbor.id] && joined.storeProducts.map(\.id) == [third],
+              "B2: Case-insensitive owned title substring matches come first; exact Store duplicates are removed")
+        check(joined.badge(for: first) == .owned && joined.badge(for: third) == .gamePass
+              && joined.badge(for: "FIXTURE00004") == nil,
+              "B2: Owned takes precedence; Game Pass requires loaded feed membership; unknown access has no badge")
+        check(joined.ownedGame(for: first)?.id == harbor.id
+              && PCGamesController.installedMatch(harbor, in: [imported])?.id == imported.id
+              && PCGamesController.installedMatch(ridge, in: [imported]) == nil,
+              "B2: Search-owned controls use the same exact Installed match as PC tiles")
+        let absentOwned = CatalogSearchResults(query: "harbor", ownedGames: [],
+            storeProducts: [duplicate], gamePassProductIDs: [])
+        check(absentOwned.ownedMatches.isEmpty && absentOwned.badge(for: first) == nil,
+              "B2: Unloaded or signed-out PC Library never invents Owned evidence")
+        let emptySearch = CatalogSearchResults(query: "  ", ownedGames: [harbor],
+            storeProducts: [duplicate], gamePassProductIDs: [])
+        check(emptySearch.ownedMatches.isEmpty && emptySearch.storeProducts.count == 1
+              && emptySearch.ownedGame(for: first)?.id == harbor.id,
+              "B2: Empty-query discovery keeps its own shelf and can reuse an owned game's actions")
+        let noStore = CatalogSearchResults(query: "ridge", ownedGames: [ridge],
+            storeProducts: [], gamePassProductIDs: [])
+        check(noStore.ownedMatches.map(\.id) == [ridge.id], "B2: Store failure/omission cannot hide a loaded owned title")
+        let windows = NSApplication.shared.windows.count
+        let neutralInstalled = InstalledGamesController()
+        let neutralOperations = GameOperationsController(installed: neutralInstalled)
+        for width in [CGFloat(700), CGFloat(1100)] {
+            let host = NSHostingView(rootView: LiveCatalogView(library: controller, installed: neutralInstalled,
+                operations: neutralOperations, query: "neutral", allowsArtworkLoading: false, clearSearch: {})
+                .environmentObject(LiveSession()))
+            host.sizingOptions = []
+            host.frame = CGRect(x: 0, y: 0, width: width, height: 600)
+            host.layoutSubtreeIfNeeded()
+            check(host.window == nil && host.frame.width == width && NSApplication.shared.windows.count == windows
+                  && !neutralOperations.checkingCompatibility && neutralOperations.compatibility.isEmpty,
+                  "B2/B3: Owned-first search lays out at Mac widths without windows, network, cache reads or checks")
+        }
     }
 }

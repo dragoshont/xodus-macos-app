@@ -88,6 +88,21 @@ enum GameOperationChecks {
             touch '\(signed.path)'
             printf '0\\n' | publish '\(paths.processed.path)'/"$1.status"
             """)
+        try script(.check, """
+            r="$1"; product="$2"; receipts='\(paths.processed.path)'
+            printf '%s\\n' "$#" "$r" "$product" > '\(root.path)/check-arguments'
+            printf 'Synthetic check log\\n' > '\(paths.logs.path)'/"$r.stderr.log"
+            mode="$(cat '\(root.path)/mode')"
+            trap 'printf "14\\n" | publish "$receipts/$r.status"; exit 14' TERM
+            if [ "$mode" = checkslow ]; then while :; do sleep 0.1; done; fi
+            if [ "$mode" = check11 ]; then printf '11\\n' | publish "$receipts/$r.status"; exit 11; fi
+            if [ "$mode" = checkmissing ]; then exit 9; fi
+            if [ "$mode" = checkunsupported ]; then supported=false; reason='"Neutral package is not supported."'
+            else supported=true; reason=null; fi
+            if [ "$mode" = checkwrongid ]; then product=OTHER0000001; fi
+            printf '{"storeId":"%s","packageBytes":3200000000,"supported":%s,"reason":%s,"checkedAt":"2026-10-07T00:00:00Z","extra":"ignored"}\\n' "$product" "$supported" "$reason" | publish "$receipts/$r.result.json"
+            printf '0\\n' | publish "$receipts/$r.status"
+            """)
         let launcher = root.appendingPathComponent("fixture launcher.sh")
         try privateFile(launcher, "#!/bin/bash\nsleep 1\nexit 0\n", mode: 0o700)
         try script(.install, """
@@ -103,6 +118,11 @@ enum GameOperationChecks {
             if [ "$mode" = invalidprogress ]; then
                 printf '{"phase":"downloading","bytesDone":-1}\\n' | publish "$receipts/$r.progress.json"
                 while :; do sleep 0.1; done
+            fi
+            if [ "$mode" = 12progress ]; then
+                printf '{"phase":"failed","bytesDone":20,"bytesTotal":100,"message":"Neutral terminal package reason."}\\n' | publish "$receipts/$r.progress.json"
+                printf '12\\n' | publish "$receipts/$r.status"
+                exit 12
             fi
             case "$mode" in 10|11|12|13|14) printf '%s\\n' "$mode" | publish "$receipts/$r.status"; exit "$mode";; esac
             mkdir -p "$folder"
@@ -148,6 +168,77 @@ enum GameOperationChecks {
         check(operations.serviceStatus?.signedIn == true && !installed.serviceSignInActive,
               "S3 explicit sign-in is followed by a fresh status check; no token transfer")
         let game = PCGame(id: "FIXTURE00001", title: "Fixture Game", artwork: nil)
+        let compatibilityData = """
+            {"storeId":"\(game.id)","packageBytes":null,"supported":true,"reason":null,"checkedAt":"2026-10-07T00:00:00.123Z"}
+            """
+        let compatible = try GameCompatibilityResult.parse(Data(compatibilityData.utf8), productID: game.id)
+        check(compatible.supported && compatible.packageBytes == nil && compatible.badge == "Plays on Mac",
+              "B3: Support receipt preserves unknown size and validates fractional ISO dates")
+        for invalid in [
+            compatibilityData.replacingOccurrences(of: game.id, with: "OTHER0000001"),
+            compatibilityData.replacingOccurrences(of: "\"packageBytes\":null", with: "\"packageBytes\":-1"),
+            compatibilityData.replacingOccurrences(of: "\"supported\":true", with: "\"supported\":1"),
+            compatibilityData.replacingOccurrences(of: "2026-10-07T00:00:00.123Z", with: "not-a-date")
+        ] {
+            do {
+                _ = try GameCompatibilityResult.parse(Data(invalid.utf8), productID: game.id)
+                check(false, "B3: Invalid identity/size/support/time cannot become Plays on Mac")
+            } catch { check(true, "B3: Invalid identity/size/support/time cannot become Plays on Mac") }
+        }
+        await operations.loadCompatibility(productID: game.id)
+        check(operations.compatibility[game.id] == nil && operations.compatibilityErrors[game.id] == nil,
+              "B3: Missing cache supplies no badge and never starts a check")
+        try FileManager.default.createDirectory(at: paths.compatibility, withIntermediateDirectories: false,
+                                                attributes: [.posixPermissions: 0o700])
+        let cached = try paths.compatibilityFile(productID: game.id)
+        try privateFile(cached, compatibilityData)
+        await operations.loadCompatibility(productID: game.id)
+        check(operations.compatibility[game.id] == compatible
+              && !FileManager.default.fileExists(atPath: root.appendingPathComponent("check-arguments").path),
+              "B3: Cached private support result is read without a script, network or game files")
+        try FileManager.default.removeItem(at: cached)
+        await operations.loadCompatibility(productID: game.id)
+        check(operations.compatibility[game.id] == nil && operations.compatibilityErrors[game.id] == nil,
+              "B3: A removed cache clears the previous badge instead of inventing current support")
+        try privateFile(cached, compatibilityData)
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: cached.path)
+        await operations.loadCompatibility(productID: game.id)
+        check(operations.compatibility[game.id] == nil && operations.compatibilityErrors[game.id] != nil,
+              "B3: Nonprivate cache is an explicit quiet error, never a compatibility badge")
+        try privateFile(cached, compatibilityData)
+        for mode in ["checkunsupported", "check11", "checkmissing", "checkwrongid"] {
+            try writeMode(mode)
+            await operations.prepareInstall(game)
+            check(operations.installConsent != nil && !operations.canConfirmInstall
+                  && !operations.isBusy && !installed.mutationActive && operations.canQuit,
+                  "B3: \(mode) leaves consent visible, Install disabled and no held mutation")
+            if mode == "checkunsupported" {
+                check(operations.installConsent?.compatibility?.explanation == "Neutral package is not supported."
+                      && operations.compatibility[game.id]?.badge == "Not supported on Mac",
+                      "B3: Unsupported package shows the exact bounded product reason and negative badge")
+            } else {
+                check(operations.installConsent?.checkError != nil && operations.log != nil,
+                      "B3: Failed/mismatched check surfaces failure and generated-run Show log")
+            }
+            if let consent = operations.installConsent { operations.confirmInstall(consent) }
+            check(!FileManager.default.fileExists(atPath: root.appendingPathComponent("arguments").path),
+                  "B3: Failed/unsupported consent cannot invoke installation")
+            await operations.cancelInstallConsent()
+        }
+        try writeMode("checkslow")
+        let checking = Task { await operations.prepareInstall(game) }
+        try await wait { operations.checkingCompatibility }
+        check(!operations.canQuit && installed.mutationActive && !operations.canStartMutation
+              && !operations.canSignIn && !operations.canConfirmInstall,
+              "B3: One active check shares the mutation/service/Quit fence and cannot enable Install early")
+        let checkingConsent = operations.installConsent?.id
+        await operations.prepareInstall(game)
+        check(operations.installConsent?.id == checkingConsent, "B3: A second check cannot replace active consent")
+        await operations.cancelInstallConsent()
+        await checking.value
+        check(!operations.checkingCompatibility && !installed.mutationActive && operations.canQuit
+              && operations.installConsent == nil && installed.games.isEmpty,
+              "B3: Consent cancellation joins its check and releases the fence without registration or game files")
         func install(_ candidate: PCGame = game) async throws {
             await operations.prepareInstall(candidate)
             guard let consent = operations.installConsent else { throw GameScriptError.invalidDestination }
@@ -159,7 +250,12 @@ enum GameOperationChecks {
         if let error = operations.error { print("NEUTRAL consent failure: \(error)") }
         guard let first = operations.installConsent else { throw GameScriptError.invalidDestination }
         check(first.destination.lastPathComponent == "FixtureGame-Xbox" && first.freeBytes >= 0
-              && operations.operation == nil, "S5 consent has real free space and causes no script side effect")
+              && first.compatibility?.packageBytes == 3_200_000_000 && first.compatibility?.supported == true
+              && operations.operation == nil, "B3/S5 consent has real free space, checked support/size and no installation")
+        let checkArgs = try String(contentsOf: root.appendingPathComponent("check-arguments"), encoding: .utf8)
+            .components(separatedBy: "\n")
+        check(checkArgs[0] == "2" && GameScriptPaths.validRunID(checkArgs[1]) && checkArgs[2] == game.id,
+              "B3 check receives only the generated run ID and exact Store product ID")
         operations.installConsent = nil
         check(!FileManager.default.fileExists(atPath: root.appendingPathComponent("arguments").path),
               "S5 cancelling consent does not start installation")
@@ -240,6 +336,21 @@ enum GameOperationChecks {
                   && installed.games.isEmpty && !operations.isBusy,
                   "S5 code \(code) has a specific error/recovery and cannot become installed")
         }
+        let unsupportedCache = compatibilityData.replacingOccurrences(of: "\"supported\":true", with: "\"supported\":false")
+            .replacingOccurrences(of: "\"reason\":null", with: "\"reason\":\"Neutral Xbox feature is not supported.\"")
+        try privateFile(cached, unsupportedCache)
+        try writeMode("12")
+        try await install()
+        check(operations.error == "Neutral Xbox feature is not supported."
+              && operations.compatibility[game.id]?.supported == false && installed.games.isEmpty,
+              "B3: Install code 12 shows the private backend cache reason verbatim, without registration")
+        try privateFile(cached, "{}")
+        try writeMode("12progress")
+        try await install()
+        check(operations.error == "Neutral terminal package reason." && installed.games.isEmpty
+              && operations.compatibilityErrors[game.id] != nil,
+              "B3: Code 12 falls back to its bounded terminal failed-progress message when cache is invalid")
+        try privateFile(cached, compatibilityData)
         for mode in ["missing", "mismatch", "invalidprogress"] {
             try writeMode(mode)
             try await install()

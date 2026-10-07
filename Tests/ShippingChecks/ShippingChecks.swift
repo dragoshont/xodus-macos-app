@@ -32,6 +32,11 @@ final class ShippingChecks: XCTestCase {
         check(state.gameOperations.serviceStatus == nil && !state.gameOperations.serviceBusy
               && state.gameOperations.operation == nil && !state.installedGames.mutationActive,
               "Shipping game operations start without private-script, credential or mutation activity")
+        let results = CatalogSearchResults(query: "neutral", ownedGames: [], storeProducts: [], gamePassProductIDs: [])
+        check(results.ownedMatches.isEmpty && results.storeProducts.isEmpty
+              && results.badge(for: "FIXTURE00001") == nil && session.gamePassProductIDs.isEmpty
+              && state.gameOperations.compatibility.isEmpty && !state.gameOperations.checkingCompatibility,
+              "Shipping search and Mac-support badges start without invented ownership/feed/check evidence")
         await state.loadRecentActivityIfVisible(session: session)
         check(session.recentLibrary == nil && !session.recentLibraryBootstrapRunning
               && session.authentication == nil && session.libraryTitle == "Your PC library isn't available yet"

@@ -43,6 +43,7 @@ final class LiveSession: ObservableObject {
     @Published private(set) var catalogCorpus = "observedPublicProducts"
     @Published private(set) var discoveryFailures: [DiscoveryFailure] = []
     @Published private(set) var discoveryCheckedAt: String?
+    @Published private(set) var gamePassProductIDs = Set<String>()
     @Published var selectedProduct: CatalogProduct?
     @Published var errorMessage: String?
     @Published var catalogError: String?
@@ -74,6 +75,7 @@ final class LiveSession: ObservableObject {
     private var currentQuery = ""
     private var cacheRevision: UInt64?
     private var discoveryRevision: String?
+    private var gamePassRevision: String?
     private let configuration: BackendConfiguration?
     private let signInPollingBudget: Duration
     private var signInDeadline: ContinuousClock.Instant?
@@ -756,6 +758,8 @@ final class LiveSession: ObservableObject {
         discoveryFailures = []
         discoveryCheckedAt = nil
         discoveryRevision = nil
+        gamePassProductIDs = []
+        gamePassRevision = nil
         diagnosticPreview = nil
         diagnosticPreviewing = false
         diagnosticSaved = false
@@ -1185,6 +1189,10 @@ final class LiveSession: ObservableObject {
         } else { await search(scopedQuery, more: more) }
     }
 
+    func catalogMatches(query: String) -> Bool {
+        currentQuery == query.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     func stopCatalogSearch() {
         guard searching else { return }
         queryGeneration += 1
@@ -1239,7 +1247,7 @@ final class LiveSession: ObservableObject {
         defer { if isCurrent(request) { searching = false } }
         do {
             let page = try await client.request(.discover, params: [
-                "market": .string(request.market), "language": .string(request.language), "limit": .integer(8),
+                "market": .string(request.market), "language": .string(request.language), "limit": .integer(16),
                 "cursor": request.cursor.map(JSONValue.string) ?? .null
             ], timeout: .seconds(45)).decode(CatalogDiscovery.self)
             guard isCurrent(request) else { return }
@@ -1255,7 +1263,7 @@ final class LiveSession: ObservableObject {
     }
 
     private func applyDiscoveryPage(_ page: CatalogDiscovery, request: CatalogRequest) throws {
-        try page.validatePublicScope(market: request.market, language: request.language, limit: 8)
+        try page.validatePublicScope(market: request.market, language: request.language, limit: 16)
         let existingIDs = Set(products.map(\.id) + discoveryFailures.map(\.id))
         let incomingIDs = Set(page.products.map(\.id) + page.failures.map(\.id))
         if request.more {
@@ -1274,6 +1282,11 @@ final class LiveSession: ObservableObject {
         discoveryCheckedAt = page.checkedAt
         catalogCorpus = page.corpus
         cacheRevision = nil
+        if gamePassRevision != page.corpusRevision {
+            gamePassProductIDs = []
+            gamePassRevision = page.corpusRevision
+        }
+        gamePassProductIDs.formUnion(page.products.map(\.id))
     }
 
     private func invalidateCatalogScope() {
@@ -1284,6 +1297,8 @@ final class LiveSession: ObservableObject {
         nextCursor = nil
         cacheRevision = nil
         discoveryRevision = nil
+        gamePassProductIDs = []
+        gamePassRevision = nil
         discoveryFailures = []
         discoveryCheckedAt = nil
         catalogCorpus = "observedPublicProducts"

@@ -1,6 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import SwiftUI
 
+struct GameCompatibilityBadge: View {
+    @ObservedObject var operations: GameOperationsController
+    let productID: String
+    var allowsLoading = true
+
+    var body: some View {
+        Group {
+            if let result = operations.compatibility[productID] {
+                Text(result.badge).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            } else if let error = operations.compatibilityErrors[productID] {
+                Text(error).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .task(id: productID) { if allowsLoading { await operations.loadCompatibility(productID: productID) } }
+    }
+}
+
 struct GameServiceAccountView: View {
     @ObservedObject var operations: GameOperationsController
 
@@ -104,23 +122,44 @@ struct GameInstallConsentView: View {
     let consent: GameInstallConsent
 
     var body: some View {
+        let consent = operations.installConsent ?? self.consent
         VStack(alignment: .leading, spacing: 18) {
             Text(consent.installedID == nil ? "Install \(consent.game.title)" : "Check for update / Repair")
                 .font(.title2.bold()).fixedSize(horizontal: false, vertical: true)
             if consent.installedID != nil { Text(consent.game.title).font(.headline) }
             LabeledContent("Destination") { Text(consent.destination.path).textSelection(.enabled) }
             LabeledContent("Available space", value: GameOperationProgressView.bytes(consent.freeBytes))
-            Text("Size shown when download starts").foregroundStyle(.secondary)
+            if operations.checkingCompatibility {
+                ProgressView("Checking this game\u{2026}").controlSize(.small)
+                    .accessibilityIdentifier("xodus.install.checking")
+            } else if let result = consent.compatibility {
+                Label(result.explanation, systemImage: result.supported ? "checkmark.circle" : "exclamationmark.circle")
+                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("xodus.install.compatibility")
+                if let bytes = result.packageBytes {
+                    Text("\(GameOperationProgressView.bytes(bytes)) download").foregroundStyle(.secondary)
+                } else { Text("Size shown when download starts").foregroundStyle(.secondary) }
+            } else if let error = consent.checkError {
+                Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if operations.failureCode == 11 {
+                    Button("Sign in for games") {
+                        operations.installConsent = nil
+                        operations.signInForGames()
+                    }.disabled(!operations.canSignIn)
+                }
+                if operations.log != nil { Button("Show log") { operations.showLog() } }
+            }
             Text(consent.installedID == nil
                  ? "The game will be downloaded and set up for this Mac. Some PC packages aren't supported yet."
                  : "Xodus checks for changed or missing files in this folder. Your saves and installed entry are kept.")
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()
-                Button("Cancel") { operations.installConsent = nil }.keyboardShortcut(.cancelAction)
+                Button("Cancel") { Task { await operations.cancelInstallConsent() } }.keyboardShortcut(.cancelAction)
                     .accessibilityIdentifier("xodus.install.cancelConsent")
                 Button(consent.installedID == nil ? "Install" : "Check and repair") { operations.confirmInstall(consent) }
-                    .disabled(!operations.canStartMutation).keyboardShortcut(.defaultAction)
+                    .disabled(!operations.canConfirmInstall).keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
                     .accessibilityIdentifier("xodus.install.confirm")
             }
@@ -136,6 +175,7 @@ struct GameOperationPresentation: View {
         Color.clear
             .sheet(item: $operations.installConsent) { consent in
                 GameInstallConsentView(operations: operations, consent: consent)
+                    .interactiveDismissDisabled(operations.checkingCompatibility)
             }
             .sheet(item: $operations.uninstallConsent) { game in
                 VStack(alignment: .leading, spacing: 18) {

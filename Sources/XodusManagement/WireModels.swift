@@ -181,12 +181,16 @@ public struct CatalogProduct: Codable, Equatable, Sendable, Identifiable {
     public var id: String { productID }
 
     public func validatePublicScope(market: String, language: String) throws {
+        try validatePublicScope(market: market, language: language, requiresPCCandidate: true)
+    }
+
+    fileprivate func validatePublicScope(market: String, language: String, requiresPCCandidate: Bool) throws {
         try CatalogArtworkReference.validate(artwork, status: artworkStatus)
         guard artwork.allSatisfy({ $0.source == .displayCatalog && $0.role != .tile }) else {
             throw ManagementError.invalidPayload
         }
         guard self.market == market, self.language.caseInsensitiveCompare(language) == .orderedSame,
-              pcCatalogCandidate, source != "fixture",
+              (!requiresPCCandidate || pcCatalogCandidate), source != "fixture",
               Set(editions.map(\.id)).count == editions.count,
               editions.allSatisfy({ $0.productID == id && $0.entitlement.kind == .unknown }) else {
             throw ManagementError.invalidPayload
@@ -285,7 +289,9 @@ public struct CatalogDiscovery: Codable, Equatable, Sendable {
             guard nextCursor.hasPrefix(prefix), let offset = UInt64(nextCursor.dropFirst(prefix.count)),
                   offset > 0 else { throw ManagementError.invalidPayload }
         }
-        for product in products { try product.validatePublicScope(market: market, language: language) }
+        for product in products {
+            try product.validatePublicScope(market: market, language: language, requiresPCCandidate: false)
+        }
     }
 }
 

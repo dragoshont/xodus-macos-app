@@ -393,6 +393,28 @@ actor Checks {
         try JSONValue.object(pageObject).decode(CatalogDiscovery.self)
             .validatePublicScope(market: "US", language: "en-US", limit: 8)
         check(true, "Same-base neutral metadata language is explicit and allowed")
+        productObject["pcCatalogCandidate"] = .bool(false)
+        pageObject["products"] = .array([.object(productObject)])
+        try JSONValue.object(pageObject).decode(CatalogDiscovery.self)
+            .validatePublicScope(market: "US", language: "en-US", limit: 16)
+        check(true, "B1: Validated PC Game Pass feed membership accepts a false candidate flag")
+        do {
+            try JSONValue.object(productObject).decode(CatalogProduct.self)
+                .validatePublicScope(market: "US", language: "en-US")
+            check(false, "B1: Cache search remains strict about the PC candidate flag")
+        } catch { check(error as? ManagementError == .invalidPayload, "B1: Cache search remains strict about the PC candidate flag") }
+        for change: (String, JSONValue) in [("market", .string("GB")), ("source", .string("fixture")),
+                                           ("artworkStatus", .string("available"))] {
+            var invalid = productObject
+            invalid[change.0] = change.1
+            if change.0 == "artworkStatus" { invalid["artwork"] = .array([]) }
+            pageObject["products"] = .array([.object(invalid)])
+            do {
+                try JSONValue.object(pageObject).decode(CatalogDiscovery.self)
+                    .validatePublicScope(market: "US", language: "en-US", limit: 16)
+                check(false, "B1: Discovery retains scope/source/artwork checks with a false flag")
+            } catch { check(true, "B1: Discovery retains scope/source/artwork checks with a false flag") }
+        }
         for tag in ["en-GB", "fr"] {
             productObject["resolvedLanguage"] = .string(tag)
             pageObject["products"] = .array([.object(productObject)])
@@ -416,6 +438,15 @@ actor Checks {
         try JSONValue.object(queryPage).decode(CatalogQuery.self).validatePublicScope(
             query: "original fixture query", market: "US", language: "en-US", limit: 8)
         check(true, "Typed network query preserves source, PC scope and mixed failures")
+        queryProduct["pcCatalogCandidate"] = .bool(false)
+        queryPage["products"] = .array([.object(queryProduct)])
+        do {
+            try JSONValue.object(queryPage).decode(CatalogQuery.self).validatePublicScope(
+                query: "original fixture query", market: "US", language: "en-US", limit: 8)
+            check(false, "B1: Store network query still rejects a false PC candidate")
+        } catch { check(error as? ManagementError == .invalidPayload, "B1: Store network query still rejects a false PC candidate") }
+        queryProduct["pcCatalogCandidate"] = .bool(true)
+        queryPage["products"] = .array([.object(queryProduct)])
         do {
             try JSONValue.object(queryPage).decode(CatalogQuery.self).validatePublicScope(
                 query: "different query", market: "US", language: "en-US", limit: 8)
@@ -880,9 +911,9 @@ enum MockBackend {
             if scenario.hasPrefix("recent") { supported.formUnion([.libraryRecent, .query]) }
             if scenario == "verify" || scenario.hasPrefix("verify-") { supported.insert(.authVerify) }
             if scenario == "diagnostics" { supported.insert(.diagnostics) }
-            if ["discoveryfail", "discoveryrecover"].contains(scenario) { supported.insert(.discover) }
+            if ["discoveryfail", "discoveryrecover", "discoverypcflag"].contains(scenario) { supported.insert(.discover) }
             if ["queryfail", "badqueryfail", "queryempty", "queryslow", "querynodetails",
-                "querynulldetails", "querycoalesce", "startupquery", "publiccapture", "uifailures"].contains(scenario) { supported.insert(.query) }
+                "querynulldetails", "querycoalesce", "startupquery", "publiccapture", "uifailures", "discoverypcflag"].contains(scenario) { supported.insert(.query) }
             if scenario == "startupquery" { supported.insert(.search) }
             if ["publiccapture", "registryempty", "registryunavailable", "uifailures"].contains(scenario) {
                 supported.insert(.installed)
@@ -1310,6 +1341,22 @@ enum MockBackend {
                         }
                         continue
                     }
+                    if scenario == "discoverypcflag", command == "catalog.discover" {
+                        guard request["params"]?["limit"]?.uint64 == 16,
+                              var page = frames.first(where: {
+                                  $0["data"]?["corpus"]?.string == "pcGamePassDiscovery"
+                              })?["data"]?.object else { exit(3) }
+                        page["products"] = .array((page["products"]?.array ?? []).map { product in
+                            var value = product.object ?? [:]
+                            value["source"] = .string("syntheticPublicSource")
+                            value["pcCatalogCandidate"] = .bool(false)
+                            return .object(value)
+                        })
+                        page["failures"] = .array([])
+                        page["nextCursor"] = .null
+                        try emit(.object(result(request, data: .object(page))))
+                        continue
+                    }
                     if scenario == "discoveryrecover", command == "catalog.discover" {
                         discoveryReads += 1
                         guard let failedPage = frames.first(where: {
@@ -1358,7 +1405,7 @@ enum MockBackend {
                         try emit(.object(response))
                         continue
                     }
-                    if ["queryempty", "queryslow"].contains(scenario), command == "catalog.query" {
+                    if ["queryempty", "queryslow", "discoverypcflag"].contains(scenario), command == "catalog.query" {
                         guard var page = frames.first(where: {
                             $0["data"]?["corpus"]?.string == "publicMicrosoftStoreSearch"
                                 && $0["data"]?["products"]?.array?.isEmpty == true

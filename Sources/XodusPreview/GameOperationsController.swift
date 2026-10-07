@@ -9,6 +9,8 @@ struct GameInstallConsent: Identifiable, Sendable {
     let destination: URL
     let freeBytes: Int64
     let installedID: UUID?
+    var compatibility: GameCompatibilityResult?
+    var checkError: String?
 }
 
 @MainActor
@@ -21,6 +23,9 @@ final class GameOperationsController: ObservableObject {
     @Published var installConsent: GameInstallConsent?
     @Published var uninstallConsent: InstalledGame?
     @Published private(set) var preparingConsent = false
+    @Published private(set) var checkingCompatibility = false
+    @Published private(set) var compatibility: [String: GameCompatibilityResult] = [:]
+    @Published private(set) var compatibilityErrors: [String: String] = [:]
     @Published private(set) var operation: GameOperationRecord?
     @Published private(set) var progress: GameScriptProgress?
     @Published private(set) var cancelling = false
@@ -37,11 +42,13 @@ final class GameOperationsController: ObservableObject {
     private let journal: GameOperationJournal
     private var mutationTask: Task<Void, Never>?
     private var serviceTask: Task<Void, Never>?
+    private var compatibilityTask: Task<Void, Never>?
+    private var compatibilityRunID: String?
     private var restored = false
     private var terminating = false
     private var installedObservation: AnyCancellable?
 
-    var isBusy: Bool { operation != nil }
+    var isBusy: Bool { operation != nil || checkingCompatibility }
     var canSignIn: Bool {
         !serviceBusy && !isBusy && !recoveryRequired && !installed.mutationActive
             && installed.runningGameID == nil && !terminating
@@ -50,7 +57,10 @@ final class GameOperationsController: ObservableObject {
         !isBusy && !recoveryRequired && !installed.mutationActive && !serviceSigningIn && !preparingConsent && installed.loaded
             && !installed.editing && !installed.choosing && !terminating
     }
-    var canQuit: Bool { mutationTask == nil && !serviceSigningIn }
+    var canQuit: Bool { mutationTask == nil && compatibilityTask == nil && !serviceSigningIn }
+    var canConfirmInstall: Bool {
+        canStartMutation && installConsent?.compatibility?.supported == true
+    }
     var canCancel: Bool {
         operation?.kind != .uninstall && isBusy && !recoveryRequired && !cancelling
     }
@@ -160,11 +170,45 @@ final class GameOperationsController: ObservableObject {
             installConsent = GameInstallConsent(game: game, destination: destination,
                                                 freeBytes: free, installedID: repairing?.id)
             error = nil
+            preparingConsent = false
+            try installed.reserveMutation(gameID: repairing?.id)
+            checkingCompatibility = true
+            let runID = InstalledGamesController.runID()
+            compatibilityRunID = runID
+            log = nil
+            failureCode = nil
+            compatibilityTask = Task {
+                defer {
+                    checkingCompatibility = false
+                    compatibilityRunID = nil
+                    compatibilityTask = nil
+                    installed.releaseMutation()
+                }
+                do {
+                    let outcome = try await mutationRunner.run(command: .check, runID: runID, arguments: [game.id])
+                    guard compatibilityRunID == runID, installConsent?.game.id == game.id else { return }
+                    log = outcome.log
+                    guard outcome.code == 0, let data = outcome.result else {
+                        failureCode = outcome.code
+                        throw GameScriptError.failed(outcome.code)
+                    }
+                    let result = try GameCompatibilityResult.parse(data, productID: game.id)
+                    compatibility[game.id] = result
+                    compatibilityErrors[game.id] = nil
+                    installConsent?.compatibility = result
+                } catch {
+                    guard installConsent?.game.id == game.id else { return }
+                    installConsent?.checkError = Self.message(error)
+                    log = await scriptLog(runID)
+                }
+            }
+            await compatibilityTask?.value
         } catch { self.error = Self.message(error) }
     }
 
     func confirmInstall(_ consent: GameInstallConsent) {
-        guard installConsent?.id == consent.id, canStartMutation, !recoveryRequired else { return }
+        guard installConsent?.id == consent.id, canConfirmInstall, !recoveryRequired,
+              consent.compatibility?.supported == true else { return }
         installConsent = nil
         let record = GameOperationRecord(id: InstalledGamesController.runID(),
             kind: consent.installedID == nil ? .install : .repair, productID: consent.game.id,
@@ -179,6 +223,33 @@ final class GameOperationsController: ObservableObject {
             return
         }
         begin(record)
+    }
+
+    func cancelInstallConsent() async {
+        installConsent = nil
+        guard let runID = compatibilityRunID else { return }
+        await mutationRunner.cancel(runID: runID)
+        await compatibilityTask?.value
+    }
+
+    func loadCompatibility(productID: String) async {
+        guard PCGamesClient.validProductID(productID) else { return }
+        let paths = paths
+        do {
+            let result = try await Task.detached {
+                guard let data = try GameScriptFiles.read(paths.compatibilityFile(productID: productID),
+                                                          missingAllowed: true) else { return Optional<GameCompatibilityResult>.none }
+                return try GameCompatibilityResult.parse(data, productID: productID)
+            }.value
+            if let result {
+                if let previous = compatibility[productID]?.checkedDate, let date = result.checkedDate, date < previous { return }
+            }
+            compatibility[productID] = result
+            compatibilityErrors[productID] = nil
+        } catch {
+            compatibility[productID] = nil
+            compatibilityErrors[productID] = "Mac support details couldn't be read. Choose Install to check again."
+        }
     }
 
     func prepareUninstall(_ game: InstalledGame) {
@@ -263,8 +334,13 @@ final class GameOperationsController: ObservableObject {
             }
         } else {
             failureCode = outcome.code
+            if outcome.code == 12 { await loadCompatibility(productID: record.productID) }
+            let unsupportedReason = compatibility[record.productID].flatMap { $0.supported ? nil : $0.reason }
+                ?? (progress?.phase == .failed ? progress?.message : nil)
             error = outcome.code == 20 && record.kind == .uninstall
                 ? "Your saves couldn't be preserved. The game wasn't uninstalled."
+                : outcome.code == 12 ? unsupportedReason
+                    ?? GameScriptError.failed(outcome.code).localizedDescription
                 : GameScriptError.failed(outcome.code).localizedDescription
         }
         try await journal.clear()
@@ -304,7 +380,10 @@ final class GameOperationsController: ObservableObject {
 
     func showLog() { if let log { NSWorkspace.shared.activateFileViewerSelecting([log]) } }
     func showServiceLog() { if let serviceLog { NSWorkspace.shared.activateFileViewerSelecting([serviceLog]) } }
-    func waitForMutation() async { await mutationTask?.value }
+    func waitForMutation() async {
+        await compatibilityTask?.value
+        await mutationTask?.value
+    }
     func waitForService() async { await serviceTask?.value }
     func beginTermination() { terminating = true }
     func resumeAfterTerminationRefusal() { terminating = false }

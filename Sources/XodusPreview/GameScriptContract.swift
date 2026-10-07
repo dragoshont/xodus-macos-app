@@ -3,12 +3,13 @@ import Darwin
 import Foundation
 
 enum GameScriptCommand: String, Codable, Sendable {
-    case serviceStatus, serviceSignIn, install, uninstall
+    case serviceStatus, serviceSignIn, check, install, uninstall
 
     var file: String {
         switch self {
         case .serviceStatus: "private-xodus-service-status.sh"
         case .serviceSignIn: "private-xodus-service-signin.sh"
+        case .check: "private-xodus-check.sh"
         case .install: "private-xodus-install.sh"
         case .uninstall: "private-xodus-uninstall.sh"
         }
@@ -28,7 +29,7 @@ enum GameScriptError: Error, LocalizedError, Equatable {
         case .invalidProgress: "Download progress couldn't be read. The operation is stopping; partial files are kept."
         case .storage: "Xodus couldn't save the operation details. Check access to Application Support and try again."
         case .busy: "Wait for the current game or operation to finish."
-        case .timeout: "The game sign-in check didn't finish. Try checking again."
+        case .timeout: "The game check or sign-in didn't finish. Try checking again."
         case .invalidDestination: "The game folder isn't safe to use. Choose a different installation or check Xodus setup."
         case .failed(let code):
             switch code {
@@ -88,12 +89,48 @@ struct GameInstallResult: Decodable, Sendable {
     let storeId: String
 }
 
+struct GameCompatibilityResult: Decodable, Equatable, Sendable {
+    let storeId: String
+    let packageBytes: Int64?
+    let supported: Bool
+    let reason: String?
+    let checkedAt: String
+
+    var badge: String { supported ? "Plays on Mac" : "Not supported on Mac" }
+    var explanation: String {
+        supported ? "Plays on Mac" : reason ?? "This game isn't supported on Mac yet."
+    }
+    var checkedDate: Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: checkedAt) ?? ISO8601DateFormatter().date(from: checkedAt)
+    }
+
+    static func parse(_ data: Data, productID: String) throws -> Self {
+        let value = try JSONDecoder().decode(Self.self, from: data)
+        guard PCGamesClient.validProductID(productID), value.storeId == productID,
+              value.packageBytes.map({ $0 >= 0 }) ?? true, value.checkedAt.utf8.count <= 64,
+              value.checkedDate != nil,
+              value.reason.map({ !$0.isEmpty && $0.utf8.count <= 4096
+                  && $0.unicodeScalars.allSatisfy { !CharacterSet.controlCharacters.contains($0) } }) ?? true else {
+            throw GameScriptError.invalidReceipt
+        }
+        return value
+    }
+}
+
 struct GameScriptPaths: Sendable {
     let scripts: URL
     let processed: URL
     let logs: URL
     let games: URL
     let journal: URL
+    var compatibility: URL { processed.deletingLastPathComponent().appendingPathComponent("compatibility") }
+
+    func compatibilityFile(productID: String) throws -> URL {
+        guard PCGamesClient.validProductID(productID) else { throw GameScriptError.invalidReceipt }
+        return compatibility.appendingPathComponent(productID + ".json")
+    }
 
     static var production: Self {
         let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
@@ -238,6 +275,10 @@ actor GameScriptRunner {
                 throw GameScriptError.invalidDestination
             }
             try GameScriptFiles.checkPath(URL(fileURLWithPath: arguments[1]), allowMissing: command == .install)
+        } else if command == .check {
+            guard arguments.count == 1, PCGamesClient.validProductID(arguments[0]) else {
+                throw GameScriptError.invalidReceipt
+            }
         } else {
             guard arguments.isEmpty else { throw GameScriptError.invalidReceipt }
         }
@@ -245,7 +286,7 @@ actor GameScriptRunner {
         cancellationRequested = pendingCancellation == runID
         pendingCancellation = nil
         defer { activeRunID = nil; process = nil }
-        if cancellationRequested, command == .install {
+        if cancellationRequested, command == .install || command == .check {
             return GameScriptOutcome(code: 14, result: nil, log: nil)
         }
         let script = try GameScriptFiles.script(command, paths: paths)
@@ -268,7 +309,8 @@ actor GameScriptRunner {
         }.value
         process = child
         if cancellationRequested, child.isRunning { child.terminate() }
-        let deadline = ContinuousClock.now.advanced(by: command == .serviceStatus ? .seconds(30) : .seconds(1800))
+        let deadline = ContinuousClock.now.advanced(by: command == .serviceStatus ? .seconds(30)
+            : command == .check ? .seconds(120) : .seconds(1800))
         var lastProgress: GameScriptProgress?
         var observationError: GameScriptError?
         while child.isRunning {
@@ -283,13 +325,13 @@ actor GameScriptRunner {
                     if child.isRunning { child.terminate() }
                 }
             }
-            if command == .serviceStatus || command == .serviceSignIn {
+            if command == .serviceStatus || command == .serviceSignIn || command == .check {
                 if ContinuousClock.now >= deadline, observationError == nil {
                     observationError = .timeout
                     if child.isRunning { child.terminate() }
                 }
             }
-            // Only an explicit install cancellation or bounded read failure terminates a child.
+            // Cancellation or a bounded observation failure terminates only this owned child.
             do { try await Task.sleep(for: .milliseconds(300)) }
             catch {
                 if child.isRunning { child.terminate() }
@@ -305,7 +347,12 @@ actor GameScriptRunner {
         let code = try GameScriptFiles.status(data)
         guard Int(child.terminationStatus) == code else { throw GameScriptError.statusMismatch }
         if let observationError { throw observationError }
-        let result = code == 0 && (command == .install || command == .serviceStatus)
+        if command == .install, code == 12,
+           let data = try GameScriptFiles.read(paths.receipt(runID, suffix: "progress.json"), missingAllowed: true) {
+            let value = try GameScriptProgress.parse(data)
+            if value.phase == .failed { await progress(value) }
+        }
+        let result = code == 0 && (command == .install || command == .serviceStatus || command == .check)
             ? try GameScriptFiles.read(paths.receipt(runID, suffix: "result.json")) : nil
         return GameScriptOutcome(code: code, result: result, log: GameScriptFiles.log(runID: runID, paths: paths))
     }

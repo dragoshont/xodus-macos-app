@@ -10,6 +10,18 @@ entrypoints. Shipping screens use native setup/empty/loading/error states and
 actual public product data, not synthetic game illustrations. See
 [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
+**Phase 2 B1/B2/B3 source candidate (not yet admitted or installed):** Discover
+accepts verified PC Game Pass feed membership without requiring the separate
+Store PC-candidate flag. Store search remains strict. Search shows matching
+titles from the loaded PC library first, reuses its Play/Install controls and
+removes exact duplicates from Store results. Owned and Game Pass labels use
+only loaded library/feed evidence. Install consent checks package support before
+enabling Install and shows the reported download size or unsupported reason.
+Private cached check results provide Mac-support badges without running a
+check. These labels are not general gameplay certification. C8 is unchanged.
+Mac neutral suites and shipping-debug compilation pass; exact-source CI and
+independent admission are required before replacement and owner live acceptance.
+
 **S3/S5/S6 (`1463cdb`, admitted, installed and live-accepted):** the account area
 adds explicit game-service sign-in/status, separate from PC-library credentials.
 PC Library games offer Install with native destination/free-space consent.

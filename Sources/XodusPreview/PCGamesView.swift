@@ -56,28 +56,10 @@ struct PCGamesView: View {
                     } else {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 180, maximum: 240), spacing: 24)], spacing: 28) {
                             ForEach(visibleGames) { game in
-                                VStack(alignment: .leading, spacing: 12) {
-                                    CatalogArtworkView(reference: allowsStartupTasks ? game.artwork : nil,
-                                                       status: game.artwork == nil ? .absent : .available,
-                                                       contentMode: .fit)
-                                        .aspectRatio(1, contentMode: .fit)
-                                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                                    Text(game.title).font(.headline)
-                                        .lineLimit(2).frame(minHeight: 40, alignment: .topLeading)
-                                    if let match = PCGamesController.installedMatch(game, in: installed.games) {
-                                        InstalledPlayButton(library: installed, game: match)
-                                        InstalledPlayError(library: installed, game: match)
-                                    } else {
-                                        Text("Not installed").font(.callout).foregroundStyle(.secondary)
-                                        Button("Install") { Task { await operations.prepareInstall(game) } }
-                                            .disabled(!operations.canStartMutation)
-                                            .accessibilityLabel("Install \(game.title)")
-                                            .accessibilityIdentifier("xodus.pcGames.install")
-                                    }
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .accessibilityElement(children: .contain)
+                                PCGameTile(game: game, installed: installed, operations: operations,
+                                           allowsArtworkLoading: allowsStartupTasks, badge: query.isEmpty ? nil : .owned)
                             }
+
                         }
                     }
                     VStack(alignment: .leading, spacing: 6) {
@@ -134,5 +116,40 @@ struct PCGamesView: View {
             .padding(28).frame(width: 480)
             .interactiveDismissDisabled(library.busy)
         }
+    }
+}
+
+struct PCGameTile: View {
+    let game: PCGame
+    @ObservedObject var installed: InstalledGamesController
+    @ObservedObject var operations: GameOperationsController
+    var allowsArtworkLoading = true
+    var badge: CatalogAccessBadge?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            CatalogArtworkView(reference: allowsArtworkLoading ? game.artwork : nil,
+                               status: game.artwork == nil ? .absent : .available, contentMode: .fit)
+                .aspectRatio(1, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            Text(game.title).font(.headline)
+                .lineLimit(2).frame(minHeight: 40, alignment: .topLeading)
+            if let badge {
+                Text(badge.rawValue).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            }
+            GameCompatibilityBadge(operations: operations, productID: game.id, allowsLoading: allowsArtworkLoading)
+            if let match = PCGamesController.installedMatch(game, in: installed.games) {
+                InstalledPlayButton(library: installed, game: match)
+                InstalledPlayError(library: installed, game: match)
+            } else {
+                Text("Not installed").font(.callout).foregroundStyle(.secondary)
+                Button("Install") { Task { await operations.prepareInstall(game) } }
+                    .disabled(!operations.canStartMutation)
+                    .accessibilityLabel("Install \(game.title)")
+                    .accessibilityIdentifier("xodus.pcGames.install")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
     }
 }
