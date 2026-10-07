@@ -24,7 +24,7 @@ No backend, contract or signed engine change accompanies this interface.
 Hogwarts Legacy's live test is separately user-controlled; neutral checks never
 launch a real game.
 
-**S1 admitted and installed:** imported tiles use bounded local PNG/JPEG art from
+**S1 admitted, installed and live-accepted:** imported tiles use bounded local PNG/JPEG art from
 MicrosoftGame.config. The newest recorded Xodus-launched imported game supplies
 a Continue Playing splash card, publisher and relative last-played date, sharing
 the list's Play state. Session start/duration stay in the private local list;
@@ -35,10 +35,12 @@ Root independently admitted the matching package and confirmed the game had
 ended before normal Quit/replacement. All 21 installed files and strict
 app/helper/engine signatures matched admission, with C8 unchanged. Full 092
 rollback, profile and installed-list bytes/permissions were preserved. One
-ordinary Library startup was left open; no Import or Play was automated.
-**S1 real-product closure remains pending:** Root/user must confirm actual
-Hogwarts tile art and a new session's Continue Playing splash. Neutral checks
-and installed-byte/startup evidence do not imply those observations.
+ordinary Library startup was left open; no Import or Play was automated by the
+app implementation/deployment lane. Root subsequently observed actual Hogwarts
+tile artwork and, after its own post-install Play session, the real splash,
+publisher, relative last-played date and shared retry/Show log actions.
+Session history persisted with 0600 permissions. Root closed S1 with no defect;
+this separate live evidence is not inferred from neutral or package checks.
 
 The initial Play slice's exact-source [CI passed](https://github.com/dragoshont/xodus-macos-app/actions/runs/37603065132).
 The independently admitted package was installed after normal Quit, preserving

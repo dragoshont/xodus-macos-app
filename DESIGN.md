@@ -41,8 +41,13 @@ accessible. No motion, personal-history read or network artwork request is
 added. Missing art is silent; session-history save failure is a quiet
 product message and never prevents play/termination state updates.
 Source, neutral/native layout and installed-byte/signature/startup qualification
-passed. Actual Hogwarts artwork and post-install Continue Playing observations
-remain a separate user/Root gate; no such visual/session proof is inferred here.
+passed. Root separately closed the live gate using its already-approved native
+ScreenCaptureKit observer of the installed app: actual Hogwarts tile art and,
+after a Root-launched session, the real splash, title, publisher and relative
+last-played date were visible. The test session ended by SIGTERM; shared Try
+again and Show log were visible on the hero and row. This is bounded live
+evidence, not a claim of natural-exit, complete accessibility or compositor
+certification.
 
 **Initial installed-game Play (admitted at `0926414`):** the non-activity Library begins with
 an Installed section, separate from the unchanged owned-PC unavailable state.

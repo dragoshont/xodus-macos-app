@@ -4,7 +4,7 @@ This is implementation work beyond the immutable foundation at `44d7338`. It is 
 
 ## Local imported-game Play
 
-### S1 artwork and Continue Playing (admitted and installed)
+### S1 artwork and Continue Playing (admitted, installed and live-accepted)
 
 This slice implements AC1.1–AC1.6 of the
 [published remaining-work spec](https://github.com/dragoshont/xodus-macos/blob/dragoshont-heroic-xbox-integration/docs/xodus/remaining-work-plan.md).
@@ -37,9 +37,10 @@ Neutral checks use tiny synthetic PNGs and fake scripts for ordered art
 fallback, contained paths/symlink refusal, byte/pixel bounds, downsampling,
 legacy decoding, persisted own-session lifetime, history-save failure,
 concurrent import preservation and hero ordering/launchability. Real-product
-closure still requires an admitted installation, Hogwarts artwork observation
-and one user/Root-controlled post-install session. The running game and app
-must not be interrupted; CI/package alone do not close that gate.
+closure requires an admitted installation, Hogwarts artwork observation and
+one user/Root-controlled post-install session. Root separately supplied that
+evidence below; CI/package alone did not close the gate. The implementation and
+deployment lane did not interrupt or launch the game.
 
 The user-directed AC2.3 addition shares this batch: a nonzero session exposes
 Show log only when its generated-runID stderr file exists in
@@ -69,10 +70,22 @@ installed-games.json remained byte-identical and 0600 across replacement/startup
 One ordinary main-Library startup left app PID 51247 owning sole engine 51265,
 with no helper. All 21 installed files and three strict fixed-leaf signatures
 matched admission. No Import, Play, game launch, activity/Account/Store action,
-screenshot, exporter or extra RPC was automated. This is installed/startup
-evidence, not visual or gameplay proof. S1 remains open until the admitted app shows
-Hogwarts tile art and a post-install user/Root-launched session supplies its
-Continue Playing splash; CI/package alone do not close the spec.
+screenshot, exporter or extra RPC was automated by the implementation/deployment
+lane. This is installed/startup evidence, not visual or gameplay proof.
+
+**Separate Root live acceptance (2026-10-07):** using its already-approved native
+ScreenCaptureKit observer of app PID 51247, Root reported actual Hogwarts
+Square480 tile art in Installed. One Root-controlled Play session reached the
+full-screen game in about 20 seconds with no driver warning; Root ended the
+test by SIGTERM after about 55 seconds. The app then showed Continue Playing
+with the real 1920x1080 splash, title, publisher "Warner Bros. Interactive",
+relative last-played date, shared Try again and AC2.3 Show log on both hero and
+row. The registry recorded lastPlayedAt and lastSessionSeconds 54.6, with 0600
+permissions preserved. Root explicitly closed S1 with no defect. The failed-exit
+retry/log observation does not claim a natural exit-0 test or an exercised
+Finder reveal. No captured image, private registry contents or real artwork is
+published here; runtime source, package, signed C8 and production pins remain
+unchanged.
 
 Main Library offers an Installed section independently of owned-PC inventory,
 which remains unavailable. The user chooses one game folder and then one
