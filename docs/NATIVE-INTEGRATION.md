@@ -2,6 +2,45 @@
 
 This is implementation work beyond the immutable foundation at `44d7338`. It is **not a consumer-ready game launcher**.
 
+## Local imported-game Play
+
+Main Library offers an Installed section independently of owned-PC inventory,
+which remains unavailable. The user chooses one game folder and then one
+executable working Xodus launch script through native file panels. The folder
+must contain one case-insensitive `MicrosoftGame.config`; bounded `XMLParser`
+reads Identity Name/Version, StoreId and ShellVisuals DefaultDisplayName, falling
+back to Identity Name. Malformed/missing identity, version or StoreId is refused;
+external entities are not resolved. No provider, title-name mapping, engine
+snapshot, entitlement or installation check is inferred from this import.
+
+Entries contain UUID, title, identityName, version, storeId, folder, launcher and
+importedAt. `~/Library/Application Support/Xodus/installed-games.json` is separate
+from the existing Management profile. Writes use an exclusive 0600 temporary
+file, sync and atomic rename inside a 0700 directory. Corrupt/unreadable lists
+produce a visible failure and block mutations, not a success-empty overwrite.
+Reimporting the same folder updates its local entry while retaining its UUID.
+Remove edits only this JSON; it never deletes game, launcher or save files.
+
+Play checks the selected folder and executable regular launcher, then starts
+`/bin/bash <launcher> <runID>` off the main thread. The argument array passes no
+shell-interpolated command. The runID is `xodus-yyyyMMddTHHmmssZ-xxxxxxxx` in UTC,
+with eight lowercase hexadecimal characters. Environment inheritance is limited
+to HOME, USER and LANG; PATH is fixed to
+`/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin`. The script owns the game session;
+its exit resets Play, with a code-specific Try again error for nonzero exit.
+Only one session can launch at a time. The first five seconds show Launching,
+then Playing if still alive. Termination callbacks return to MainActor. App
+Quit fences new launches but never terminates the game process.
+
+Neutral checks use only temporary synthetic configs and fake exit-0, exit-3 and
+sleep-2 scripts. They cover parsing, private persistence, argument/environment
+format, launch states, missing launcher, single-session fencing, list-only
+removal and natural completion after app shutdown begins. These are not real
+gameplay or service sign-in evidence. Hogwarts Legacy is the sole user-approved
+live target and is not launched by qualification or deployment.
+The signed C8 engine, production schemas/pins, future support packets and
+existing account/history boundaries are unchanged.
+
 ## Development-only registry compatibility
 
 The typed registry record accepts a **required-but-nullable** `runtimeFingerprint`

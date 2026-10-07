@@ -25,6 +25,21 @@ visually confirmed.
 
 ## Actual native implementation
 
+**Installed-game Play (current source):** the non-activity Library begins with
+an Installed section, separate from the unchanged owned-PC unavailable state.
+User-imported entries use their config display name and a restrained system
+gamecontroller icon, with native Play and list-only Remove actions. No artwork
+request, ownership badge, mock shelf or game count is introduced. The empty
+section has one short explanation and Import installed Xbox game. Two native
+file panels select the installed folder and its executable working launch
+script; cancellation changes nothing. Launching/Playing replace the Play label
+for the one active session; other Play buttons are disabled. Nonzero exit shows
+one plain error and Try again. Native button focus, title-specific accessibility
+labels and `xodus.installed.*` identifiers preserve keyboard/VoiceOver access.
+Quit leaves the game running; Remove keeps game files, launch script and saves.
+This local list is not an ownership or engine registry claim. Main Library
+still never reads TitleHub history; Recent activity remains separate.
+
 **User-directed Library semantic correction (current source):** Library is the
 default, but its owned-PC surface remains unavailable. It uses one stock native
 empty state, “Your PC library isn't available yet” / “Xodus can't yet verify
@@ -60,7 +75,7 @@ Reported PC/console/mixed/unknown platform tags and a native platform filter do
 not establish Mac compatibility. Search in this scope filters only the loaded
 history window. History has no Store mapping, entitlement or installation
 evidence; its tiles do not fabricate product-detail or Play actions.
-Owned/installed Library enumeration still remains unavailable: the engine's registry response
+Engine-owned/installed Library enumeration still remains unavailable: the engine's registry response
 is a constant empty vector, not an implemented durable registry or Mac scan.
 It must not become "no games registered" or an installed-game list; Library
 search is disabled. A real, read-only selected-folder marker check remains

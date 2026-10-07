@@ -38,6 +38,7 @@ final class SheetInteraction: ObservableObject {
 @MainActor
 final class AppState: ObservableObject {
     let runtimeSettings = RuntimeProviderSettings()
+    let installedGames = InstalledGamesController()
 #if !XODUS_SHIPPING
     @Published var fixtureMode = CommandLine.arguments.contains("--fixture")
         || CommandLine.arguments.contains("--export-preview")

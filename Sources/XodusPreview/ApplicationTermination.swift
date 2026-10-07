@@ -5,8 +5,10 @@ import Foundation
 final class ApplicationTerminationCoordinator {
     private var operation: Task<Bool, Never>?
 
-    func shutdown(session: LiveSession?, runtime: RuntimeProviderSettings?) async -> Bool {
+    func shutdown(session: LiveSession?, runtime: RuntimeProviderSettings?,
+                  installedGames: InstalledGamesController? = nil) async -> Bool {
         if let operation { return await operation.value }
+        installedGames?.applicationTerminating = true
         runtime?.beginApplicationTermination()
         session?.applicationTerminating = true
         let pending = Task {
@@ -18,6 +20,7 @@ final class ApplicationTerminationCoordinator {
         operation = pending
         let closed = await pending.value
         if !closed {
+            installedGames?.applicationTerminating = false
             runtime?.resumeAfterTerminationRefusal()
             session?.applicationTerminating = false
             operation = nil

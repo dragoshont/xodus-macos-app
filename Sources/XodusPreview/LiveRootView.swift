@@ -60,6 +60,9 @@ struct LiveRootView: View {
             if startupAllowed { await state.runtimeSettings.refreshCrossOverDependency() }
         }
         .task {
+            if startupAllowed { await state.installedGames.load() }
+        }
+        .task {
             if startupAllowed, session.phase == .disconnected, !session.connectionTransitioning,
                !session.backendPath.isEmpty { await session.connect() }
         }
@@ -96,6 +99,7 @@ struct LiveRootView: View {
                                       findInStore: { state.findInStore($0, session: session) })
                     .accessibilityIdentifier("xodus.library.recentActivity")
             } else {
+                InstalledGamesView(library: state.installedGames)
                 ContentUnavailableView {
                     Label(session.libraryTitle, systemImage: "gamecontroller")
                 } description: {
@@ -114,8 +118,9 @@ struct LiveRootView: View {
                         selectedFolderInspection
                         Divider()
                         Text(session.accountLibraryExplanation).foregroundStyle(.secondary)
-                        Text("Owned-game listing and a durable installed-game registry aren't implemented. The engine's empty registry response isn't a check of your Mac or evidence that no games are installed.")
-                        Text("The selected-folder check only reads an Xodus marker. It doesn't scan your Mac, register a game, verify its files, establish ownership, download or enable play.")
+                        Text("Installed shows only games you've imported. It doesn't scan your Mac or verify which PC games you own.")
+                        Text("Import an installed Xbox game and choose its working Xodus launch script to play. Removing it from the list keeps its game files and saves.")
+                        Text("Inspect a game folder checks its Xodus marker only. This check doesn't import the game or enable Play.")
                     }
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)

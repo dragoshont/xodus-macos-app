@@ -7,6 +7,7 @@ import XodusCore
 final class PreviewDelegate: NSObject, NSApplicationDelegate {
     var liveSession: LiveSession?
     var runtimeSettings: RuntimeProviderSettings?
+    var installedGames: InstalledGamesController?
     let termination = ApplicationTerminationCoordinator()
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -14,7 +15,8 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         Task {
-            let closed = await termination.shutdown(session: liveSession, runtime: runtimeSettings)
+            let closed = await termination.shutdown(session: liveSession, runtime: runtimeSettings,
+                                                    installedGames: installedGames)
             sender.reply(toApplicationShouldTerminate: closed)
         }
         return .terminateLater
@@ -66,6 +68,7 @@ struct XodusPreviewApp: App {
                 .onAppear {
                     delegate.liveSession = session
                     delegate.runtimeSettings = state.runtimeSettings
+                    delegate.installedGames = state.installedGames
                 }
         }
         .defaultSize(width: 1200, height: 860)
@@ -104,6 +107,7 @@ struct XodusPreviewApp: App {
                 .onAppear {
                     delegate.liveSession = session
                     delegate.runtimeSettings = state.runtimeSettings
+                    delegate.installedGames = state.installedGames
                 }
         }
     }

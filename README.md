@@ -2,13 +2,27 @@
 
 A native Mac launcher in development for legitimately entitled Xbox PC games, integrating with the Xodus management engine.
 
-**Current status: native development app, not a complete game launcher.** The default SwiftUI/AppKit app has a real bounded management client, isolated Microsoft Store sign-in integration, source-backed PC Game Pass discovery and Microsoft Store network search, edition detail and activity. A native folder picker also supports a read-only marker check in one explicitly selected game folder; observed header identifiers never become retail identity, registration or permission to launch. A packaged development build includes its matching engine and connects without Terminal setup; negotiated capabilities determine which actions work. Search coverage is explicitly partial, and public results never establish ownership. The admitted f30/d00 pair confirmed saved credentials after the user's native Keychain approval and completed one Halo authenticated read with `verified: true`; no repeat verification or ownership inference was made. Authoritative owned-PC inventory, a durable installed-game registry, authorized game installation and certified gameplay remain implementation gaps. Saved sign-in is **not** proof of PC ownership or package access.
+**Current status: native development app, not a complete game launcher.** The default SwiftUI/AppKit app has a real bounded management client, isolated Microsoft Store sign-in integration, source-backed PC Game Pass discovery and Microsoft Store network search, edition detail and activity. A native folder picker also supports a read-only marker check in one explicitly selected game folder; observed header identifiers never become retail identity, registration or permission to launch. A packaged development build includes its matching engine and connects without Terminal setup; negotiated capabilities determine which actions work. Search coverage is explicitly partial, and public results never establish ownership. The admitted f30/d00 pair confirmed saved credentials after the user's native Keychain approval and completed one Halo authenticated read with `verified: true`; no repeat verification or ownership inference was made. Authoritative owned-PC inventory, an engine-backed installed-game registry, authorized game installation and certified gameplay remain implementation gaps. Saved sign-in is **not** proof of PC ownership or package access.
 
 The original offline demonstration is **nonshipping only**. `XODUS_SHIPPING=1`
 compiles out its views, invented state, artwork, resources and check/export
 entrypoints. Shipping screens use native setup/empty/loading/error states and
 actual public product data, not synthetic game illustrations. See
 [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
+
+**Installed-game Play (current source):** main Library has an **Installed** section
+above the unchanged owned-PC unavailable state. Import an already-installed Xbox
+game folder, then explicitly select its executable Xodus launch script. The app
+reads `MicrosoftGame.config` locally and saves only the selected entry in a
+private, atomic local list. Play runs `/bin/bash <script> <runID>` with a minimal
+environment. Only one game session runs at a time; Launching becomes Playing
+while the script remains alive, and its exit ends the session. A failed exit
+shows its code and Try again. Quit does not stop the game. Remove deletes only
+the list entry, never the game, launch script or saves. These local imports are
+**Installed**, not Owned, and do not establish Store availability or entitlement.
+No backend, contract or signed engine change accompanies this interface.
+Hogwarts Legacy's live test is separately user-controlled; neutral checks never
+launch a real game.
 
 **Current admitted shipping correction:** startup opens an unavailable **PC Library**:
 Xodus cannot yet verify which PC games you own. It does not display TitleHub
@@ -59,11 +73,13 @@ It does not map history to a Store product, establish access or enable play.
 The routing/selection behavior was qualified with neutral tests and exact CI;
 no personal-title Store query was automated during deployment.
 
-Owned/installed Library enumeration remains unavailable: the installed snapshot is a constant empty
+Engine-owned/installed Library enumeration remains unavailable: the installed snapshot is a constant empty
 response, not a durable registry or scan of this Mac. It never proves that no
 games are installed. A selected-folder marker check is separate from ownership,
 game-file integrity and permission to play. Technical metadata stays in
-contextual information disclosures. No Install or Play action is offered yet.
+contextual information disclosures. No Install action is offered. The separate
+local Installed list above enables Play only through an explicitly imported
+working launch script, not through the engine's empty registry.
 
 ![Original Library concept](design/previews/library.png)
 

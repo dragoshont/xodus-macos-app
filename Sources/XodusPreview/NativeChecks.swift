@@ -47,6 +47,7 @@ enum NativeChecks {
             }
         }
         do {
+            try await InstalledGameChecks.run(check: check)
             func observationFailure(_ message: String, code: String = "AUTH_INVALID",
                                     reason: String = "pipelineFailed") throws -> WireFailure {
                 let value = JSONValue.object([
