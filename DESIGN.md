@@ -25,7 +25,7 @@ visually confirmed.
 
 ## Actual native implementation
 
-**S4 PC Library candidate:** the existing native Library retains Continue Playing
+**S4 PC Library (admitted and installed `7ec1daa`):** the existing native Library retains Continue Playing
 and Installed above a distinct Your PC games shelf. Signed out, one native
 unavailable-content prompt offers Sign in, Browse games and Recent activity.
 The sign-in sheet shows Microsoft's short-lived code, opens the exact Microsoft
@@ -82,12 +82,13 @@ Source/native-layout checks and installed-byte/signature/startup verification
 passed. No screenshot, actual Import/Play interaction or live gameplay was used
 for admission or deployment; those outcomes are not implied by neutral checks.
 
-**User-directed Library semantic correction (current source):** Library is the
-default, but its owned-PC surface remains unavailable. It uses one stock native
+**User-directed Library semantic correction (historical unavailable state):** Library is the
+default. Before S4's account-bound collection/PC join, it used one stock native
 empty state, “Your PC library isn't available yet” / “Xodus can't yet verify
 which PC games you own,” with real Browse games and Recent activity routes.
-No TitleHub image feature, game count, owned shelf or fake install/play action
-appears here. The Figma Library's purchased/subscription fixture shelf and Apple
+No TitleHub image feature, owned game count or fake install/play action was used
+to fill this unavailable surface. That history boundary remains in S4. The
+Figma Library's purchased/subscription fixture shelf and Apple
 Games Continue Playing composition require matching access/installation
 evidence; play history cannot fill them.
 

@@ -4,7 +4,7 @@ This is implementation work beyond the immutable foundation at `44d7338`. It is 
 
 ## Local imported-game Play
 
-### S4 owned PC Library (source candidate; not admitted or installed)
+### S4 owned PC Library (admitted and installed; live acceptance pending)
 
 This slice implements AC4.1–AC4.5 of the
 [remaining-work spec at fbf849d](https://github.com/dragoshont/xodus-macos/blob/fbf849d/docs/xodus/remaining-work-plan.md).
@@ -58,8 +58,39 @@ refresh-only retention, cancellation/sign-out/termination and Installed match.
 These are not installed sign-in or owned-PC gameplay evidence. Exact-source
 CI and preserved-C8 packaging precede independent admission.
 Root owns subsequent user-present device-code and actual PC shelf/Play evidence.
-Current installed S1, signed C8, profile, contracts/pins and frozen support
-packets are untouched by this source candidate.
+The signed C8, profile, contracts/pins and frozen support packets are unchanged.
+
+Frozen corrected source `7ec1daaf1c5f3985c29eec01ed7eb90c151f001f`, tree
+`997d3970bfc43cd1ae0f2ef18c900253808327e9`, passed the same 607 native checks
+from its exact Git-LF archive. Exact-source
+[CI 37617059339](https://github.com/dragoshont/xodus-macos-app/actions/runs/37617059339)
+completed successfully, including Release ShippingChecks and resource exclusion.
+Root's bounded source review correction is included: only candidate games
+contribute to the hidden count, incomplete third-party items cannot fail a valid
+page, and device-code copy contains no internal service language.
+
+The matching UI-only package `odJCks` was independently admitted and installed.
+Receipt SHA256:
+`4e42f6239517ecae6f850a5ec059d052cdc8fdf5a1079a1bc5d0af92c871f200`,
+14,449 bytes, covering 21 files. Launcher SHA256:
+`16b123f10f75a1b36bf56fe931bc22704a74dbf16c3811110843ca82e8b09be0`
+(5,270,144 bytes); helper SHA256:
+`58b631646457482fb1d77db233ccc2cb026adf83313df5a61a4428000cc17393`
+(359,072 bytes). The signed C8 engine is byte-identical to admitted S1's
+`tmzPp3` input (22,012,176 bytes). All three fixed-leaf signature requirements
+and deep strict verification passed; the one-use signing job is unloaded.
+Root reviewed the corrected source and exact package/CI, confirmed the game and
+launch script had ended, and explicitly authorized normal Quit/replacement.
+The complete working S1 app and older rollbacks were preserved. The profile
+and credentials were not copied, deleted or reset; installed-games.json stayed
+byte-identical and 0600 across Quit, replacement and startup.
+One ordinary main-Library reopen left app PID 71639 owning sole engine 71654,
+with no helper. All 21 installed files and three strict fixed-leaf signatures
+matched admission. No actual device-code, auth, owned-library, Import/Play, game
+or new screenshot request was automated by the implementation/deployment lane;
+ordinary anonymous startup catalog search remains unchanged.
+These are installed/startup observations, not user-present sign-in, PC shelf
+or gameplay proof. S4 stays open for Root's authorized live acceptance.
 
 ### S1 artwork and Continue Playing (admitted, installed and live-accepted)
 

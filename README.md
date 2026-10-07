@@ -10,7 +10,7 @@ entrypoints. Shipping screens use native setup/empty/loading/error states and
 actual public product data, not synthetic game illustrations. See
 [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
-**S4 PC Library candidate (not yet admitted or installed):** a separate native
+**S4 PC Library (`7ec1daa`, admitted and installed; live acceptance pending):** a separate native
 Microsoft device-code sign-in reads the account's complete paged collection,
 then joins active, non-trial Game entries to exact Store products declaring
 `Windows.Desktop`. The Your PC games shelf never comes from Xbox activity or
@@ -19,10 +19,15 @@ other games say Not installed. Refresh tokens alone use an app-owned Keychain
 item; access/Xbox tokens and the library remain in memory. Entry checks saved
 sign-in presence without reading credentials or automatically querying.
 Partial/failed refreshes are explicit and cannot become an empty library.
-Installed and Continue Playing remain above the shelf. This source slice still
-requires exact-source CI/package admission and Root-controlled installed
-sign-in evidence; it does not add installation, entitlement inference from
-history, or a backend/engine change.
+Installed and Continue Playing remain above the shelf.
+[Exact-source CI passed](https://github.com/dragoshont/xodus-macos-app/actions/runs/37617059339);
+the independently admitted signed package preserves C8 byte-for-byte. Normal
+Quit/replacement preserved the full S1 rollback, profile and private installed
+list; all 21 installed files and strict signatures matched admission. One
+ordinary Library startup was left open. Root-controlled user-present sign-in,
+actual PC shelf and imported-game Play evidence remain pending; no such action
+was automated for deployment. It does not add installation, entitlement
+inference from history, or a backend/engine change.
 
 **Installed-game Play (shipping `e401464`, initially admitted at `0926414`):** main Library has an **Installed** section
 above the unchanged owned-PC unavailable state. Import an already-installed Xbox
@@ -64,9 +69,10 @@ engine is unchanged. One ordinary main-Library startup was left open; no Import,
 Play or real-game launch was automated, and no screenshot or gameplay proof is
 claimed.
 
-**Preserved Library semantic correction (first admitted at `2d741a7`):** the
-owned-PC Library remains unavailable:
-Xodus cannot yet verify which PC games you own. It does not display TitleHub
+**Preserved Library history boundary (first admitted at `2d741a7`):** before S4,
+the owned-PC Library showed an unavailable state rather than guessing which
+games you own. S4 replaces that state only with explicit account-bound
+collection/PC-package evidence. Main Library still does not display TitleHub
 history as your games, a featured owned title or a PC Store shelf, and entering
 main Library makes no saved-status or history request. **Browse games** opens
 Discover; **Recent activity** explicitly opens a separate in-Library scope.
