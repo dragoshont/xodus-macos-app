@@ -37,7 +37,10 @@ system text, keyboard defaults/cancellation and resize rules apply. Child
 buttons retain their own accessibility identifiers rather than inheriting a
 whole-section identifier. No additional navigation, sidebar or dashboard is
 introduced. The source and signed package are admitted and installed; separate
-owner visual/interaction acceptance is pending.
+owner live acceptance is partial. The owner verified child identifiers, the
+Installed menu, Repair consent destination/free-space/unknown-size copy and the
+code-11 sign-in-required failure with no registry change. No app defect was found in
+those flows. Further operation acceptance awaits user-only Keychain approvals.
 
 ## Actual native implementation
 
@@ -58,8 +61,9 @@ owned shelf or fixture source. Root separately closed live acceptance after
 user-completed device-code sign-in: 13 PC games with real Store box art,
 Hogwarts matched to Installed with shared Play, and Refresh/Sign out visible.
 This does not certify parity with every Windows Xbox Owned-view entry or
-complete accessibility coverage; those two non-blocking follow-ups remain
-in the owner's spec.
+complete accessibility coverage. The owned-view comparison remains open;
+the section-identifier follow-up was fixed in S3/S5/S6 and independently
+verified live by the owner.
 
 **S1 installed Library refinement (admitted shipping `e401464`):** local tile art uses
 Square480, Square150, then StoreLogo from the imported folder's ShellVisuals,

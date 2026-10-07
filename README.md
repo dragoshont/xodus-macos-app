@@ -31,6 +31,12 @@ profile was left untouched and the private installed list remained byte-identica
 ordinary Library reopen. No game operation or sign-in was automated by the app
 implementation/deployment lane. Separate owner live acceptance remains pending.
 
+The owner has now verified child accessibility identifiers, Installed menu
+actions, the Repair consent sheet's destination/free space/copy, and a real
+Repair failure with code 11 and no registry change. No app defect was found in
+those flows. Further live acceptance is held on user-only Keychain approvals;
+successful Install, Repair, Uninstall and Play on this build are not yet claimed.
+
 **S4 PC Library (`7ec1daa`, admitted, installed and live-accepted):** a separate native
 Microsoft device-code sign-in reads the account's complete paged collection,
 then joins active, non-trial Game entries to exact Store products declaring
@@ -50,8 +56,9 @@ in-app sign-in and 13 PC games with real Store art; Hogwarts matched Installed
 with the shared Play control already verified in S1/S2. Root closed S4.
 Those observations do not come from neutral or deployment checks. The owned-view
 coverage comparison remains open in the owner's spec. The section-identifier
-follow-up is addressed in the S3/S5/S6 source above and awaits owner live
-acceptance. S4 itself does not add installation, entitlement inference from
+follow-up is addressed in the S3/S5/S6 source above, and the owner has verified
+the child identifiers on the installed build. This is not complete accessibility
+certification. S4 itself does not add installation, entitlement inference from
 history, or a backend/engine change.
 
 **Installed-game Play (introduced at `0926414`, retained in shipping `1463cdb`):** main Library has an **Installed** section

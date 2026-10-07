@@ -97,6 +97,22 @@ sign-in, Import, Install, Repair, Uninstall or Play was automated by this lane;
 no capture, private exporter or extra RPC was used. Existing anonymous startup
 catalog search is unchanged. The owner is separately performing live acceptance.
 
+**Owner-reported partial live acceptance, 2026-10-07:** no app defect found so
+far. The owner verified child accessibility identifiers (closing S4 follow-up
+b), the Installed menu's Check for update / Repair, Remove from list and
+Uninstall actions, and the Repair consent sheet's destination, measured free
+space, unknown-size copy and product wording. Repair invoked the real backend
+and correctly surfaced code 11 without changing the registry. This is evidence
+of the consent/invocation/sign-in-required failure path, not a successful repair.
+
+Remaining live acceptance is held on human-only Keychain approvals. The owner
+reported an `Xodus Library` access prompt while PC games remained at Loading
+your PC games, with an `Xodus Service` credential read queued behind it. The
+service credential-writing follow-up is owned outside this app repository; no
+app change was requested. The owner will resume Install, Uninstall, successful
+Repair and Play after user approval. This lane does not approve prompts,
+rewrite credentials or bypass Keychain protections.
+
 ### S4 owned PC Library (admitted, installed and live-accepted)
 
 This slice implements AC4.1–AC4.5 of the
