@@ -242,8 +242,8 @@ Updating the helper changes its own cdhash and can need fresh approval, even
 with the same certificate. Do not replace it as part of ordinary app updates.
 A pre-broker rollback cannot read the new account directly; retain a
 broker-aware rollback for future releases and gate older rollback deliberately.
-No live migration or next-replacement prompt-free claim is established by this
-candidate. The owner performs those checks with the user present.
+Source qualification does not establish live migration or replacement behavior.
+The separately authorized owner live checks are recorded below.
 
 **Qualification boundary.** Native synthetic builds use the same transport,
 peer authentication and storage logic with a compile-only fixed neutral
@@ -271,10 +271,21 @@ unchanged, and the one-use signing job was unloaded.
 
 The separately signed production helper candidate is 228448 bytes, SHA-256
 `2c40354c471c7a692cc64eea473a2fe1d34630c140341010ae9967e9742c9381`.
-It has not been installed or used against a live item. Synthetic preauthorization
-is not the user's native approval; injected retention is not an observed live
-delete failure. The final package/independent admission and user-present live
+Synthetic preauthorization is not the user's native approval; injected retention
+is not an observed live delete failure. Final package/independent admission and user-present live
 migration remain separate gates.
+
+**Bounded live observations.** The owner independently admitted `2d420d1`,
+its exact-source CI and the signed frozen-broker package, then authorized a
+user-present installation and migration. The helper was installed at the fixed
+path with the exact bytes above. The user answered the single expected native
+approval; migration finished with `legacyRetained=false`. A subsequent identical
+app reinstallation loaded 13 PC games without an observed reapproval. A distinct
+signed, non-installed Library review build also read the same broker and loaded
+13 PC games without an observed Keychain prompt, performed no credential
+write/delete/migration, and quit normally. Private receipts retain the exact
+identities; these observations do not guarantee every future prompt-free
+replacement, authorize helper updates or establish fresh game-service status.
 
 ### Phase 2 B1/B2/B3 (admitted, installed and owner-live-accepted)
 

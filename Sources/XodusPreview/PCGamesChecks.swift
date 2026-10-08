@@ -303,11 +303,22 @@ enum PCGamesChecks {
         let requestsBeforeRefresh = await controllerTransport.requests
         check(controller.hasSavedSignIn && readsBeforeRefresh == 0 && requestsBeforeRefresh.isEmpty,
               "S4: Library entry checks only item presence; it does not read credentials or auto-query")
+        let autoStore = PCGamesMockStore("neutral-auto-load")
+        let autoTransport = PCGamesMockTransport([tokenResponse] + (try authResponses()) + [
+            try page([item(first)]), try response(["Products": [catalogProduct(first)]])])
+        let automatic = PCGamesController(store: autoStore, client: PCGamesClient(transport: autoTransport))
+        await automatic.loadOnAppear()
+        await automatic.waitForOperation()
+        await automatic.loadOnAppear()
+        let automaticReads = await autoStore.reads
+        check(automatic.snapshot?.games.map(\.id) == [first] && automaticReads == 1 && !automatic.busy,
+              "Library refresh loads known saved PC games once on appearance, without repeated account refresh")
         let migrationStore = PCGamesMockStore("neutral-legacy-retained")
         await migrationStore.requireApproval()
         let migrationTransport = PCGamesMockTransport([])
         let migrating = PCGamesController(store: migrationStore, client: PCGamesClient(transport: migrationTransport))
         await migrating.restorePresence()
+        await migrating.loadOnAppear()
         migrating.refresh()
         migrating.signIn()
         let beforeApproval = await migrationStore.approvals

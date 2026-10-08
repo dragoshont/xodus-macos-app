@@ -262,6 +262,14 @@ struct PCGamesCatalog: Decodable {
                     struct Package: Decodable {
                         struct Platform: Decodable { let PlatformName: String? }
                         let PlatformDependencies: [Platform]?
+                        let MaxDownloadSizeInBytes: Int64?
+                        private enum CodingKeys: String, CodingKey { case PlatformDependencies, MaxDownloadSizeInBytes }
+                        init(from decoder: Decoder) throws {
+                            let values = try decoder.container(keyedBy: CodingKeys.self)
+                            PlatformDependencies = try values.decodeIfPresent([Platform].self, forKey: .PlatformDependencies)
+                            MaxDownloadSizeInBytes = (try? values.decode(Int64.self, forKey: .MaxDownloadSizeInBytes))
+                                ?? (try? values.decode(String.self, forKey: .MaxDownloadSizeInBytes)).flatMap(Int64.init)
+                        }
                     }
                     let Packages: [Package]?
                 }
@@ -269,9 +277,38 @@ struct PCGamesCatalog: Decodable {
             }
             let Sku: SKU?
         }
+        struct PropertiesDTO: Decodable {
+            struct Attribute: Decodable {
+                let Name: String?
+                let ApplicablePlatforms: [String]?
+            }
+            let Categories: [String]?
+            let Category: String?
+            let Attributes: [Attribute]?
+
+            private enum CodingKeys: String, CodingKey { case Categories, Category, Attributes }
+            init(from decoder: Decoder) throws {
+                let values = try decoder.container(keyedBy: CodingKeys.self)
+                Categories = try? values.decode([String].self, forKey: .Categories)
+                Category = try? values.decode(String.self, forKey: .Category)
+                Attributes = try? values.decode([Attribute].self, forKey: .Attributes)
+            }
+        }
         let ProductId: String
         let LocalizedProperties: [Localized]?
         let DisplaySkuAvailabilities: [Availability]?
+        let Properties: PropertiesDTO?
+
+        private enum CodingKeys: String, CodingKey {
+            case ProductId, LocalizedProperties, DisplaySkuAvailabilities, Properties
+        }
+        init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            ProductId = try values.decode(String.self, forKey: .ProductId)
+            LocalizedProperties = try values.decodeIfPresent([Localized].self, forKey: .LocalizedProperties)
+            DisplaySkuAvailabilities = try values.decodeIfPresent([Availability].self, forKey: .DisplaySkuAvailabilities)
+            Properties = try? values.decode(PropertiesDTO.self, forKey: .Properties)
+        }
 
         var isPC: Bool {
             (DisplaySkuAvailabilities ?? []).contains { availability in
@@ -279,6 +316,12 @@ struct PCGamesCatalog: Decodable {
                     (package.PlatformDependencies ?? []).contains { $0.PlatformName == "Windows.Desktop" }
                 }
             }
+        }
+
+        var pcDownloadBytes: Int64? {
+            (DisplaySkuAvailabilities ?? []).flatMap { $0.Sku?.Properties?.Packages ?? [] }
+                .filter { ($0.PlatformDependencies ?? []).contains { $0.PlatformName == "Windows.Desktop" } }
+                .compactMap(\.MaxDownloadSizeInBytes).filter { $0 > 0 }.max()
         }
 
         var game: PCGame? {

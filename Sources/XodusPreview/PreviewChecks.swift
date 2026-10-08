@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import Foundation
 import XodusCore
+import XodusManagement
 
 @MainActor
 enum PreviewChecks {
@@ -84,8 +85,123 @@ enum PreviewChecks {
         check(!live.signInPending && !live.accountBusy, "No unattended native sign-in begins")
         check(live.diagnosticPreview == nil, "No diagnostics or raw engine text are captured at startup")
         check(live.phase == .disconnected, "Presentation checks do not contact Xodus or Keychain")
+        libraryChecks(check: check)
         NativeUIChecks.run(check: check)
         print("\(count) preview checks, \(failures) failures. No backend connected.")
         return failures == 0
+    }
+
+    private static func libraryChecks(check: (Bool, String) -> Void) {
+        let installed = InstalledGame(id: UUID(), title: "Original Harbor", identityName: "fixture",
+            version: "1.0.0.0", storeId: "FIXTURE00001", folder: "/fixture", launcher: "/fixture/run",
+            importedAt: .distantPast, lastPlayedAt: Date(timeIntervalSince1970: 100))
+        let owned = PCGame(id: "FIXTURE00002", title: "Original Ridge", artwork: nil)
+        do {
+            func product(_ id: String) throws -> CatalogProduct {
+                try JSONDecoder().decode(CatalogProduct.self, from: Data("""
+                    {"productID":"\(id)","title":"Original Moss","market":"US","language":"en-US",
+                    "source":"MicrosoftGamePassSigls:v3","checkedAt":"2026-10-08T00:00:00Z",
+                    "freshness":"current","editions":[],"pcCatalogCandidate":true,
+                    "artwork":[],"artworkStatus":"absent"}
+                    """.utf8))
+            }
+            let pass = try product("FIXTURE00003")
+            let catalogOnly = try product("FIXTURE00004")
+            let all = LibraryGame.collection(installed: [installed, installed], owned: [owned, owned],
+                products: [catalogOnly], gamePass: [pass, pass], active: true)
+            check(all.count == 3 && Set(all.map(\.id)).count == 3,
+                  "Refreshed Library joins exact identities once across repeated inputs")
+            check(all.first?.installed != nil && all.first?.owned == false,
+                  "Importing a game never changes its ownership evidence")
+            check(!all.contains { $0.id == catalogOnly.id },
+                  "Library never imports unrelated Store discovery into an entitled collection")
+            check(LibraryGame.visible(all, query: "", filter: .owned, sort: .title).map(\.id) == [owned.id],
+                  "Owned filter is based only on the complete PC account collection")
+            check(LibraryGame.visible(all, query: "", filter: .gamePass, sort: .title).map(\.id) == [pass.id],
+                  "Game Pass filter preserves separate membership evidence")
+            check(LibraryGame.collection(installed: [installed], owned: [owned], products: [],
+                gamePass: [pass], active: false).map(\.id) == [installed.storeId, owned.id],
+                  "Inactive subscription excludes feed-only titles without deleting installed or purchased games")
+            check(LibraryGame.visible(all, query: "  RIDGE  ", filter: .all, sort: .title).map(\.id) == [owned.id],
+                  "Library query trims whitespace and searches only titles in the current collection")
+            check(LibraryGame.visible(all, query: "", filter: .installed, sort: .recentlyPlayed).map(\.id) == [installed.storeId],
+                  "Installed and last-played filtering uses local registry evidence only")
+            let joined = LibraryGame.collection(installed: [installed],
+                owned: [PCGame(id: installed.storeId, title: "Account title", artwork: nil)],
+                products: [], gamePass: [try product(installed.storeId)], active: true)
+            check(joined.count == 1 && joined[0].owned && joined[0].gamePass && joined[0].installed != nil,
+                  "One exact title can retain independent installation, purchase and subscription facets")
+            let square = PCGamesClient.artwork(uri: "https://store-images.s-microsoft.com/image/apps.fixture",
+                                              width: 400, height: 400, role: .boxArt)
+            let squareGame = LibraryGame(id: owned.id, title: owned.title, installed: nil,
+                pc: PCGame(id: owned.id, title: owned.title, artwork: square), product: nil, owned: true, gamePass: false)
+            check(square != nil && squareGame.cover == nil, "Portrait Library covers do not stretch square Store icons")
+            check(LibraryAccess(joined[0]) == .owned && LibraryAccess(all[0]) == nil &&
+                  all.first(where: { $0.gamePass }).flatMap(LibraryAccess.init) == .gamePass,
+                  "Access badges preserve purchase priority and never turn installation into entitlement")
+            check(all[0].actionTitle == "Play" && all.filter { $0.installed == nil }.allSatisfy { $0.actionTitle == "Install" },
+                  "Only installed entries say Play; uninstalled purchase/subscription cards say Install")
+            let metadata = try JSONDecoder().decode(PCGamesCatalog.Product.self, from: Data("""
+                {"ProductId":"FIXTURE00002","Properties":{
+                 "Categories":[" Action & adventure ","Role playing","Action & adventure"],
+                 "Attributes":[{"Name":"SinglePlayer","ApplicablePlatforms":["Desktop"]},
+                   {"Name":"XblOnlineMultiPlayer"},{"Name":"XblOnlineCoop"},
+                   {"Name":"XblCrossPlatformMultiPlayer"},{"Name":"XblAchievements"}]}}
+                """.utf8))
+            let facts = LibraryCatalogFacts(properties: metadata.Properties)
+            check(facts.genres == ["Action & adventure", "Role playing"] &&
+                  facts.capabilities == LibraryCapability.allCases,
+                  "DisplayCatalog genre and four recognized capabilities decode without inferred achievements")
+            let console = try JSONDecoder().decode(PCGamesCatalog.Product.self, from: Data("""
+                {"ProductId":"FIXTURE00002","Properties":{"Category":"Games",
+                 "Attributes":[{"Name":"SinglePlayer","ApplicablePlatforms":["Xbox"]},
+                   {"Name":"XblOnlineMultiPlayer","ApplicablePlatforms":[]}]}}
+                """.utf8))
+            check(LibraryCatalogFacts(properties: console.Properties).capabilities.isEmpty &&
+                  LibraryCatalogFacts(properties: console.Properties).genres.isEmpty,
+                  "Console-only capabilities and a generic Games category never masquerade as PC metadata")
+            let absent = LibraryCatalogFacts(properties: nil)
+            let malformed = try JSONDecoder().decode(PCGamesCatalog.Product.self, from:
+                Data(#"{"ProductId":"FIXTURE00002","Properties":"unusable optional metadata"}"#.utf8))
+            check(absent.genres.isEmpty && absent.capabilities.isEmpty && malformed.Properties == nil,
+                  "Missing or malformed optional presentation metadata hides rather than breaking game identity")
+            let packages = try JSONDecoder().decode(PCGamesCatalog.Product.self, from: Data("""
+                {"ProductId":"FIXTURE00002","DisplaySkuAvailabilities":[{"Sku":{"Properties":{"Packages":[
+                 {"PlatformDependencies":[{"PlatformName":"Xbox"}],"MaxDownloadSizeInBytes":999999999999},
+                 {"PlatformDependencies":[{"PlatformName":"Windows.Desktop"}],"MaxDownloadSizeInBytes":"5300000000"},
+                 {"PlatformDependencies":[{"PlatformName":"Windows.Desktop"}],"MaxDownloadSizeInBytes":-1},
+                 {"PlatformDependencies":[{"PlatformName":"Windows.Desktop"}],"MaxDownloadSizeInBytes":"unknown"}
+                ]}}}]}
+                """.utf8))
+            check(packages.pcDownloadBytes == 5_300_000_000 && packages.isPC,
+                  "Public size uses positive PC package maxima, not console sizes or malformed metadata")
+            check(metadata.pcDownloadBytes == nil && malformed.pcDownloadBytes == nil,
+                  "Missing public size stays unknown and never becomes a zero-byte download")
+            check(LibraryGameInformation.playTimeLabel(seconds: 43_200)?.hasPrefix("12 h") == true &&
+                  LibraryGameInformation.playTimeLabel(seconds: 120)?.hasPrefix("2 min") == true &&
+                  LibraryGameInformation.playTimeLabel(seconds: nil) == nil &&
+                  LibraryGameInformation.playTimeLabel(seconds: .infinity) == nil &&
+                  LibraryGameInformation.playTimeLabel(seconds: -1) == nil,
+                  "Local total-play-time labels are honest, bounded and absent without cumulative evidence")
+            let statsData = Data("""
+                {"friends":1,"checkedAt":"2026-10-08T00:00:00Z","games":{"FIXTURE00002":{
+                 "achievementsUnlocked":14,"achievementsTotal":0,"gamerscore":215,"gamerscoreTotal":1000,
+                 "genres":["Adventure"],"minutesPlayed":292,
+                 "friendsWhoPlay":[{"gamertag":"OriginalFixtureGamer","online":false}]}}}
+                """.utf8)
+            let stats = try LibraryXboxStatsCache.decode(statsData)
+            let detail = stats.games[owned.id]
+            check(detail?.achievements == "\(14.formatted()) achievements · \(215.formatted()) / \(1000.formatted()) G" &&
+                  detail?.playTime?.hasSuffix(" h on Xbox") == true &&
+                  detail?.friends == "1 friend plays" && detail?.friendHelp == "OriginalFixtureGamer" &&
+                  stats.games[installed.storeId] == nil,
+                  "Cached Xbox stats preserve unknown totals, explicit Xbox time and exact-ID missing-game hiding")
+            let invalidStats = Data(String(decoding: statsData, as: UTF8.self)
+                .replacingOccurrences(of: #""minutesPlayed":292"#, with: #""minutesPlayed":-1"#).utf8)
+            do {
+                _ = try LibraryXboxStatsCache.decode(invalidStats)
+                check(false, "Negative Xbox play time is never presented as a successful cache")
+            } catch { check(true, "Negative Xbox play time is never presented as a successful cache") }
+        } catch { check(false, "Library presentation fixture decoding completes without runtime or account access") }
     }
 }

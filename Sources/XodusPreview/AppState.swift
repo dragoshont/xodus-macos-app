@@ -43,7 +43,7 @@ final class AppState: ObservableObject {
     lazy var gameOperations = GameOperationsController(installed: installedGames)
 #if !XODUS_SHIPPING
     @Published var fixtureMode = CommandLine.arguments.contains("--fixture")
-        || CommandLine.arguments.contains("--export-preview")
+        || CommandLine.arguments.contains("--export-preview") || LibraryPreviewExporter.fixtureRequested
     @Published var sortByTitle = false
     @Published var accessFilter: Entitlement? = nil
     @Published var category: BrowseCategory = .all

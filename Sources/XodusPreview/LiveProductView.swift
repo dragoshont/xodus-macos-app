@@ -4,8 +4,10 @@ import XodusManagement
 
 struct LiveProductView: View {
     let product: CatalogProduct
+    var installed: InstalledGame? = nil
     @EnvironmentObject private var session: LiveSession
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var catalog = LibraryCatalogArtwork.shared
     private var hero: CatalogArtworkReference? {
         CatalogArtworkReference.preferred(in: product.artwork, roles: [.hero])
     }
@@ -35,6 +37,8 @@ struct LiveProductView: View {
                     }
                     Text(session.productSummary(product))
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    LibraryGameSizeView(installed: installed,
+                                        downloadBytes: catalog.images[product.id]?.facts.downloadBytes)
                     DisclosureGroup("Catalog info") {
                         VStack(alignment: .leading, spacing: 18) {
                             ForEach(product.editions) { edition in

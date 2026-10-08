@@ -7,6 +7,7 @@ struct RootView: View {
     @FocusState private var searchFocused: Bool
 
     var body: some View {
+        ScrollViewReader { proxy in
         Group {
             if state.destination == .downloads {
                 VStack(spacing: 0) {
@@ -14,6 +15,8 @@ struct RootView: View {
                     FixtureNotice().padding(.horizontal, 30).padding(.top, 12)
                     DownloadsView()
                 }
+            } else if state.destination == .library {
+                ScrollView { FixtureLibraryView() }.modifier(LibraryScrollEdge())
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
@@ -24,6 +27,7 @@ struct RootView: View {
             }
         }
         .ignoresSafeArea(.container, edges: .top)
+        .modifier(LibraryImmersion(enabled: state.destination == .library))
         .background(Color(nsColor: .windowBackgroundColor))
         .toolbar {
             XodusToolbar(selection: state.navigationSelection, searchText: $state.query,
@@ -31,10 +35,15 @@ struct RootView: View {
                          searchPlaceholder: state.destination == .downloads ? "Search Library or Discover"
                             : "Search \(state.destination.rawValue)",
                          searchEnabled: state.destination != .downloads, accountLabel: "Fixture account",
-                         accountSymbol: "person.crop.circle") { state.showingWelcome = true }
+                         accountSymbol: "person.crop.circle",
+                         libraryContrast: state.destination == .library) { state.showingWelcome = true }
         }
         .onAppear {
             PreviewExporter.startIfRequested(state: state)
+            LibraryPreviewExporter.start(state: state, session: LiveSession())
+        }
+        .onReceive(LibraryPreviewExporter.presentation.$showGrid) { show in
+            if show { proxy.scrollTo("library-games", anchor: .top) }
         }
         .sheet(item: $state.selectedGame) { game in GameDetailView(game: game) }
         .sheet(isPresented: $state.showingWelcome) { WelcomeView() }
@@ -45,6 +54,7 @@ struct RootView: View {
         } message: { Text(state.message ?? "") }
         .background {
             Button("Focus search") { searchFocused = true }.keyboardShortcut("f").hidden()
+        }
         }
     }
 

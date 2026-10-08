@@ -1,0 +1,149 @@
+// SPDX-License-Identifier: GPL-3.0-only
+import Foundation
+import XodusManagement
+
+@MainActor
+final class LibraryCatalogArtwork: ObservableObject {
+    static let shared = LibraryCatalogArtwork()
+    struct Images {
+        let cover: CatalogArtworkReference?
+        let hero: CatalogArtworkReference?
+        let landscape: [CatalogArtworkReference]
+        let logos: [CatalogArtworkReference]
+        let facts: LibraryCatalogFacts
+        let product: CatalogProduct
+    }
+    @Published private(set) var images: [String: Images] = [:]
+    @Published private(set) var error: String?
+    private var requested = Set<String>()
+    private var pending: Task<Void, Never>?
+
+    func load(ids: [String], market: String, language: String) async {
+        if let pending { await pending.value }
+        let ids = Set(ids.filter(PCGamesClient.validProductID)).subtracting(requested).sorted()
+        guard !ids.isEmpty else { return }
+        let task = Task {
+            do {
+                let transport = PCGamesHTTP()
+                for start in stride(from: 0, to: ids.count, by: 20) {
+                    try Task.checkCancellation()
+                    let batch = Array(ids[start..<min(start + 20, ids.count)])
+                    var url = URLComponents(string: "https://displaycatalog.mp.microsoft.com/v7.0/products")
+                    url?.queryItems = [URLQueryItem(name: "bigIds", value: batch.joined(separator: ",")),
+                                      URLQueryItem(name: "market", value: PCGamesClient.market(market)),
+                                      URLQueryItem(name: "languages", value: PCGamesClient.language(language))]
+                    guard let endpoint = url?.url else { throw PCGamesError.invalidResponse }
+                    var request = URLRequest(url: endpoint)
+                    request.httpShouldHandleCookies = false
+                    let response = try await transport.send(request)
+                    guard response.status == 200 else { throw PCGamesError.http(response.status) }
+                    let products = try JSONDecoder().decode(PCGamesCatalog.self, from: response.data).Products
+                    guard products.count <= batch.count, Set(products.map(\.ProductId)).count == products.count,
+                          products.allSatisfy({ batch.contains($0.ProductId) }) else { throw PCGamesError.invalidResponse }
+                    for product in products {
+                        let art = product.LocalizedProperties?.first?.Images ?? []
+                        func references(_ purposes: [String], portrait: Bool) -> [CatalogArtworkReference] {
+                            var values: [CatalogArtworkReference] = []
+                            for purpose in purposes {
+                                for image in art where image.ImagePurpose == purpose {
+                                    guard let width = image.Width, let height = image.Height,
+                                          portrait ? height > width : width > height else { continue }
+                                    if let value = PCGamesClient.artwork(uri: image.Uri, width: width, height: height,
+                                                                        role: portrait ? .boxArt : .hero) {
+                                        if !values.contains(value) { values.append(value) }
+                                    }
+                                }
+                            }
+                            return values
+                        }
+                        let cover = references(["BoxArt", "Poster"], portrait: true).first
+                        let heroes = references(["SuperHeroArt", "TitledHeroArt", "TitleHeroArt", "Hero"], portrait: false)
+                        let screenshots = references(["Screenshot"], portrait: false)
+                        let landscape = Array(heroes.prefix(2)) + Array(screenshots.prefix(1)) + (cover.map { [$0] } ?? [])
+                        var unique: [CatalogArtworkReference] = []
+                        for value in landscape where !unique.contains(value) { unique.append(value) }
+                        let title = product.LocalizedProperties?.first?.ProductTitle ?? product.ProductId
+                        let detail = try LibraryGame.details(id: product.ProductId, title: title,
+                            artwork: (heroes.first.map { [$0] } ?? []) + (cover.map { [$0] } ?? []),
+                            market: market, language: language, source: "MicrosoftDisplayCatalog:v7",
+                            pcCandidate: product.isPC)
+                        images[product.ProductId] = Images(cover: cover, hero: heroes.first,
+                            landscape: unique, logos: Self.logoReferences(in: art),
+                            facts: LibraryCatalogFacts(properties: product.Properties,
+                                                       downloadBytes: product.pcDownloadBytes), product: detail)
+                    }
+                    requested.formUnion(batch)
+                }
+                error = nil
+            } catch is CancellationError { }
+            catch { self.error = "Some library artwork couldn't be loaded. Your games and access haven't changed." }
+        }
+        pending = task
+        await task.value
+        pending = nil
+    }
+
+    func preload() async -> Int {
+        await CatalogArtworkStore.shared.preload(images.values.flatMap { $0.landscape + $0.logos })
+    }
+
+    static func logoReferences(in images: [PCGamesCatalog.Product.Localized.Image]) -> [CatalogArtworkReference] {
+        ["Logo", "TitledHeroArt", "TitleHeroArt"].compactMap { purpose in
+            images.first(where: { $0.ImagePurpose == purpose }).flatMap {
+                PCGamesClient.artwork(uri: $0.Uri, width: $0.Width, height: $0.Height, role: .hero)
+            }
+        }
+    }
+}
+
+enum LibraryCapability: String, CaseIterable, Identifiable {
+    case singlePlayer = "Single player", multiplayer = "Online multiplayer", coop = "Co-op", crossPlatform = "Cross-platform"
+    var id: Self { self }
+    var symbol: String {
+        switch self {
+        case .singlePlayer: "person.fill"
+        case .multiplayer: "person.2.fill"
+        case .coop: "person.2"
+        case .crossPlatform: "network"
+        }
+    }
+    private var catalogNames: Set<String> {
+        switch self {
+        case .singlePlayer: ["SinglePlayer"]
+        case .multiplayer: ["XblOnlineMultiPlayer"]
+        case .coop: ["XblLocalCoop", "XblOnlineCoop", "XblCrossPlatformCoop"]
+        case .crossPlatform: ["XblCrossPlatformMultiPlayer", "XblCrossPlatformCoop"]
+        }
+    }
+    func matches(_ name: String) -> Bool { catalogNames.contains(name) }
+}
+
+struct LibraryCatalogFacts {
+    let genres: [String]
+    let capabilities: [LibraryCapability]
+    let downloadBytes: Int64?
+
+    init(genres: [String], capabilities: [LibraryCapability] = [], downloadBytes: Int64? = nil) {
+        self.genres = Array(genres.prefix(2))
+        self.capabilities = capabilities
+        self.downloadBytes = downloadBytes
+    }
+
+    init(properties: PCGamesCatalog.Product.PropertiesDTO?, downloadBytes: Int64? = nil) {
+        self.downloadBytes = downloadBytes
+        var seen = Set<String>()
+        genres = Array((properties?.Categories ?? properties?.Category.map { [$0] } ?? [])
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter {
+                !$0.isEmpty && $0 != "Games" && $0.utf8.count <= 128 &&
+                !$0.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) &&
+                seen.insert($0).inserted
+            }.prefix(2))
+        let attributes = (properties?.Attributes ?? []).filter {
+            $0.ApplicablePlatforms.map { $0.contains("Desktop") || $0.contains("Windows.Desktop") } ?? true
+        }
+        capabilities = LibraryCapability.allCases.filter { capability in
+            attributes.contains { $0.Name.map(capability.matches) ?? false }
+        }
+    }
+}

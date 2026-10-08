@@ -117,18 +117,30 @@ struct InstalledPlayButton: View {
     @ObservedObject var library: InstalledGamesController
     @ObservedObject var operations: GameOperationsController
     let game: InstalledGame
+    var usesGlass = false
+    var prominent = true
+    var heroStyle = false
+    private var title: String {
+        canStop ? "Stop" : library.runningGameID == game.id ? "Launching"
+            : library.playErrors[game.id] == nil ? "Play" : "Try again"
+    }
 
     private var canStop: Bool {
         (library.runningGameID == game.id && library.launchStarted) || library.stoppingGameID == game.id
     }
 
     var body: some View {
-        Button(canStop ? "Stop" : library.runningGameID == game.id ? "Launching"
-               : library.playErrors[game.id] == nil ? "Play" : "Try again") {
+        Button {
             if canStop { operations.stop(game) }
             else { Task { await library.play(game) } }
+        } label: {
+            if heroStyle {
+                Label(title, systemImage: canStop ? "stop.fill" : "play.fill")
+                    .font(.title3.weight(.semibold)).frame(minHeight: 28).padding(.horizontal, 12)
+            } else { Text(title) }
         }
-        .buttonStyle(.borderedProminent)
+        .modifier(LibraryActionStyle(primary: prominent, usesGlass: usesGlass))
+        .modifier(LibraryHeroControlSize(enabled: heroStyle))
         .disabled(canStop ? !library.canStop(game) || !operations.canStartMutation
                   : library.runningGameID != nil || library.stoppingGameID != nil || library.editing || library.choosing
                   || library.mutationGameID == game.id || library.serviceSignInActive || library.runtimeRepairActive)

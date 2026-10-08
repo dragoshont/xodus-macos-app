@@ -10,6 +10,61 @@ enum NativeUIChecks {
         catch { check(false, "Native image threshold/thumbnail checks complete without network access") }
         let application = NSApplication.shared
         let windows = application.windows.count
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            for reduceTransparency in [false, true] {
+                let chrome = NSHostingView(rootView: HStack {
+                    Picker("Navigate Xodus", selection: .constant(Destination.library)) {
+                        Text("Library").tag(Destination.library)
+                    }.pickerStyle(.segmented)
+                    NativeToolbarSearch(text: .constant(""), focused: .constant(false), placeholder: "Search Library")
+                }.modifier(NativeToolbarMaterial())
+                    .environment(\.xodusReviewReduceTransparency, reduceTransparency))
+                chrome.sizingOptions = []
+                chrome.appearance = NSAppearance(named: appearance)
+                chrome.frame = CGRect(x: 0, y: 0, width: 460, height: 52)
+                chrome.layoutSubtreeIfNeeded()
+                check(chrome.window == nil && chrome.frame.height == 52,
+                      "Native contrast chrome lays out detached in \(appearance.rawValue), app-local reduced-material fallback \(reduceTransparency)")
+            }
+        }
+        if let context = CGContext(data: nil, width: 32, height: 16, bitsPerComponent: 8, bytesPerRow: 128,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) {
+            context.clear(CGRect(x: 0, y: 0, width: 32, height: 16))
+            context.setFillColor(CGColor(gray: 1, alpha: 1))
+            context.fill(CGRect(x: 8, y: 4, width: 16, height: 8))
+            check(context.makeImage().map(LibraryLogoPolicy.isTransparent) == true,
+                  "A real transparent title asset with visible ink qualifies as a hero logo")
+            context.fill(CGRect(x: 0, y: 0, width: 32, height: 16))
+            check(context.makeImage().map(LibraryLogoPolicy.isTransparent) == false,
+                  "Opaque TitledHeroArt remains background artwork, not a fake transparent title logo")
+            context.clear(CGRect(x: 0, y: 0, width: 32, height: 16))
+            check(context.makeImage().map(LibraryLogoPolicy.isTransparent) == false,
+                  "An empty transparent asset falls back to the accessible text title")
+        } else { check(false, "Synthetic logo pixel context allocates without a window") }
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            for width in [CGFloat(820), CGFloat(1440)] {
+                let state = AppState()
+                let session = LiveSession()
+                let fixture = NSHostingView(rootView: FixtureLibraryView().environmentObject(state))
+                fixture.sizingOptions = []
+                fixture.appearance = NSAppearance(named: appearance)
+                fixture.frame = CGRect(x: 0, y: 0, width: width, height: 874)
+                fixture.layoutSubtreeIfNeeded()
+                check(fixture.window == nil && fixture.frame.width == width && fixture.frame.height == 874,
+                      "Library fixture lays out detached in \(appearance.rawValue) at \(Int(width)) points")
+                let live = NSHostingView(rootView: LiveLibraryView(library: state.pcGames,
+                    installed: state.installedGames, operations: state.gameOperations, query: "",
+                    allowsStartupTasks: false, allowsArtworkLoading: false, browse: {}, recentActivity: {})
+                    .environmentObject(session))
+                live.sizingOptions = []
+                live.appearance = NSAppearance(named: appearance)
+                live.frame = CGRect(x: 0, y: 0, width: width, height: 874)
+                live.layoutSubtreeIfNeeded()
+                check(live.window == nil && session.phase == .disconnected && !state.pcGames.busy &&
+                      !state.gameOperations.isBusy && !state.installedGames.loading,
+                      "Library signed-out layout remains detached and side-effect-free at \(Int(width)) in \(appearance.rawValue)")
+            }
+        }
         let runtime = RuntimeProviderSettings()
         check(runtime.configuration == nil && runtime.plan == nil && !runtime.planning,
               "Runtime Settings start with no provider selected, no trial-default inheritance and no plan")

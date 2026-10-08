@@ -8,6 +8,7 @@ struct PCGamesView: View {
     @ObservedObject var operations: GameOperationsController
     let query: String
     var allowsStartupTasks = true
+    var showsCollection = true
     let browse: () -> Void
     let recentActivity: () -> Void
 
@@ -56,9 +57,9 @@ struct PCGamesView: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 220)
             } else {
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                if showsCollection { HStack(alignment: .firstTextBaseline, spacing: 12) {
                     Text("Your PC games").font(.title.bold())
-                    if let snapshot = library.snapshot {
+                    if showsCollection, let snapshot = library.snapshot {
                         Text("\(snapshot.games.count)").font(.title3).foregroundStyle(.secondary)
                             .accessibilityLabel("\(snapshot.games.count) PC games")
                     }
@@ -67,17 +68,17 @@ struct PCGamesView: View {
                         .disabled(library.busy || library.needsKeychainApproval).accessibilityIdentifier("xodus.pcGames.refresh")
                     Button("Sign out of PC games") { Task { await library.signOut() } }
                         .disabled(library.busy).accessibilityIdentifier("xodus.pcGames.signOut")
-                }
+                } }
                 if library.busy && !library.approvingKeychain {
                     ProgressView("Loading your PC games").controlSize(.small)
                         .accessibilityIdentifier("xodus.pcGames.loading")
                 }
                 if let snapshot = library.snapshot {
-                    if snapshot.games.isEmpty {
+                    if showsCollection, snapshot.games.isEmpty {
                         Text("No PC games were found in this account.").foregroundStyle(.secondary)
-                    } else if visibleGames.isEmpty {
+                    } else if showsCollection, visibleGames.isEmpty {
                         ContentUnavailableView.search(text: query)
-                    } else {
+                    } else if showsCollection {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 180, maximum: 240), spacing: 24)], spacing: 28) {
                             ForEach(visibleGames) { game in
                                 PCGameTile(game: game, installed: installed, operations: operations,
@@ -86,22 +87,25 @@ struct PCGamesView: View {
 
                         }
                     }
-                    VStack(alignment: .leading, spacing: 6) {
+                    if showsCollection { VStack(alignment: .leading, spacing: 6) {
                         if snapshot.excludedCount > 0 {
                             Text("\(snapshot.excludedCount) games not shown (not for PC or unavailable)")
                         }
                         Text("Last updated \(Text(snapshot.updatedAt, style: .relative)) ago")
                         if library.error != nil { Text("Showing the last complete library.") }
                     }
-                    .font(.callout).foregroundStyle(.secondary)
-                } else if !library.busy {
+                    .font(.callout).foregroundStyle(.secondary) }
+                    if !showsCollection, library.error != nil {
+                        Text("Showing the last complete library.").font(.callout).foregroundStyle(.secondary)
+                    }
+                } else if showsCollection, !library.busy {
                     Text("Load your library to see your PC games.").foregroundStyle(.secondary)
                 }
-                HStack {
+                if showsCollection { HStack {
                     Button("Browse games", action: browse)
                     Button("Recent activity", action: recentActivity)
                         .accessibilityIdentifier("xodus.library.openRecentActivity")
-                }
+                } }
             }
             if let error = library.error {
                 Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.secondary)
@@ -109,7 +113,7 @@ struct PCGamesView: View {
                     .accessibilityIdentifier("xodus.pcGames.error")
             }
         }
-        .task { if allowsStartupTasks { await library.restorePresence() } }
+        .task { if allowsStartupTasks && showsCollection { await library.restorePresence() } }
         .sheet(isPresented: Binding(get: { library.sheetPresented }, set: { value in
             if !value { Task { await library.cancelSignIn() } }
         })) {

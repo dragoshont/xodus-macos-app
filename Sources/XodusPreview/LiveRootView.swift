@@ -17,7 +17,8 @@ struct LiveRootView: View {
 #if XODUS_SHIPPING
         true
 #else
-        allowsStartupTasks && !CommandLine.arguments.contains("--export-live") && !PreviewExporter.liveDataRequested
+        allowsStartupTasks && !CommandLine.arguments.contains("--export-live") &&
+            !PreviewExporter.liveDataRequested && !LibraryPreviewExporter.requested
 #endif
     }
     private var searchEnabled: Bool {
@@ -25,13 +26,26 @@ struct LiveRootView: View {
             || (state.destination == .library && !state.showsRecentActivity)
             || (state.showsRecentActivity && session.recentLibrary != nil)
     }
+    private var libraryArtworkAllowed: Bool {
+#if XODUS_SHIPPING
+        startupAllowed
+#else
+        startupAllowed || LibraryPreviewExporter.requested
+#endif
+    }
     private var searchPlaceholder: String {
         state.destination == .library ? (state.showsRecentActivity ? "Search recent activity" : "Search your PC games")
             : state.destination == .downloads ? "Search Library or Discover"
             : session.supports(.query) ? "Search your games and Microsoft Store" : "Search your games and checked catalog"
     }
+    private var refreshHelp: String {
+        guard let snapshot = state.pcGames.snapshot else { return "Refresh Library" }
+        let age = snapshot.updatedAt.formatted(.relative(presentation: .named))
+        return "Refresh Library - updated \(age)"
+    }
 
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
                 GameSetupBannerView(operations: state.gameOperations) {
@@ -42,21 +56,57 @@ struct LiveRootView: View {
                 else if state.destination == .discover { catalog }
                 else { LiveActivityView(operations: state.gameOperations) }
             }
-            .padding(30)
+            .padding(state.destination == .library && !state.showsRecentActivity ? 0 : 30)
         }
+        .modifier(LibraryScrollEdge(enabled: state.destination == .library && !state.showsRecentActivity))
+        .modifier(LibraryImmersion(enabled: state.destination == .library && !state.showsRecentActivity))
         .background(Color(nsColor: .windowBackgroundColor))
         .toolbar {
             XodusToolbar(selection: state.navigationSelection, searchText: $state.query,
                          searchFocused: Binding(get: { searchFocused }, set: { searchFocused = $0 }),
                          searchPlaceholder: searchPlaceholder, searchEnabled: searchEnabled,
                          accountLabel: session.accountLabel,
-                         accountSymbol: session.accountSymbol) { state.showingAccount = true }
+                         accountSymbol: session.accountSymbol,
+                         libraryContrast: state.destination == .library && !state.showsRecentActivity) {
+                state.showingAccount = true
+            }
+            if state.destination == .library && !state.showsRecentActivity {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Import installed Xbox game", systemImage: "plus") {
+                        Task { await state.installedGames.chooseGame() }
+                    }
+                    .labelStyle(.iconOnly).help("Import installed game")
+                    .modifier(NativeToolbarIconStyle())
+                    .disabled(!state.installedGames.loaded || state.installedGames.editing ||
+                              state.installedGames.choosing || state.installedGames.mutationActive)
+                    .accessibilityIdentifier("xodus.installed.import")
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Refresh Library", systemImage: "arrow.clockwise") {
+                        state.pcGames.refresh()
+                        if state.gameOperations.gamePassActive, session.isReady, session.supports(.discover) {
+                            Task { await session.refreshCatalog("") }
+                        }
+                    }
+                        .labelStyle(.iconOnly).help(refreshHelp).keyboardShortcut("r")
+                        .modifier(NativeToolbarIconStyle())
+                        .disabled(!startupAllowed || state.pcGames.busy || !state.pcGames.hasSavedSignIn ||
+                                  state.pcGames.needsKeychainApproval || state.pcGames.needsSignIn)
+                        .accessibilityIdentifier("xodus.pcGames.refresh")
+                }
+            }
         }
         .onAppear {
 #if !XODUS_SHIPPING
             PreviewExporter.startIfRequested(state: state, session: session)
+            LibraryPreviewExporter.start(state: state, session: session)
 #endif
         }
+#if !XODUS_SHIPPING
+        .onReceive(LibraryPreviewExporter.presentation.$showGrid) { show in
+            if show { proxy.scrollTo("library-games", anchor: .top) }
+        }
+#endif
         .task {
             if startupAllowed { await state.runtimeSettings.refreshCrossOverDependency() }
         }
@@ -89,10 +139,13 @@ struct LiveRootView: View {
             LiveAccountView()
 #endif
         }
-        .sheet(item: $session.selectedProduct) { product in LiveProductView(product: product) }
+        .sheet(item: $session.selectedProduct) { product in
+            LiveProductView(product: product, installed: state.installedGames.games.first { $0.storeId == product.id })
+        }
         .background { GameOperationPresentation(operations: state.gameOperations) }
         .background {
             Button("Focus search") { searchFocused = true }.keyboardShortcut("f").hidden()
+        }
         }
     }
 
@@ -106,17 +159,12 @@ struct LiveRootView: View {
                                       findInStore: { state.findInStore($0, session: session) })
                     .accessibilityIdentifier("xodus.library.recentActivity")
             } else {
-                InstalledGamesView(library: state.installedGames, operations: state.gameOperations,
-                                   allowsArtworkLoading: startupAllowed)
-                GameOperationProgressView(operations: state.gameOperations)
-                PCGamesView(library: state.pcGames, installed: state.installedGames,
-                            operations: state.gameOperations,
-                            query: scopedQuery, allowsStartupTasks: startupAllowed,
-                            browse: { state.navigate(.discover) },
-                            recentActivity: { state.openRecentActivity() })
-                GamePassLibraryView(library: state.pcGames, installed: state.installedGames,
-                                    operations: state.gameOperations, query: scopedQuery,
-                                    allowsStartupTasks: startupAllowed)
+                LiveLibraryView(library: state.pcGames, installed: state.installedGames,
+                                operations: state.gameOperations, query: scopedQuery,
+                                allowsStartupTasks: startupAllowed,
+                                allowsArtworkLoading: libraryArtworkAllowed,
+                                browse: { state.navigate(.discover) },
+                                recentActivity: { state.openRecentActivity() })
             }
             if !state.showsRecentActivity {
                 DisclosureGroup("Library details") {
@@ -128,6 +176,7 @@ struct LiveRootView: View {
                         Text("Import an installed Xbox game and choose its working Xodus launch script to play. Removing it from the list keeps its game files and saves.")
                         Text("Inspect a game folder checks its Xodus marker only. This check doesn't import the game or enable Play.")
                     }
+                    .padding(.horizontal, 56).padding(.bottom, 28)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 12)

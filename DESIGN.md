@@ -1,8 +1,8 @@
-# Design system: immersive native content, system toolbar revision
+# Design system: native art-first Library
 
 ## User-directed visual contract
 
-Apple Games for macOS is the **actual composition/layout authority**, not loose inspiration. The user rejected the flat v0.1 interpretation and later the bespoke floating-menu interpretation. The current direction is immersive artwork under a translucent native bar, grouped native navigation/search, a separate trailing account control and no visible app title. The framework remains SwiftUI/AppKit, not a UIKit rewrite.
+For the Library refresh, the user-selected v0.2 Figma Library (`5iQu716UFImHjRxJkf0t8V`, `3:115`) owns layout and flow; Apple Games for macOS owns visual treatment. The replacement is dark-reviewed, art-first and native Liquid Glass, while production follows the system appearance. The user rejected the flat v0.1 interpretation and bespoke floating menus. Artwork extends under the real system toolbar; navigation/search and the separate trailing account control remain native. The framework is SwiftUI/AppKit, not UIKit or a painted web dashboard.
 
 The subsequent user critique rejected the hand-rolled rounded menu as non-native.
 The navigation correction uses the real macOS window toolbar: a centered native
@@ -11,13 +11,100 @@ button. System chrome owns geometry, selected/focus state, appearance and
 background; no custom capsule selection or forced white/dark toolbar treatment.
 Keep the original artwork-led content, traffic lights and routes, without a web
 sidebar, Xbox-green brand or copied Apple logo/art/source. The system toolbar
-is deployed in an older source pairing; the grouped search, artwork-under-chrome,
-Account and Scene corrections below remain separately staged, not deployed or
-visually confirmed.
+is already deployed. The Library-only refresh below is separately staged for
+Dark/Light screenshot sign-off; it is not a shipping replacement or approval
+to restyle Discover, detail, installation consent or Downloads.
 
 ## Surfaces
 
-**Library (Operate):** original immersive focused-game area, scoped Search, compact Continue Playing, then Your Games/count/filter-sort. Three columns of horizontal square-icon entries at roomy widths, fewer when resized. Title, access, compatibility and contextual View are separate. The compact Library observation remains important, but no longer prohibits the featured imagery explicitly requested by the user.
+**Library (Operate, C3 visual direction approved; nonshipping):** a 340-point full-width hero uses the most
+recent recorded, launchable installed game, with artwork under the system
+toolbar, a transparent catalog logo (up to 420x120 points, otherwise a 40-point
+bold system title), a 100x150 portrait poster and large native glass actions. A landscape
+Continue Playing shelf follows, then Your Games/count and adaptive 2:3 portrait
+covers. Each cover opens the existing detail surface; small glass Play/Install
+and contextual menu actions appear on hover or keyboard focus and remain
+reachable with VoiceOver. Errors remain visible below the art. Grid minimum
+width is 170 points, maximum 220, with 24-point gaps and 56-point section insets;
+at the owner-accepted 1440x874 review size the first row must enter the initial viewport. Resize may reduce the
+column count, not clip controls or invent horizontal page scrolling.
+
+Use a labels-hidden native segmented All / Installed / Owned / Game Pass Picker,
+with its accessibility label retained, and a fixed-size trailing native Sort
+Menu. Exact Store IDs join installed, account and Game Pass evidence once.
+Importing never proves purchase; feed presence only participates with active
+saved subscription status. The Library loads a known saved PC collection once
+on appearance only after presence/migration checks succeed. Migration remains
+explicit, errors preserve the last complete collection, and Refresh is in the
+toolbar with Command-R. PC-library Sign out belongs in Account, not above the
+grid. Import is in the toolbar with a help tag and in File with Command-Shift-I.
+
+Landscape art tries real public hero/title art, then screenshots, then a
+portrait cover cropped to fill, then validated local splash/tile art. Missing
+optional landscape art leaves a semantic neutral surface, not a broken-image
+glyph. Portrait covers never stretch square icons. Metadata/image failures do
+not grant access or disable valid game actions. No real account artwork or
+captures are committed. Native `backgroundExtensionEffect`, soft scroll edges,
+`GlassEffectContainer`, `.glassProminent` and `.glass` are availability-gated;
+older systems use ordinary native buttons/materials. No sampled artwork tint,
+painted glass or forced production appearance is introduced.
+
+C3 reinforces only Library chrome: native macOS 27 tabs and the stock
+NSSearchField share a `.glassEffect(.regular, in: Capsule())` principal group.
+Account, Import and Refresh use native `.glass` circular buttons. Art still
+extends under the toolbar; no opaque full-width band is restored. Reduce
+Transparency uses the semantic opaque `.background` style and native bordered
+buttons; pre-26 systems use regular material/bordered controls. Discover and
+Downloads keep their original toolbar grouping. Dark, Light and injected
+app-local Reduce Transparency are separate visual-review states; injection
+never changes the user's system preference. SwiftUI's real
+`accessibilityReduceTransparency` is read-only; the review flag exercises this
+app's opaque-material fallback, not a false claim that the OS preference was
+toggled. Actual OS-level Reduce Transparency still needs user-present review.
+The user approved the native regular-glass treatment. This source freeze does
+not authorize installing/replacing the shipping app or forcing opaque chrome.
+
+Play remains launch-only for a registered installed entry. An uninstalled owned
+or Game Pass title says Install, opens compatibility/space/consent review and
+never auto-plays on completion. Public positive PC package
+`MaxDownloadSizeInBytes` maxima appear as approximate download estimates, not
+verified architecture/edition/package authorization. The install review uses
+the backend's selected `packageBytes` or explicit unknown-size copy instead.
+Installed sizes are metadata-only filesystem measurements off the main thread,
+with symlinks excluded, hardlinks counted once, overflow checks and a
+100,000-entry/15-second traversal bound. Allocated and logical bytes are kept
+separate; the label uses allocated bytes and the help tag explains logical
+content and shared/cloned allocation. A per-installed-identity memory cache
+coalesces requests for 15 minutes. Unavailable/incomplete sizes are hidden,
+with a counts-only diagnostic; no per-tile private package check is added.
+
+Remote catalog images still have only a 64 MiB/40-image process cache in C3.
+Persistent public media caching is required D8/shipping work, deliberately
+outside this visual correction: hashed URL keys in
+`~/Library/Caches/Xodus/CatalogMedia`, atomic files, HTTP validators/expiry,
+512 MiB LRU ceiling and existing redirect/MIME/byte/pixel guards. Account
+clear-cache support follows. Trailers remain future D3 native AVPlayer
+streaming, not automatic whole-video downloads.
+
+Hero, Continue Playing and covers show an Owned/Game Pass native glass badge only
+when exact account/subscription evidence supports it. Genre/category and
+recognized single-player, online-multiplayer, co-op and cross-platform features
+come from DisplayCatalog, excluding explicitly console-only attributes; they do
+not certify Mac runtime support. Only actually transparent Logo/TitledHeroArt
+pixels qualify as a title logo; opaque artwork remains background art. Missing
+optional facts hide without a placeholder. The read-only review also accepts the
+owner-provided private Xbox stats cache: hours explicitly say "on Xbox",
+achievement totals of zero mean unknown rather than "of 0", and a positive
+friends-who-play count has private gamertags in its help tag. Local Last played
+continues to use the Mac registry, not Xbox-wide time. Cumulative local time
+remains absent: the registry retains only the latest session duration. Stats
+are cache-only in this review; command scheduling, account-bound refresh and
+the 15-minute backend refresh integration are not yet wired into ordinary
+startup. There are no stats service actions or fabricated values in review.
+The nonshipping read-only reviewer can open directly at Your Games using
+`--library-grid`, without enabling interactions or changing installed data.
+Freshness is in the Refresh help tag; unloaded Game Pass copy appears only in
+its filter's native unavailable state, not in the Library body.
 
 **Discover (Operate/explore):** immersive original environment, one title/action, empty-query categories and catalog shelf. Typing shows scoped results rather than fake empty-query results. Catalog presence never proves ownership.
 
@@ -82,8 +169,12 @@ indicator and Cancel approval; refusal/cancellation is visible and cannot clear
 the saved sign-in. No Microsoft refresh happens automatically after approval.
 A verified new copy with failed old-item removal ends approval normally and
 shows a secondary retained-legacy notice. Load/Refresh then uses the broker
-copy, never an automatic delete retry. This candidate is not installed or
-live-migrated; synthetic checks do not establish production prompt behavior.
+copy, never an automatic delete retry. The admitted `2d420d1` broker package is
+installed and live-migrated with `legacyRetained=false`. An identical
+reinstallation and a distinct, separately signed Library review build both
+read through the byte-frozen broker without an observed Keychain prompt.
+These bounded observations do not establish unlimited future prompt immunity
+or authorize helper updates.
 
 **Phase 2 B1/B2/B3 (`7c3c1f0`, admitted, installed and live-accepted):** retain the existing native catalog grid and
 toolbar. A nonblank Discover search places Your games above Microsoft Store;

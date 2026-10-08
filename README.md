@@ -10,6 +10,23 @@ entrypoints. Shipping screens use native setup/empty/loading/error states and
 actual public product data, not synthetic game illustrations. See
 [native integration status and evidence](docs/NATIVE-INTEGRATION.md).
 
+**Library design refresh (C3 visual direction approved; not installed):** the
+user-selected v0.2 Figma layout uses native Apple Games-inspired art-under-toolbar chrome,
+landscape Continue Playing and a 2:3 portrait grid. Native segmented filters,
+compact Sort and contextual glass actions retain real access/install evidence.
+The user approved C3's native regular-glass toolbar treatment. Production only
+uses opaque fallback when the system requests Reduce Transparency. The source
+passed 110 presentation and 853 synthetic native-session checks, and the shipping
+configuration compiled; this is not shipping admission. A separate non-installed review app reads the frozen credential
+broker only, keeps refreshed tokens in memory, and cannot run ordinary startup.
+Real account captures remain private. Window-compositor screenshots require
+an already approved observer; detached layout checks are not glass evidence.
+Public PC package sizes are approximate download estimates; installed-folder
+sizes are cached off-main filesystem measurements. Play remains installed-only,
+and Install never auto-plays. Xbox statistics are cache-only in C3; ordinary
+15-minute refresh integration and persistent catalog-media caching remain
+required follow-ups before final shipping.
+
 **Phase 2 B5/B7/B8/B9 (`fee7f5f`, admitted and installed; live acceptance partial):** Account
 shows cached PC Game Pass status and an explicit fenced Check. Active status
 enables a separate Game Pass shelf after Your PC games and the existing
@@ -74,7 +91,7 @@ owned-first Lara/Hogwarts Play and Celeste Install, and Celeste's exact
 unsupported reason with Install disabled. These are bounded live observations,
 not general gameplay certification.
 
-**B6 is a separate frozen-credential-broker candidate, not deployed.** A fixed
+**B6 (`2d420d1`) is independently admitted, installed and live-migrated.** A fixed
 self-signed certificate alone cannot make macOS's per-build Keychain partition
 stable. The user selected a tiny separately installed helper whose signed bytes
 stay unchanged across launcher updates. It authenticates each app caller against
@@ -89,9 +106,14 @@ attempt deletion of that exact old reference without further interaction.
 Failure to remove the old item retains the verified new copy and reports
 **legacy retained**; future launches use the new copy first and never retry
 removal automatically. Helper updates need their own approval and release gate.
-Synthetic qualification and live migration are separate; the owner runs the
-latter with the user present. No live item or game-service credential is changed
-by this implementation/qualification lane. See the
+Synthetic qualification and live migration are separate. The owner authorized
+the user-present live migration, which completed with `legacyRetained=false`.
+An identical reinstallation then read the PC library without reapproval.
+A distinct signed, non-installed Library review build also read the frozen
+helper and loaded 13 PC titles with no Keychain prompt observed; it performed
+no write/delete/migration and quit normally. This is bounded cross-build
+evidence, not a guarantee against all future prompts. Game-service credentials
+were not changed by this lane. See the
 [broker contract and qualification boundary](docs/NATIVE-INTEGRATION.md#b6-frozen-credential-broker-candidate).
 
 **S3/S5/S6 (`1463cdb`, admitted, installed and live-accepted):** the account area

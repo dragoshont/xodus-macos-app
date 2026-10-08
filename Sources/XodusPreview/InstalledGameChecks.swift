@@ -37,6 +37,39 @@ enum InstalledGameChecks {
         }
         let folder = root.appendingPathComponent("game folder with spaces")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+        let sizeFolder = root.appendingPathComponent("size-fixture")
+        let sizeOutside = root.appendingPathComponent("size-outside")
+        try FileManager.default.createDirectory(at: sizeFolder, withIntermediateDirectories: false)
+        try FileManager.default.createDirectory(at: sizeOutside, withIntermediateDirectories: false)
+        let sizeFile = sizeFolder.appendingPathComponent("payload")
+        try Data(repeating: 42, count: 8192).write(to: sizeFile)
+        try Data(repeating: 42, count: 32768).write(to: sizeOutside.appendingPathComponent("outside"))
+        try FileManager.default.createSymbolicLink(at: sizeFolder.appendingPathComponent("external"),
+                                                  withDestinationURL: sizeOutside)
+        guard link(sizeFile.path, sizeFolder.appendingPathComponent("hardlink").path) == 0 else {
+            throw InstalledSizeFailure.unavailable
+        }
+        let measured = try await Task.detached { try InstalledFolderSize.measure(folder: sizeFolder) }.value
+        var sizeRootInfo = stat(), sizeFileInfo = stat()
+        guard lstat(sizeFolder.path, &sizeRootInfo) == 0, lstat(sizeFile.path, &sizeFileInfo) == 0 else {
+            throw InstalledSizeFailure.unavailable
+        }
+        check(measured.logicalBytes == 8192 &&
+              measured.allocatedBytes == Int64(sizeRootInfo.st_blocks + sizeFileInfo.st_blocks) * 512,
+              "Installed size measures off-main, excludes external symlinks and counts hardlinks once")
+        do {
+            _ = try await Task.detached { try InstalledFolderSize.measure(folder: sizeFolder, maximumEntries: 1) }.value
+            check(false, "Incomplete bounded folder traversal never publishes a successful size")
+        } catch { check(error as? InstalledSizeFailure == .incomplete,
+                        "Incomplete bounded folder traversal never publishes a successful size") }
+        let sizeGame = InstalledGame(id: UUID(), title: "Size fixture", identityName: "Fixture.Size",
+            version: "1.0.0.0", storeId: "FIXTURE00002", folder: sizeFolder.path, launcher: "/fixture/not-run",
+            importedAt: Date())
+        let sizeStore = InstalledGameSizeStore()
+        await sizeStore.load(sizeGame)
+        await sizeStore.load(sizeGame)
+        check(sizeStore.measurementAttempts == 1 && sizeStore.value(for: sizeGame)?.logicalBytes == 8192,
+              "Rendering/reopening the same installed identity reuses its size cache without another traversal")
         do { _ = try MicrosoftGameConfig.read(folder: folder); check(false, "Missing config folder is rejected") }
         catch { check(error is InstalledGameError, "Missing config folder is rejected") }
         try Data(config.utf8).write(to: folder.appendingPathComponent("MicrosoftGame.Config"))

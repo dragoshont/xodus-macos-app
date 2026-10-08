@@ -44,11 +44,14 @@ banner after Check game sign-in. No unlock is automated. The earlier B6 ACL
 approach was rejected because self-signed builds have distinct Keychain
 partitions even with a stable certificate requirement. The user selected a
 separately installed, byte-frozen authenticated credential broker for the new
-three-hour B6 slice. The candidate uses explicit approval and verified staged
+three-hour B6 slice. The admitted `2d420d1` implementation uses explicit approval and verified staged
 copy migration; a failed old-item deletion retains the new copy with a visible
-notice, not an automatic retry. Live migration/replacement remains the owner's
-user-present gate; no prompt-free production replacement claim is made from
-synthetic tests, and live credentials remain untouched by this lane.
+notice, not an automatic retry. The separately owner-authorized user-present
+migration completed with `legacyRetained=false`; an identical reinstallation
+and distinct signed non-installed Library review both read through the frozen
+broker without an observed Keychain prompt. Review reads never persist refreshed
+credentials. These bounded live observations are separate from synthetic tests
+and do not guarantee every future replacement or authorize helper upgrades.
 No complete owned-view parity or general gameplay certification is
 claimed. Exact deployment and real provider evidence are recorded separately
 in [native integration](docs/NATIVE-INTEGRATION.md), never inferred from mocks.
@@ -96,12 +99,23 @@ focus and semantic appearance take precedence over hand-rolled pill geometry.
 Actual macOS 26+ Glass is used where available, not ordinary material relabelled
 as glass. SwiftUI/AppKit remains the native framework; UIKit was not a chosen
 rewrite. An older native toolbar is deployed in the pairing recorded in
-verification. This subsequent source correction includes shared stock search
-and adaptive Account layout without changing routes or authentication behavior.
-It is built/headlessly checked, not deployed or visually confirmed. Natural
-artwork-dependent toolbar tint remains a compositor acceptance gate.
+verification. The current Library-only replacement uses the approved v0.2
+Figma layout/flow and Apple Games visual treatment: art under the native
+toolbar, large glass hero controls, landscape Continue Playing and portrait
+2:3 covers with native segmented filters and fixed-size Sort. Production follows
+system appearance; Dark and Light own-window review precedes shipping admission.
+Natural artwork-dependent toolbar appearance remains a compositor gate.
 
-Directly observed Library compact three-column horizontal entries remain useful alongside the user-directed artwork-led featured/Continue Playing area. Each entry keeps access and compatibility separate. Discover has immersive features/browse/shelves, scoped Search, and no checkout promise. Navigation is Library / Discover / Downloads; Library remains the proposed default. No Apple logos/proprietary images/source, invented Friends/Arcade or Xbox-green identity. v0.1 was not approved and is explicitly superseded.
+The Library grid joins exact installed IDs, the loaded PC collection and active
+Game Pass feed evidence without promoting installation into purchase. Its saved
+PC library loads once on appearance after migration/presence checks; Refresh is
+in the toolbar/Command-R and Sign out is in Account. The isolated review uses
+broker-read-only loading instead, with Game Pass explicitly not loaded when no
+validated discovery snapshot is available. Discover, detail, installation
+consent and Downloads remain unchanged pending Library sign-off. Navigation is
+Library / Discover / Downloads; Library remains the default. No Apple logos,
+proprietary imagery in public source, invented Friends/Arcade or Xbox-green
+identity. v0.1 was not approved and is explicitly superseded.
 
 ## Evidence on hand
 

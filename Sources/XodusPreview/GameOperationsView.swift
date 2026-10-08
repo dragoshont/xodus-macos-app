@@ -26,6 +26,14 @@ struct GameServiceAccountView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Games").font(.headline)
+            if library.hasSavedSignIn {
+                HStack {
+                    Label("PC Library sign-in saved", systemImage: "checkmark.circle")
+                    Spacer()
+                    Button("Sign out of PC games") { Task { await library.signOut() } }
+                        .disabled(library.busy).accessibilityIdentifier("xodus.pcGames.signOut")
+                }
+            }
             Text("Sign in to download and play. Your PC Library uses its own sign-in.")
                 .font(.callout).foregroundStyle(.secondary)
             Label(operations.serviceLabel, systemImage: operations.serviceStatus?.signedIn == true
@@ -258,9 +266,34 @@ struct InstalledGameActions: View {
     @ObservedObject var library: InstalledGamesController
     @ObservedObject var operations: GameOperationsController
     let game: InstalledGame
+    var usesGlass = false
+    var heroStyle = false
 
     var body: some View {
         Menu {
+            InstalledGameManagement(library: library, operations: operations, game: game)
+        } label: {
+            if heroStyle {
+                Image(systemName: "ellipsis").font(.title3.weight(.semibold))
+                    .frame(width: 28, height: 28).accessibilityHidden(true)
+            } else { Image(systemName: "ellipsis").accessibilityHidden(true) }
+        }
+        .menuIndicator(usesGlass ? .hidden : .automatic)
+        .modifier(LibraryActionStyle(primary: false, usesGlass: usesGlass))
+        .modifier(LibraryHeroControlSize(enabled: heroStyle))
+        .buttonBorderShape(heroStyle ? .circle : .automatic)
+        .fixedSize()
+        .accessibilityLabel("Actions for \(game.title)")
+    }
+}
+
+struct InstalledGameManagement: View {
+    @ObservedObject var library: InstalledGamesController
+    @ObservedObject var operations: GameOperationsController
+    let game: InstalledGame
+
+    var body: some View {
+        Group {
             Button("Check for update / Repair") {
                 Task { await operations.prepareInstall(PCGame(id: game.storeId, title: game.title, artwork: nil),
                                                         repairing: game) }
@@ -274,8 +307,6 @@ struct InstalledGameActions: View {
             Button("Uninstall…", role: .destructive) { operations.prepareUninstall(game) }
                 .disabled(!operations.canStartMutation || library.runningGameID == game.id)
                 .accessibilityIdentifier("xodus.installed.uninstall")
-        } label: { Image(systemName: "ellipsis").accessibilityHidden(true) }
-        .menuStyle(.borderlessButton).fixedSize()
-        .accessibilityLabel("Actions for \(game.title)")
+        }
     }
 }

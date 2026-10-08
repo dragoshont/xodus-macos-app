@@ -3,6 +3,14 @@ import AppKit
 import SwiftUI
 import XodusCore
 
+#if !XODUS_SHIPPING
+private struct LibraryReviewAccessibility: ViewModifier {
+    func body(content: Content) -> some View {
+        content.environment(\.xodusReviewReduceTransparency, LibraryPreviewExporter.reduceTransparencyRequested)
+    }
+}
+#endif
+
 @MainActor
 final class PreviewDelegate: NSObject, NSApplicationDelegate {
     var liveSession: LiveSession?
@@ -46,6 +54,11 @@ struct XodusPreviewApp: App {
             exit(64)
         }
 #else
+        if Bundle.main.object(forInfoDictionaryKey: "XodusLibraryReviewBuild") as? Bool == true,
+           !LibraryPreviewExporter.requested {
+            FileHandle.standardError.write(Data("Use the staged read-only Library review job; ordinary startup is disabled.\n".utf8))
+            exit(64)
+        }
         if PreviewExporter.liveDataRequested {
             do {
                 let configuration = try PreviewExporter.liveConfiguration()
@@ -73,6 +86,10 @@ struct XodusPreviewApp: App {
                 LiveRootView()
 #endif
             }
+#if !XODUS_SHIPPING
+                .allowsHitTesting(!LibraryPreviewExporter.requested)
+                .modifier(LibraryReviewAccessibility())
+#endif
                 .environmentObject(state)
                 .environmentObject(session)
                 .frame(minWidth: 820, minHeight: 600)
@@ -84,10 +101,23 @@ struct XodusPreviewApp: App {
                     delegate.gameOperations = state.gameOperations
                 }
         }
+
         .defaultSize(width: 1200, height: 860)
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified)
         .commands {
+            CommandGroup(after: .newItem) {
+                Button("Import installed Xbox game…") { Task { await state.installedGames.chooseGame() } }
+                    .keyboardShortcut("i", modifiers: [.command, .shift])
+#if !XODUS_SHIPPING
+                    .disabled(state.fixtureMode || LibraryPreviewExporter.requested || !state.installedGames.loaded ||
+                              state.installedGames.editing || state.installedGames.choosing ||
+                              state.installedGames.mutationActive)
+#else
+                    .disabled(!state.installedGames.loaded || state.installedGames.editing ||
+                              state.installedGames.choosing || state.installedGames.mutationActive)
+#endif
+            }
             CommandMenu("Navigate") {
                 Button("Library") { state.navigate(.library) }.keyboardShortcut("1")
                 Button("Discover") { state.navigate(.discover) }.keyboardShortcut("2")

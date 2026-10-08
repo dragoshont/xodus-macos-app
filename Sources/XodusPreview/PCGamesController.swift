@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import AppKit
 import Foundation
+import XodusCredentials
 
 @MainActor
 final class PCGamesController: ObservableObject {
@@ -22,6 +23,7 @@ final class PCGamesController: ObservableObject {
     private var generation = UUID()
     private var restored = false
     private var terminating = false
+    private var attemptedAutomaticLoad = false
 
     init(store: any PCGamesRefreshStore = PCGamesCredentialStore(), client: PCGamesClient = PCGamesClient(),
          market: String = PCGamesClient.market(Locale.current.region?.identifier),
@@ -50,6 +52,15 @@ final class PCGamesController: ObservableObject {
             guard generation == token, !terminating else { return }
             self.error = Self.message(error)
         }
+
+    }
+
+    func loadOnAppear() async {
+        guard !attemptedAutomaticLoad, !terminating else { return }
+        attemptedAutomaticLoad = true
+        await restorePresence()
+        guard snapshot == nil, hasSavedSignIn, !needsKeychainApproval, !needsSignIn, !busy, error == nil else { return }
+        refresh()
     }
 
     func signIn() {
@@ -207,6 +218,25 @@ final class PCGamesController: ObservableObject {
     }
 
     func resumeAfterTerminationRefusal() { terminating = false }
+
+#if !XODUS_SHIPPING
+    func loadReadOnlyLibraryPreview(broker: CredentialBrokerClient) async throws {
+        guard !busy, !terminating else { throw PCGamesError.credentialBrokerUnavailable }
+        busy = true
+        defer { busy = false }
+        let response = try await broker.send(CredentialRequest(operation: .read))
+        guard !response.migrationRequired, let saved = response.value else {
+            throw PCGamesError.keychainApprovalRequired
+        }
+        let tokens = try await client.refresh(saved)
+        let result = try await client.library(accessToken: tokens.access, market: market, language: language)
+        try Task.checkCancellation()
+        snapshot = result
+        hasSavedSignIn = true
+        needsSignIn = false
+        // The isolated review never persists refreshed credentials or changes Keychain access.
+    }
+#endif
 
     func waitForOperation() async { await operation?.value }
 
