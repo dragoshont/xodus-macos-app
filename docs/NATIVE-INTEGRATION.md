@@ -2,6 +2,42 @@
 
 This is implementation work beyond the immutable foundation at `44d7338`. It is **not a consumer-ready game launcher**.
 
+## Library source freeze and functional follow-up
+
+The user approved C3's native regular-glass Library direction. Source
+`a080225966a9519acad54540a19ee90041e297c2` is pushed and passed
+[exact-source CI](https://github.com/dragoshont/xodus-macos-app/actions/runs/37811471091).
+Its separate signed reviewer is not installed and never refreshes Xbox stats.
+The shipping app remains independently admitted at `2d420d1`.
+
+Follow-up source, still pending shipping admission, extends the fixed private
+script protocol with `private-xodus-manage.py game-stats <generatedRunId>`:
+no extra arguments, a 120-second deadline, the usual private status/result
+receipts and exact process-exit/status agreement. The result's `accountHash`
+(64 lowercase hex), `games` and `friends` must match the fresh 0600 cache.
+Service status supplies the same opaque, domain-separated account hash, never
+the XUID or a token. Legacy status remains parsable but cannot authorize
+identity-unbound stats. The private backend owns cache/binding clearing on
+account change, new game sign-in and signed-out status.
+
+Ordinary launch/foreground and Library Refresh first confirm game-service
+status; they do not initiate sign-in. A matching recent cache avoids the stats
+command. A locked, atomic 0600 refresh ledger in Xodus Application Support
+stores only the account hash and attempt date, fencing repeated/failed requests
+inside 15 minutes even after restart. Concurrent clicks coalesce. Account
+retirement hides stats and joins its cancelled child; normal Quit fences new
+jobs and joins cancellation. Xbox hours remain explicitly Xbox-wide, separate
+from the Mac installed registry's last-played time.
+
+Public media persistence is separate from personal metadata: atomic binary
+entries under `~/Library/Caches/Xodus/CatalogMedia` use SHA-256 URL names, body
+digests, expiry, ETag/Last-Modified and a 512 MiB LRU ceiling. Restart reuse and
+304 revalidation retain image/MIME/redirect/byte/pixel guards. No cookies,
+credentials or trailers are stored; public product metadata remains a separate
+bounded request. Cache clearing fences in-flight old-generation writes. Read-only
+review/export modes disable disk persistence. Neither these checks nor Root's
+backend verification establish live acceptance of an installed follow-up app.
+
 ## Local imported-game Play
 
 ### Phase 2 B5/B7/B8/B9 (admitted and installed; owner live acceptance partial)

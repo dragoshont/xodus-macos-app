@@ -3,7 +3,7 @@ import Darwin
 import Foundation
 
 enum GameScriptCommand: String, Codable, Sendable {
-    case serviceStatus, serviceSignIn, check, gamePassStatus, stop, setup, install, uninstall
+    case serviceStatus, serviceSignIn, check, gamePassStatus, gameStats, stop, setup, install, uninstall
 
     var file: String {
         switch self {
@@ -11,6 +11,7 @@ enum GameScriptCommand: String, Codable, Sendable {
         case .serviceSignIn: "private-xodus-service-signin.sh"
         case .check: "private-xodus-check.sh"
         case .gamePassStatus: "private-xodus-gamepass-status.sh"
+        case .gameStats: "private-xodus-manage.py"
         case .stop: "private-xodus-stop.sh"
         case .setup: "private-xodus-setup.sh"
         case .install: "private-xodus-install.sh"
@@ -53,11 +54,20 @@ enum GameScriptError: Error, LocalizedError, Equatable {
 struct GameServiceStatus: Codable, Equatable, Sendable {
     let serviceRunning: Bool
     let signedIn: Bool
+    let accountHash: String?
 
     static func parse(_ data: Data) throws -> Self {
         let value = try JSONDecoder().decode(Self.self, from: data)
-        guard value.serviceRunning || !value.signedIn else { throw GameScriptError.invalidReceipt }
+        guard (value.serviceRunning || !value.signedIn),
+              value.accountHash.map(XboxAccountBinding.valid) ?? true,
+              value.signedIn || value.accountHash == nil else { throw GameScriptError.invalidReceipt }
         return value
+    }
+}
+
+enum XboxAccountBinding {
+    static func valid(_ value: String) -> Bool {
+        value.utf8.count == 64 && value.utf8.allSatisfy { (48...57).contains($0) || (97...102).contains($0) }
     }
 }
 
@@ -174,6 +184,8 @@ struct GameScriptPaths: Sendable {
     let journal: URL
     var compatibility: URL { processed.deletingLastPathComponent().appendingPathComponent("compatibility") }
     var gamePassStatus: URL { compatibility.appendingPathComponent("gamepass.json") }
+    var gameStats: URL { processed.deletingLastPathComponent().appendingPathComponent("game-stats.json") }
+    var statsRefreshLedger: URL { journal.deletingLastPathComponent().appendingPathComponent("game-stats-refresh.json") }
 
     func compatibilityFile(productID: String) throws -> URL {
         guard PCGamesClient.validProductID(productID) else { throw GameScriptError.invalidReceipt }
@@ -212,6 +224,31 @@ struct GameScriptPaths: Sendable {
 }
 
 enum GameScriptFiles {
+    static func writePrivate(_ data: Data, to file: URL) throws {
+        let parent = file.deletingLastPathComponent()
+        try checkPath(parent, allowMissing: true)
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true,
+                                                attributes: [.posixPermissions: 0o700])
+        var info = stat()
+        guard lstat(parent.path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR,
+              info.st_uid == getuid(), chmod(parent.path, 0o700) == 0,
+              data.count <= 64 * 1024 else { throw GameScriptError.storage }
+        let tmp = parent.appendingPathComponent(".private-write-\(UUID().uuidString).json")
+        let fd = open(tmp.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
+        guard fd >= 0 else { throw GameScriptError.storage }
+        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+        do {
+            try handle.write(contentsOf: data)
+            guard fsync(fd) == 0 else { throw GameScriptError.storage }
+            try handle.close()
+            guard rename(tmp.path, file.path) == 0 else { throw GameScriptError.storage }
+        } catch {
+            handle.closeFile()
+            if unlink(tmp.path) != 0 && errno != ENOENT { throw GameScriptError.storage }
+            throw error
+        }
+    }
+
     static func checkPath(_ url: URL, allowMissing: Bool = false) throws {
         guard url.isFileURL, url.path.hasPrefix("/"), !url.pathComponents.contains("."),
               !url.pathComponents.contains(".."), url.path != "/" else { throw GameScriptError.invalidDestination }
@@ -338,7 +375,7 @@ actor GameScriptRunner {
         cancellationRequested = pendingCancellation == runID
         pendingCancellation = nil
         defer { activeRunID = nil; process = nil }
-        if cancellationRequested, command == .install || command == .check {
+        if cancellationRequested, [.install, .check, .gameStats].contains(command) {
             return GameScriptOutcome(code: 14, result: nil, log: nil)
         }
         let script = try GameScriptFiles.script(command, paths: paths)
@@ -350,8 +387,8 @@ actor GameScriptRunner {
         let env = InstalledGamesController.launchEnvironment(ProcessInfo.processInfo.environment)
         let child = try await Task.detached(priority: .userInitiated) {
             let child = Process()
-            child.executableURL = URL(fileURLWithPath: "/bin/bash")
-            child.arguments = [script.path, runID] + arguments
+            child.executableURL = command == .gameStats ? script : URL(fileURLWithPath: "/bin/bash")
+            child.arguments = command == .gameStats ? ["game-stats", runID] : [script.path, runID] + arguments
             child.environment = env
             child.standardInput = FileHandle.nullDevice
             child.standardOutput = FileHandle.nullDevice
@@ -362,7 +399,7 @@ actor GameScriptRunner {
         process = child
         if cancellationRequested, child.isRunning { child.terminate() }
         let deadline = ContinuousClock.now.advanced(by: command == .serviceStatus ? .seconds(30)
-            : [.check, .gamePassStatus, .stop, .setup].contains(command) ? .seconds(120) : .seconds(1800))
+            : [.check, .gamePassStatus, .gameStats, .stop, .setup].contains(command) ? .seconds(120) : .seconds(1800))
         var lastProgress: GameScriptProgress?
         var observationError: GameScriptError?
         while child.isRunning {
@@ -377,7 +414,7 @@ actor GameScriptRunner {
                     if child.isRunning { child.terminate() }
                 }
             }
-            if [.serviceStatus, .serviceSignIn, .check, .gamePassStatus, .stop, .setup].contains(command) {
+            if [.serviceStatus, .serviceSignIn, .check, .gamePassStatus, .gameStats, .stop, .setup].contains(command) {
                 if ContinuousClock.now >= deadline, observationError == nil {
                     observationError = .timeout
                     if child.isRunning { child.terminate() }
@@ -404,7 +441,7 @@ actor GameScriptRunner {
             let value = try GameScriptProgress.parse(data)
             if value.phase == .failed { await progress(value) }
         }
-        let result = code == 0 && [.install, .serviceStatus, .check, .gamePassStatus, .stop, .setup].contains(command)
+        let result = code == 0 && [.install, .serviceStatus, .check, .gamePassStatus, .gameStats, .stop, .setup].contains(command)
             ? try GameScriptFiles.read(paths.receipt(runID, suffix: "result.json")) : nil
         return GameScriptOutcome(code: code, result: result, log: GameScriptFiles.log(runID: runID, paths: paths))
     }
@@ -441,29 +478,7 @@ actor GameOperationJournal {
 
     func save(_ record: GameOperationRecord) throws {
         try record.validate()
-        let parent = file.deletingLastPathComponent()
-        try GameScriptFiles.checkPath(parent, allowMissing: true)
-        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true,
-                                                attributes: [.posixPermissions: 0o700])
-        var info = stat()
-        guard lstat(parent.path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR,
-              info.st_uid == getuid(), chmod(parent.path, 0o700) == 0 else { throw GameScriptError.storage }
-        let data = try JSONEncoder().encode(record)
-        guard data.count <= 64 * 1024 else { throw GameScriptError.storage }
-        let tmp = parent.appendingPathComponent(".game-operation-\(UUID().uuidString).json")
-        let fd = open(tmp.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
-        guard fd >= 0 else { throw GameScriptError.storage }
-        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
-        do {
-            try handle.write(contentsOf: data)
-            guard fsync(fd) == 0 else { throw GameScriptError.storage }
-            try handle.close()
-            guard rename(tmp.path, file.path) == 0 else { throw GameScriptError.storage }
-        } catch {
-            handle.closeFile()
-            if unlink(tmp.path) != 0 && errno != ENOENT { throw GameScriptError.storage }
-            throw error
-        }
+        try GameScriptFiles.writePrivate(JSONEncoder().encode(record), to: file)
     }
 
     func clear() throws {

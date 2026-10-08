@@ -25,9 +25,11 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         Task {
+            await LibraryXboxStats.shared.shutdown()
             let closed = await termination.shutdown(session: liveSession, runtime: runtimeSettings,
                                                     installedGames: installedGames, pcGames: pcGames,
                                                     gameOperations: gameOperations)
+            if !closed { LibraryXboxStats.shared.resumeAfterTerminationRefusal() }
             if !closed, gameOperations?.canQuit == false {
                 let alert = NSAlert()
                 alert.messageText = "Wait before quitting Xodus"
@@ -69,6 +71,8 @@ struct XodusPreviewApp: App {
             }
         }
         if CommandLine.arguments.contains("--live-check") { NativeChecks.launch() }
+        if CommandLine.arguments.contains("--media-check") { NativeChecks.launch(mediaOnly: true) }
+        if CommandLine.arguments.contains("--stats-check") { NativeChecks.launch(statsOnly: true) }
         if CommandLine.arguments.contains("--game-operation-check") { NativeChecks.launch(gameOperationsOnly: true) }
         if CommandLine.arguments.contains("--self-check") {
             exit(PreviewChecks.run() ? 0 : 1)

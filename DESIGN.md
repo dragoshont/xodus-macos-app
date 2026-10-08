@@ -78,12 +78,17 @@ content and shared/cloned allocation. A per-installed-identity memory cache
 coalesces requests for 15 minutes. Unavailable/incomplete sizes are hidden,
 with a counts-only diagnostic; no per-tile private package check is added.
 
-Remote catalog images still have only a 64 MiB/40-image process cache in C3.
-Persistent public media caching is required D8/shipping work, deliberately
-outside this visual correction: hashed URL keys in
+Frozen C3 has only a 64 MiB/40-image process cache. The subsequent functional
+source adds persistent public-image caching without altering C3's signed review:
+hashed URL keys in
 `~/Library/Caches/Xodus/CatalogMedia`, atomic files, HTTP validators/expiry,
-512 MiB LRU ceiling and existing redirect/MIME/byte/pixel guards. Account
-clear-cache support follows. Trailers remain future D3 native AVPlayer
+512 MiB LRU ceiling and existing redirect/MIME/byte/pixel guards. A fresh file
+survives restart without another image request; expired files revalidate with
+ETag/Last-Modified and confirmed 304 responses. Cache failures are redacted
+diagnostics, not claims of persistence. Clear-cache logic exists; its Account
+control follows. Read-only review/export modes remain memory-only. Public product
+metadata is still requested separately; this is not a persistent catalog database.
+Trailers remain future D3 native AVPlayer
 streaming, not automatic whole-video downloads.
 
 Hero, Continue Playing and covers show an Owned/Game Pass native glass badge only
@@ -100,7 +105,16 @@ continues to use the Mac registry, not Xbox-wide time. Cumulative local time
 remains absent: the registry retains only the latest session duration. Stats
 are cache-only in this review; command scheduling, account-bound refresh and
 the 15-minute backend refresh integration are not yet wired into ordinary
-startup. There are no stats service actions or fabricated values in review.
+startup in frozen C3. The functional follow-up reads service status on ordinary
+launch/foreground and Library Refresh, matches its opaque account hash to the
+0600 cache, and invokes only `private-xodus-manage.py game-stats RUN_ID` when due.
+A private, atomic, locked timestamp ledger throttles failures across restart too.
+Current-account cached stats remain visible during revalidation; account change,
+new sign-in and sign-out invalidate them before late results can publish. Success
+requires matching service/receipt/cache hashes, counts and a fresh checkedAt.
+Normal Quit cancels and joins the owned optional stats child. There is no periodic
+poller, sign-in automation or changed Mac last-played provenance. There are no
+stats service actions or fabricated values in read-only review.
 The nonshipping read-only reviewer can open directly at Your Games using
 `--library-grid`, without enabling interactions or changing installed data.
 Freshness is in the Refresh help tag; unloaded Game Pass copy appears only in

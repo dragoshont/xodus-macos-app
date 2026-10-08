@@ -5,13 +5,13 @@ import XodusManagement
 
 @MainActor
 enum NativeChecks {
-    static func launch(gameOperationsOnly: Bool = false) -> Never {
-        Task { exit(await run(gameOperationsOnly: gameOperationsOnly) ? 0 : 1) }
+    static func launch(gameOperationsOnly: Bool = false, mediaOnly: Bool = false, statsOnly: Bool = false) -> Never {
+        Task { exit(await run(gameOperationsOnly: gameOperationsOnly, mediaOnly: mediaOnly, statsOnly: statsOnly) ? 0 : 1) }
         CFRunLoopRun()
         fatalError("The native check run loop ended before completion.")
     }
 
-    static func run(gameOperationsOnly: Bool = false) async -> Bool {
+    static func run(gameOperationsOnly: Bool = false, mediaOnly: Bool = false, statsOnly: Bool = false) async -> Bool {
         var count = 0, failures = 0
         func check(_ condition: Bool, _ name: String) {
             count += 1
@@ -47,6 +47,20 @@ enum NativeChecks {
             }
         }
         do {
+            if statsOnly {
+                do { try await LibraryStatsChecks.run(check: check) }
+                catch { check(false, "Stats fixture failed: \(error.localizedDescription)") }
+                print("\(count) Xbox stats checks, \(failures) failures. Synthetic scripts only.")
+                return failures == 0
+            }
+            if mediaOnly {
+                do { try await CatalogMediaChecks.run(check: check) }
+                catch {
+                    check(false, "Public-media fixture failed: \(error.localizedDescription)")
+                }
+                print("\(count) public-media checks, \(failures) failures. Synthetic transport only.")
+                return failures == 0
+            }
             if gameOperationsOnly {
                 try await GameOperationChecks.run(check: check)
                 print("\(count) game operation checks, \(failures) failures. Synthetic scripts only.")
@@ -132,6 +146,8 @@ enum NativeChecks {
             try await CrossOverDependencyChecks.run(check: check)
             try await ApplicationTerminationChecks.run(check: check)
             try await RecentLibraryChecks.run(check: check)
+            try await CatalogMediaChecks.run(check: check)
+            try await LibraryStatsChecks.run(check: check)
             let expired = session("expired")
             await expired.connect()
             check(expired.isReady && !expired.canSignIn, "Unchecked account cannot blindly retry a mutation")

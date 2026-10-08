@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import AppKit
+import CryptoKit
 import ImageIO
 import OSLog
 import SwiftUI
@@ -58,9 +59,13 @@ final class CatalogArtworkStore {
     private let cache = NSCache<NSURL, NSImage>()
     private var pending: [URL: Task<NSImage, Error>] = [:]
     private let session: URLSession
+    private let disk: CatalogMediaDiskCache?
+    private var expires: [URL: Date] = [:]
+    private var generation = 0
     private let logger = Logger(subsystem: "io.github.dragoshont.xodus", category: "catalog-artwork")
 
-    init() {
+    init(diskCache: CatalogMediaDiskCache? = CatalogArtworkStore.defaultDiskCache(), session suppliedSession: URLSession? = nil) {
+        disk = diskCache
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpCookieStorage = nil
         configuration.httpShouldSetCookies = false
@@ -69,45 +74,109 @@ final class CatalogArtworkStore {
         configuration.timeoutIntervalForRequest = 10
         configuration.timeoutIntervalForResource = 10
         configuration.httpMaximumConnectionsPerHost = 4
-        session = URLSession(configuration: configuration, delegate: ArtworkRedirectPolicy(),
+        session = suppliedSession ?? URLSession(configuration: configuration, delegate: ArtworkRedirectPolicy(),
                              delegateQueue: nil)
         cache.totalCostLimit = 64 * 1024 * 1024
         cache.countLimit = 40
     }
 
+    nonisolated private static func defaultDiskCache() -> CatalogMediaDiskCache? {
+        let isolated = ["--library-preview", "--export-preview", "--export-live", "--fixture", "--self-check", "--live-check", "--media-check", "--stats-check"]
+        return CommandLine.arguments.contains(where: isolated.contains) ? nil : .production()
+    }
+
+    func clearCache() async throws {
+        generation += 1
+        cache.removeAllObjects()
+        expires.removeAll()
+        try await disk?.clear()
+    }
+
     func image(for reference: CatalogArtworkReference) async throws -> NSImage {
         let url = try reference.validatedURL()
-        if let image = cache.object(forKey: url as NSURL) { return image }
+        if let image = cache.object(forKey: url as NSURL), expires[url].map({ $0 > Date() }) == true { return image }
         if let task = pending[url] { return try await task.value }
         let session = session
+        let disk = disk
+        let logger = logger
+        let epoch = generation
         let task = Task {
-            let image = try await Task.detached(priority: .utility) {
+            let (image, expiry) = try await Task.detached(priority: .utility) {
+                var saved: CatalogMediaEntry?
+                var diskGeneration: Int?
+                if let disk {
+                    do {
+                        let lookup = try await disk.lookup(url)
+                        diskGeneration = lookup.generation
+                        saved = lookup.entry
+                        if let saved, saved.expiresAt > Date() {
+                            return (try CatalogImagePolicy.decode(saved.data), saved.expiresAt)
+                        }
+                    } catch {
+                        saved = nil
+                        logger.warning("stage=imageCacheReadFailed; requesting public artwork")
+                        do {
+                            try await disk.remove(url)
+                            diskGeneration = try await disk.lookup(url).generation
+                        } catch { logger.warning("stage=imageCacheUnavailable; public artwork is memory-only") }
+                    }
+                }
                 var request = URLRequest(url: url)
                 request.httpShouldHandleCookies = false
                 request.setValue("image/*", forHTTPHeaderField: "Accept")
+                request.setValue(saved?.etag, forHTTPHeaderField: "If-None-Match")
+                request.setValue(saved?.lastModified, forHTTPHeaderField: "If-Modified-Since")
                 let (stream, response) = try await session.bytes(for: request)
                 defer { stream.task.cancel() }
-                guard let http = response as? HTTPURLResponse, http.statusCode == 200,
-                      response.url == url, http.mimeType?.hasPrefix("image/") == true else {
+                guard let http = response as? HTTPURLResponse, response.url == url,
+                      http.statusCode == 200 || (http.statusCode == 304 &&
+                        (saved?.etag != nil || saved?.lastModified != nil)) else {
                     throw ArtworkLoadError.unavailable
                 }
-                guard response.expectedContentLength <= CatalogImagePolicy.maximumBytes else {
-                    throw ArtworkLoadError.oversized
-                }
                 var data = Data()
-                for try await byte in stream {
-                    guard data.count < CatalogImagePolicy.maximumBytes else { throw ArtworkLoadError.oversized }
-                    data.append(byte)
+                let mime: String
+                if http.statusCode == 304, let saved {
+                    data = saved.data
+                    mime = saved.mimeType
+                } else {
+                    guard let type = http.mimeType, type.hasPrefix("image/") else { throw ArtworkLoadError.unavailable }
+                    mime = type
+                    guard response.expectedContentLength <= CatalogImagePolicy.maximumBytes else { throw ArtworkLoadError.oversized }
+                    for try await byte in stream {
+                        guard data.count < CatalogImagePolicy.maximumBytes else { throw ArtworkLoadError.oversized }
+                        data.append(byte)
+                    }
                 }
-                return try CatalogImagePolicy.decode(data)
+                let decoded = try CatalogImagePolicy.decode(data)
+                let now = Date()
+                let expiry = CatalogMediaHTTPPolicy.expiry(http, now: now)
+                if let disk, let diskGeneration {
+                    let entry = expiry.map {
+                        CatalogMediaEntry(url: url.absoluteString, data: data,
+                            digest: SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined(),
+                            mimeType: mime,
+                            etag: CatalogMediaHTTPPolicy.validator(http.value(forHTTPHeaderField: "ETag")) ??
+                                (http.statusCode == 304 ? saved?.etag : nil),
+                            lastModified: CatalogMediaHTTPPolicy.validator(http.value(forHTTPHeaderField: "Last-Modified")) ??
+                                (http.statusCode == 304 ? saved?.lastModified : nil),
+                            expiresAt: $0)
+                    }
+                    do { try await disk.store(entry, for: url, generation: diskGeneration) }
+                    catch { logger.warning("stage=imageCacheWriteFailed; public artwork is memory-only") }
+                }
+                return (decoded, expiry ?? now)
             }.value
+            if epoch == generation { expires[url] = expiry }
             return NSImage(cgImage: image, size: .zero)
         }
         pending[url] = task
         defer { pending[url] = nil }
         let image = try await task.value
-        cache.setObject(image, forKey: url as NSURL,
-                        cost: Int(image.size.width * image.size.height) * 4)
+        if epoch == generation {
+            cache.setObject(image, forKey: url as NSURL,
+                            cost: Int(image.size.width * image.size.height) * 4)
+            if expires.count > 160 { expires = expires.filter { cache.object(forKey: $0.key as NSURL) != nil } }
+        }
         logger.notice("stage=imageDecoded count=1")
         return image
     }

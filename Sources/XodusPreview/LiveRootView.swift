@@ -83,15 +83,16 @@ struct LiveRootView: View {
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button("Refresh Library", systemImage: "arrow.clockwise") {
-                        state.pcGames.refresh()
+                        if state.pcGames.hasSavedSignIn, !state.pcGames.needsKeychainApproval,
+                           !state.pcGames.needsSignIn { state.pcGames.refresh() }
+                        Task { await refreshXboxStats() }
                         if state.gameOperations.gamePassActive, session.isReady, session.supports(.discover) {
                             Task { await session.refreshCatalog("") }
                         }
                     }
                         .labelStyle(.iconOnly).help(refreshHelp).keyboardShortcut("r")
                         .modifier(NativeToolbarIconStyle())
-                        .disabled(!startupAllowed || state.pcGames.busy || !state.pcGames.hasSavedSignIn ||
-                                  state.pcGames.needsKeychainApproval || state.pcGames.needsSignIn)
+                        .disabled(!startupAllowed || state.pcGames.busy)
                         .accessibilityIdentifier("xodus.pcGames.refresh")
                 }
             }
@@ -116,6 +117,15 @@ struct LiveRootView: View {
                 await state.gameOperations.restore()
                 await state.gameOperations.loadGamePassCache()
                 state.gameOperations.checkSetupOnce()
+            }
+        }
+        .task(id: scenePhase == .active) {
+            if startupAllowed, scenePhase == .active { await refreshXboxStats() }
+        }
+        .task(id: "\(state.gameOperations.serviceStatus?.accountHash ?? ""):\(state.gameOperations.serviceStatus?.signedIn == true):\(state.gameOperations.serviceSigningIn)") {
+            if startupAllowed {
+                await LibraryXboxStats.shared.refresh(for: state.gameOperations.serviceStatus,
+                    signingIn: state.gameOperations.serviceSigningIn)
             }
         }
         .task {
@@ -147,6 +157,14 @@ struct LiveRootView: View {
             Button("Focus search") { searchFocused = true }.keyboardShortcut("f").hidden()
         }
         }
+    }
+
+    private func refreshXboxStats() async {
+        guard startupAllowed else { return }
+        state.gameOperations.refreshService()
+        await state.gameOperations.waitForService()
+        await LibraryXboxStats.shared.refresh(for: state.gameOperations.serviceStatus,
+            signingIn: state.gameOperations.serviceSigningIn)
     }
 
     private var library: some View {

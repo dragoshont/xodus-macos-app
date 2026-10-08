@@ -158,6 +158,7 @@ final class GameOperationsController: ObservableObject {
 
     func signInForGames() {
         guard canSignIn else { return }
+        LibraryXboxStats.shared.invalidateBinding()
         gamePassGeneration += 1
         gamePassStatus = nil
         gamePassFromCache = false

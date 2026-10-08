@@ -23,9 +23,10 @@ Real account captures remain private. Window-compositor screenshots require
 an already approved observer; detached layout checks are not glass evidence.
 Public PC package sizes are approximate download estimates; installed-folder
 sizes are cached off-main filesystem measurements. Play remains installed-only,
-and Install never auto-plays. Xbox statistics are cache-only in C3; ordinary
-15-minute refresh integration and persistent catalog-media caching remain
-required follow-ups before final shipping.
+and Install never auto-plays. Xbox statistics are cache-only in the frozen C3 reviewer. Subsequent source
+adds account-bound ordinary stats refresh, throttled durably to one attempt per
+15 minutes, and bounded persistent public-image caching. These follow-ups are
+not installed or live-app-accepted; final D8 admission remains required.
 
 **Phase 2 B5/B7/B8/B9 (`fee7f5f`, admitted and installed; live acceptance partial):** Account
 shows cached PC Game Pass status and an explicit fenced Check. Active status
