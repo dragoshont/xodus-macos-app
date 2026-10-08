@@ -11,6 +11,9 @@ final class PCGamesController: ObservableObject {
     @Published private(set) var deviceCode: PCGamesDeviceCode?
     @Published private(set) var snapshot: PCGamesSnapshot?
     @Published private(set) var error: String?
+    @Published private(set) var needsKeychainApproval = false
+    @Published private(set) var approvingKeychain = false
+    @Published private(set) var legacyKeychainRetained = false
     private let store: any PCGamesRefreshStore
     private let client: PCGamesClient
     private let market: String
@@ -20,7 +23,7 @@ final class PCGamesController: ObservableObject {
     private var restored = false
     private var terminating = false
 
-    init(store: any PCGamesRefreshStore = PCGamesKeychain(), client: PCGamesClient = PCGamesClient(),
+    init(store: any PCGamesRefreshStore = PCGamesCredentialStore(), client: PCGamesClient = PCGamesClient(),
          market: String = PCGamesClient.market(Locale.current.region?.identifier),
          language: String = PCGamesClient.language(Locale.preferredLanguages.first ?? "en-US")) {
         self.store = store
@@ -37,6 +40,12 @@ final class PCGamesController: ObservableObject {
             let present = try await store.contains()
             guard generation == token, !terminating else { return }
             hasSavedSignIn = present
+            let approval = try await store.migrationRequired()
+            guard generation == token, !terminating else { return }
+            needsKeychainApproval = approval
+            let retained = try await store.legacyRetained()
+            guard generation == token, !terminating else { return }
+            legacyKeychainRetained = retained
         } catch {
             guard generation == token, !terminating else { return }
             self.error = Self.message(error)
@@ -44,7 +53,7 @@ final class PCGamesController: ObservableObject {
     }
 
     func signIn() {
-        guard !busy, !terminating else { return }
+        guard !busy, !needsKeychainApproval, !terminating else { return }
         let token = UUID()
         generation = token
         busy = true
@@ -78,7 +87,7 @@ final class PCGamesController: ObservableObject {
     }
 
     func refresh() {
-        guard !busy, hasSavedSignIn, !needsSignIn, !terminating else { return }
+        guard !busy, hasSavedSignIn, !needsSignIn, !needsKeychainApproval, !terminating else { return }
         let token = UUID()
         generation = token
         busy = true
@@ -99,9 +108,49 @@ final class PCGamesController: ObservableObject {
             catch {
                 guard generation == token, !terminating else { return }
                 if error as? PCGamesError == .signInRequired { needsSignIn = true }
+                if error as? PCGamesError == .keychainApprovalRequired { needsKeychainApproval = true }
                 self.error = Self.message(error)
             }
         }
+    }
+
+    func approveKeychain() {
+        guard !busy, needsKeychainApproval, !terminating else { return }
+        let token = UUID()
+        generation = token
+        busy = true
+        approvingKeychain = true
+        error = nil
+        operation = Task {
+            defer { finish(token) }
+            do {
+                try await store.migrate()
+                try current(token)
+                let approval = try await store.migrationRequired()
+                let present = try await store.contains()
+                let retained = try await store.legacyRetained()
+                try current(token)
+                needsKeychainApproval = approval
+                hasSavedSignIn = present
+                legacyKeychainRetained = retained
+            } catch is CancellationError { }
+            catch {
+                guard generation == token, !terminating else { return }
+                self.error = Self.message(error)
+            }
+        }
+    }
+
+    func cancelKeychainApproval() async {
+        guard approvingKeychain else { return }
+        let old = operation
+        generation = UUID()
+        old?.cancel()
+        await old?.value
+        operation = nil
+        busy = false
+        approvingKeychain = false
+        error = "Keychain approval didn't finish. Your saved sign-in is preserved. Check approval again before loading PC games."
     }
 
     func cancelSignIn() async {
@@ -131,10 +180,13 @@ final class PCGamesController: ObservableObject {
             try await store.delete()
             hasSavedSignIn = false
             needsSignIn = false
+            needsKeychainApproval = false
+            legacyKeychainRetained = false
             snapshot = nil
             error = nil
         } catch { self.error = Self.message(error) }
         busy = false
+        approvingKeychain = false
     }
 
     func openVerification() {
@@ -151,6 +203,7 @@ final class PCGamesController: ObservableObject {
         sheetPresented = false
         deviceCode = nil
         busy = false
+        approvingKeychain = false
     }
 
     func resumeAfterTerminationRefusal() { terminating = false }
@@ -165,6 +218,7 @@ final class PCGamesController: ObservableObject {
     private func finish(_ token: UUID) {
         guard generation == token else { return }
         busy = false
+        approvingKeychain = false
         operation = nil
     }
 

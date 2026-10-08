@@ -8,6 +8,7 @@ enum PCGamesError: Error, LocalizedError, Equatable {
     case signInExpired, signInDeclined, signInRequired, keychain(OSStatus)
     case noXboxProfile, childAccount, regionUnavailable, xboxSignIn, identityMismatch
     case incompleteCollection(Int), incompleteCatalog(Int)
+    case credentialBrokerUnavailable, keychainApprovalRequired, keychainApprovalCancelled
 
     var errorDescription: String? {
         switch self {
@@ -19,6 +20,9 @@ enum PCGamesError: Error, LocalizedError, Equatable {
         case .signInDeclined: "Microsoft sign-in was declined. Start again when you're ready."
         case .signInRequired: "Sign in again to see your PC games."
         case .keychain: "Couldn't access the saved PC-games sign-in. Unlock your Keychain or respond to macOS's permission prompt, then try again."
+        case .credentialBrokerUnavailable: "The saved-sign-in helper couldn't be verified or reached. Repair the approved Xodus credential helper, then try again. Xodus won't switch to direct Keychain access while the helper is installed."
+        case .keychainApprovalRequired: "Xodus needs one-time Keychain approval."
+        case .keychainApprovalCancelled: "Keychain approval was cancelled. Your saved sign-in is preserved. Approve access when you're ready."
         case .noXboxProfile: "This Microsoft account needs an Xbox profile. Create one at xbox.com, then sign in again."
         case .childAccount: "This account needs its Xbox family permissions updated before it can sign in."
         case .regionUnavailable: "Xbox sign-in isn't available for this account's region."
@@ -44,6 +48,15 @@ protocol PCGamesRefreshStore: Sendable {
     func read() async throws -> String?
     func save(_ refreshToken: String) async throws
     func delete() async throws
+    func migrationRequired() async throws -> Bool
+    func migrate() async throws
+    func legacyRetained() async throws -> Bool
+}
+
+extension PCGamesRefreshStore {
+    func migrationRequired() async throws -> Bool { false }
+    func migrate() async throws { throw PCGamesError.credentialBrokerUnavailable }
+    func legacyRetained() async throws -> Bool { false }
 }
 
 actor PCGamesKeychain: PCGamesRefreshStore {

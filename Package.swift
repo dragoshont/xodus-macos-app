@@ -16,11 +16,14 @@ let package = Package(
     products: [
         .library(name: "XodusCore", targets: ["XodusCore"]),
         .library(name: "XodusManagement", targets: ["XodusManagement"]),
+        .library(name: "XodusCredentials", targets: ["XodusCredentials"]),
         .executable(name: "XodusPreview", targets: ["XodusPreview"]),
-        .executable(name: "XodusAuthHost", targets: ["XodusAuthHost"])
+        .executable(name: "XodusAuthHost", targets: ["XodusAuthHost"]),
+        .executable(name: "XodusCredentialBroker", targets: ["XodusCredentialBroker"])
     ] + (shipping ? [] : [
         .executable(name: "XodusFixtureChecks", targets: ["XodusFixtureChecks"]),
-        .executable(name: "XodusManagementChecks", targets: ["XodusManagementChecks"])
+        .executable(name: "XodusManagementChecks", targets: ["XodusManagementChecks"]),
+        .executable(name: "XodusCredentialChecks", targets: ["XodusCredentialChecks"])
     ]),
     targets: [
         .target(name: "XodusCore", exclude: shipping ? ["Fixtures.swift"] : [],
@@ -28,7 +31,9 @@ let package = Package(
         .target(name: "XodusManagement", dependencies: ["XodusCore"],
                 resources: [.copy("Resources/management-v1.schema.json"),
                             .copy("Resources/runtime-providers-v1.schema.json")]),
-        .executableTarget(name: "XodusPreview", dependencies: ["XodusCore", "XodusManagement"],
+        .target(name: "XodusCredentials"),
+        .executableTarget(name: "XodusCredentialBroker", dependencies: ["XodusCredentials"]),
+        .executableTarget(name: "XodusPreview", dependencies: ["XodusCore", "XodusManagement", "XodusCredentials"],
                           exclude: shipping ? previewOnly : [],
                           resources: shipping ? [] : [.copy("Resources/Artwork")],
                           swiftSettings: shippingSettings),
@@ -41,6 +46,7 @@ let package = Package(
         .executableTarget(name: "XodusFixtureChecks", dependencies: ["XodusCore"],
                           path: "Tests/FixtureChecks"),
         .executableTarget(name: "XodusManagementChecks", dependencies: ["XodusManagement"],
-                          path: "Tests/ManagementChecks", resources: [.copy("Fixtures")])
+                          path: "Tests/ManagementChecks", resources: [.copy("Fixtures")]),
+        .executableTarget(name: "XodusCredentialChecks", dependencies: ["XodusCredentials"])
     ])
 )

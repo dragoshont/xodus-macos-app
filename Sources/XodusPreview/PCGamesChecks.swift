@@ -3,6 +3,7 @@ import Foundation
 import AppKit
 import SwiftUI
 import XodusManagement
+import XodusCredentials
 
 private actor PCGamesMockTransport: PCGamesTransport {
     var responses: [PCGamesHTTPResponse]
@@ -26,6 +27,12 @@ private actor PCGamesMockStore: PCGamesRefreshStore {
     private(set) var reads = 0
     private(set) var deletions = 0
     var deletionFails = false
+    var requiresApproval = false
+    var approvalFails = false
+    var approvalWaits = false
+    var retainsLegacy = false
+    var legacyWasRetained = false
+    private(set) var approvals = 0
 
     init(_ token: String? = nil) { self.token = token }
     func contains() -> Bool { token != nil }
@@ -41,6 +48,22 @@ private actor PCGamesMockStore: PCGamesRefreshStore {
         token = nil
     }
     func refuseDeletion() { deletionFails = true }
+    func requireApproval(fails: Bool = false, waits: Bool = false, retainsLegacy: Bool = false) {
+        requiresApproval = true
+        approvalFails = fails
+        approvalWaits = waits
+        self.retainsLegacy = retainsLegacy
+    }
+    func migrationRequired() -> Bool { requiresApproval }
+    func migrate() async throws {
+        approvals += 1
+        if approvalWaits { try await Task.sleep(for: .seconds(60)) }
+        try Task.checkCancellation()
+        if approvalFails { throw PCGamesError.keychainApprovalCancelled }
+        requiresApproval = false
+        legacyWasRetained = retainsLegacy
+    }
+    func legacyRetained() -> Bool { legacyWasRetained }
 }
 
 private actor PCGamesMockSleeper {
@@ -280,6 +303,102 @@ enum PCGamesChecks {
         let requestsBeforeRefresh = await controllerTransport.requests
         check(controller.hasSavedSignIn && readsBeforeRefresh == 0 && requestsBeforeRefresh.isEmpty,
               "S4: Library entry checks only item presence; it does not read credentials or auto-query")
+        let migrationStore = PCGamesMockStore("neutral-legacy-retained")
+        await migrationStore.requireApproval()
+        let migrationTransport = PCGamesMockTransport([])
+        let migrating = PCGamesController(store: migrationStore, client: PCGamesClient(transport: migrationTransport))
+        await migrating.restorePresence()
+        migrating.refresh()
+        migrating.signIn()
+        let beforeApproval = await migrationStore.approvals
+        let beforeMigrationReads = await migrationStore.reads
+        let beforeMigrationRequests = await migrationTransport.requests
+        check(migrating.hasSavedSignIn && migrating.needsKeychainApproval && !migrating.busy
+              && beforeApproval == 0 && beforeMigrationReads == 0 && beforeMigrationRequests.isEmpty,
+              "B6: Migration presence gates sign-in/refresh without reading a token or prompting at startup")
+        migrating.approveKeychain()
+        migrating.approveKeychain()
+        await migrating.waitForOperation()
+        let migrationCount = await migrationStore.approvals
+        let migrationValue = await migrationStore.token
+        let migrationRequests = await migrationTransport.requests
+        check(!migrating.needsKeychainApproval && !migrating.approvingKeychain && !migrating.busy
+              && migrating.hasSavedSignIn && migrationCount == 1 && migrationValue == "neutral-legacy-retained"
+              && migrationRequests.isEmpty,
+              "B6: One explicit approval preserves saved sign-in and does not automatically refresh Microsoft")
+        let refusedStore = PCGamesMockStore("neutral-denied-retained")
+        await refusedStore.requireApproval(fails: true)
+        let refused = PCGamesController(store: refusedStore, client: PCGamesClient(transport: PCGamesMockTransport([])))
+        await refused.restorePresence()
+        refused.approveKeychain()
+        await refused.waitForOperation()
+        let refusedValue = await refusedStore.token
+        check(refused.needsKeychainApproval && !refused.busy && !refused.approvingKeychain
+              && refused.error == PCGamesError.keychainApprovalCancelled.localizedDescription
+              && refusedValue == "neutral-denied-retained",
+              "B6: Native approval refusal is visible and leaves the sign-in available for a later attempt")
+        let waitingStore = PCGamesMockStore("neutral-cancel-retained")
+        await waitingStore.requireApproval(waits: true)
+        let waiting = PCGamesController(store: waitingStore, client: PCGamesClient(transport: PCGamesMockTransport([])))
+        await waiting.restorePresence()
+        waiting.approveKeychain()
+        await waiting.cancelKeychainApproval()
+        let waitingValue = await waitingStore.token
+        check(waiting.needsKeychainApproval && !waiting.busy && !waiting.approvingKeychain
+              && waiting.error != nil && waitingValue == "neutral-cancel-retained",
+              "B6: Cancelling the owned migration fences late publication and preserves at least one saved copy")
+        let retainedStore = PCGamesMockStore("neutral-broker-copy")
+        await retainedStore.requireApproval(retainsLegacy: true)
+        let retainedMigration = PCGamesController(store: retainedStore,
+            client: PCGamesClient(transport: PCGamesMockTransport([])))
+        await retainedMigration.restorePresence()
+        retainedMigration.approveKeychain()
+        await retainedMigration.waitForOperation()
+        let retainedApprovals = await retainedStore.approvals
+        check(retainedMigration.hasSavedSignIn && !retainedMigration.needsKeychainApproval
+              && retainedMigration.legacyKeychainRetained && retainedMigration.error == nil && retainedApprovals == 1,
+              "B6: A verified broker copy completes migration with an explicit retained-legacy notice, without retrying removal")
+        let brokerRoot = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+            .appendingPathComponent("XodusCredentialRouteChecks-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: brokerRoot, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: brokerRoot) }
+        let brokerPath = brokerRoot.appendingPathComponent("helper")
+        let manifestPath = brokerRoot.appendingPathComponent("pin.json")
+        let directStore = PCGamesMockStore("neutral-direct-only")
+        let absentBroker = PCGamesCredentialStore(direct: directStore, executable: brokerPath, manifest: manifestPath)
+        let directPresence = try await absentBroker.contains()
+        let directRead = try await absentBroker.read()
+        let absentMigration = try await absentBroker.migrationRequired()
+        check(directPresence && directRead == "neutral-direct-only" && !absentMigration,
+              "B6: Only a genuinely absent helper permits the existing direct refresh store")
+        try Data("Neutral, nonexecutable helper fixture.".utf8).write(to: brokerPath)
+        let rejectedDirect = PCGamesMockStore("neutral-must-not-fallback")
+        let presentBroker = PCGamesCredentialStore(direct: rejectedDirect, executable: brokerPath, manifest: manifestPath)
+        for operation in 0..<3 {
+            do {
+                if operation == 0 { _ = try await presentBroker.read() }
+                if operation == 1 { try await presentBroker.save("neutral-not-saved") }
+                if operation == 2 { try await presentBroker.delete() }
+                check(false, "B6: An existing helper without approved metadata fails closed")
+            } catch {
+                check(error as? PCGamesError == .credentialBrokerUnavailable,
+                      "B6: An existing helper without approved metadata fails closed")
+            }
+        }
+        let rejectedReads = await rejectedDirect.reads
+        let rejectedWrites = await rejectedDirect.saved
+        let rejectedDeletes = await rejectedDirect.deletions
+        check(rejectedReads == 0 && rejectedWrites.isEmpty && rejectedDeletes == 0,
+              "B6: A rejected installed helper never reads, rotates or deletes via direct fallback")
+        try JSONEncoder().encode(CredentialBrokerPin(sha256: String(repeating: "0", count: 64),
+                                                    bytes: 1)).write(to: manifestPath)
+        do {
+            _ = try await presentBroker.contains()
+            check(false, "B6: A mismatched frozen helper pin cannot start a child or become saved-sign-in evidence")
+        } catch {
+            check(error as? PCGamesError == .credentialBrokerUnavailable,
+                  "B6: A mismatched frozen helper pin cannot start a child or become saved-sign-in evidence")
+        }
         controller.refresh()
         await controller.waitForOperation()
         let savedRotations = await saved.saved
@@ -393,6 +512,17 @@ enum PCGamesChecks {
         let neutralInstalled = InstalledGamesController()
         let neutralOperations = GameOperationsController(installed: neutralInstalled)
         for width in [CGFloat(700), CGFloat(1100)] {
+            for approvalState in [refused, retainedMigration] {
+                let approvalHost = NSHostingView(rootView: PCGamesView(
+                    library: approvalState, installed: neutralInstalled, operations: neutralOperations,
+                    query: "", allowsStartupTasks: false, browse: {}, recentActivity: {}))
+                approvalHost.sizingOptions = []
+                approvalHost.frame = CGRect(x: 0, y: 0, width: width, height: 600)
+                approvalHost.layoutSubtreeIfNeeded()
+                check(approvalHost.window == nil && approvalHost.frame.width == width
+                      && NSApplication.shared.windows.count == windows,
+                      "B6: Native approval and retained-legacy states lay out at Mac widths without windows or startup work")
+            }
             let host = NSHostingView(rootView: LiveCatalogView(library: controller, installed: neutralInstalled,
                 operations: neutralOperations, query: "neutral", allowsArtworkLoading: false, clearSearch: {})
                 .environmentObject(LiveSession()))

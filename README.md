@@ -46,7 +46,12 @@ Unknown, and Check game sign-in left Setup readiness stale. Their next-package
 source correction prefers PC catalog candidates, skips strict cached
 no-PC-package/package-type failures, tries at most three exact-ID probes only
 after null results, and refreshes Setup after successful sign-in checks.
-These corrections are not installed yet. Shelf, Install, Play and Stop
+The corrections are independently admitted, installed and owner-live-accepted
+at `208939c`: Game Pass Check shows Active, Setup is all Ready, and the setup
+banner disappears after Check game sign-in. The exact CI is
+[37688479927](https://github.com/dragoshont/xodus-macos-app/actions/runs/37688479927).
+The full prior app rollback, profile and installed list were preserved.
+Shelf, Install, Play and Stop
 acceptance remains separate from neutral qualification.
 
 **Phase 2 B1/B2/B3 (`7c3c1f0`, admitted, installed and live-accepted):** Discover
@@ -69,14 +74,25 @@ owned-first Lara/Hogwarts Play and Celeste Install, and Celeste's exact
 unsupported reason with Install disabled. These are bounded live observations,
 not general gameplay certification.
 
-**B6 is a separate approved next package:** stable app-owned Keychain
-access/migration is timeboxed to 2.5 hours and must qualify across two
-differently signed synthetic builds. One human migration approval is allowed.
-No new ACL, prompt-free claim or live credential mutation is part of the
-B5/B7/B8/B9 package; game-service credentials remain out of scope.
-The separate B6 access policy remains unqualified. Following the user's unlock,
-native qualification still awaits the owner's explicit safe GUI boundary.
-Isolated synthetic preparation has not modified the live app-owned item.
+**B6 is a separate frozen-credential-broker candidate, not deployed.** A fixed
+self-signed certificate alone cannot make macOS's per-build Keychain partition
+stable. The user selected a tiny separately installed helper whose signed bytes
+stay unchanged across launcher updates. It authenticates each app caller against
+the fixed-certificate requirement over a private socketpair; the app verifies the
+helper's packaged hash and loaded code before sending anything. It handles only
+the app's PC-library refresh item. Existing but invalid or unreachable helpers
+fail visibly; direct access is allowed only when the helper is absent.
+
+An explicit **Xodus needs one-time Keychain approval.** action migrates the
+legacy item: read with human approval, save and verify a broker-owned copy, then
+attempt deletion of that exact old reference without further interaction.
+Failure to remove the old item retains the verified new copy and reports
+**legacy retained**; future launches use the new copy first and never retry
+removal automatically. Helper updates need their own approval and release gate.
+Synthetic qualification and live migration are separate; the owner runs the
+latter with the user present. No live item or game-service credential is changed
+by this implementation/qualification lane. See the
+[broker contract and qualification boundary](docs/NATIVE-INTEGRATION.md#b6-frozen-credential-broker-candidate).
 
 **S3/S5/S6 (`1463cdb`, admitted, installed and live-accepted):** the account area
 adds explicit game-service sign-in/status, separate from PC-library credentials.

@@ -29,7 +29,16 @@ title-flow acceptance. The user completed native unlock without automation;
 the owner resumed acceptance and found two defects described below.
 Remaining shelf/Install/Play/Stop outcomes are not inferred from deployment.
 
-#### Next-package live-acceptance corrections (not installed)
+#### Live-accepted corrections (`208939c`)
+
+The independently admitted `208939cb3b52e99a15f24f6c6303cb0ed0700aad`
+package passed exact CI
+[37688479927](https://github.com/dragoshont/xodus-macos-app/actions/runs/37688479927).
+The owner freshly authorized normal Quit/replacement after confirming game-ended.
+The full prior `fee7f5f` app, untouched profile and identical private installed
+list were preserved through one Library reopen. All admitted files/signatures
+matched. The owner accepted Game Pass Active, Setup all Ready, and disappearance
+of the stale setup banner after the successful sign-in check.
 
 The first nonowned feed title may lack a PC package. Explicit Game Pass Check
 now selects from retained validated feed products, preferring PC-candidate
@@ -145,7 +154,7 @@ Those qualification checks do not run a live private script, sign-in, licence
 probe or game operation, and do not themselves authorize replacement.
 The separately authorized deployment and owner observations are recorded above.
 
-### Separate B6 Keychain qualification (human authorization hold)
+### Historical B6 ACL qualification (superseded)
 
 The approved 2.5-hour slice requires an explicit fixed-certificate-bound
 app-owned access policy, migration without deleting the existing credential,
@@ -153,7 +162,7 @@ and qualification with two different signed synthetic builds. One human
 migration authorization is allowed; its required UI copy is
 Xodus needs one-time Keychain approval. The game service's item is out of scope.
 
-No policy is implemented or qualified yet. Two original synthetic probes have
+At that boundary, no policy was implemented or qualified. Two original synthetic probes had
 different binaries and the same fixed-certificate designated requirement.
 A no-UI legacy-fixture ACL edit timed out; that synthetic keychain was deleted
 and its original search-list metadata restored. A subsequent signer requested
@@ -166,10 +175,106 @@ replacement works.
 A modern-format, no-signing-key fixture is prepared but not executed; it
 reuses the signed probes and preauthorizes only their fixed-certificate role
 on synthetic data. Its source compilation is not native access qualification
-or proof of human migration. The user has since completed the actual Keychain
-unlock. Further native B6 calls await the owner's explicit safe shared-GUI
-boundary while it drives live acceptance. No live app-owned or game-service
-item has been read or changed by this qualification lane.
+or proof of human migration. The old timebox ended without a qualified ACL fix.
+After the user unlocked the Keychain, signing/package admission and deployment
+of the `208939c` follow-ups completed separately. Subsequent public-source
+inspection established why removing PartitionID could not be a repair:
+securityd assigns self-signed code a per-build cdhash partition and recreates
+missing partitions on access. The new user-approved broker approach below
+supersedes that hypothesis; it does not retroactively qualify it.
+
+### B6 frozen credential broker candidate
+
+The user chose a tiny authenticated credential helper, signed once and preserved
+byte-for-byte across launcher replacements. The new slice has a three-hour
+budget; the earlier expired ACL budget is not reset. This public implementation
+does not modify the management engine or the game service's item.
+
+**Trust and installation.** The helper is a one-request child, not a daemon.
+It is installed separately at
+`~/Library/Application Support/Xodus/CredentialBroker/XodusCredentialBroker`.
+Each package's signed resources pin its version, SHA-256 and byte count. Packaging
+copies the approved signed artifact without rebuilding or re-signing it.
+Installation is a separate owner gate and must preserve an already installed
+matching artifact; an upgrade is never inferred from a new launcher package.
+Directories are private, the executable is immutable by convention and mode
+0500, and replacement requires a new approved helper/migration policy.
+
+The app validates regular/current-user/nonlinked/non-writable-by-others file
+metadata, its full hash, fixed broker certificate requirement, and the spawned
+child's dynamic code hash before sending data. The unnamed Unix socketpair has
+no filesystem listener. The helper authenticates the kernel's LOCAL_PEERTOKEN
+with SecCode and the app's fixed leaf-certificate requirement, including the
+same UID; no caller-supplied PID/path is trusted. Authentication is repeated
+before an operation and before returning a result. Unauthorized callers exit
+with a specific denial, before any item access.
+
+**Minimal contract.** Versioned, request-ID-bound, length-delimited private
+frames permit only read (including presence-only), write, delete and explicit
+migration. The token ceiling is 128 KiB; deadlines bound ordinary transport
+and explicit approval. Tokens never use argv, stdout, stderr, files or app
+logs. Only fixed `Xodus Library` generic-password identities are reachable:
+legacy `xbox-web` and broker-owned `xbox-web.credential-broker-v1`. The backend
+and `Xodus Service` identities are not exposed. A missing helper permits the
+existing direct store; an existing rejected, mismatched or unavailable helper
+never causes silent direct fallback.
+
+**Migration and recovery.** Presence-only inspection shows the explicit native
+UI message **Xodus needs one-time Keychain approval.** before any credential read.
+Only the user's approval action enables interaction for the legacy read. The
+helper creates its own fixed-requirement item, verifies an actual no-UI re-read
+of the new bytes, then disables interaction and attempts deletion of the exact
+legacy reference returned by that read. Public SecKeychainItemDelete is used
+because SecItemDelete's legacy app-name ownership wrapper rejects a foreign
+creator even after read permission. No broad query, ACL rewrite or private SPI
+is used to remove the old item.
+
+If exact-reference deletion fails, the verified new copy remains authoritative;
+the response and UI report legacy retained. The next launch reads the broker
+copy first, even while the old item exists. It never retries that delete in a
+loop or silently repeats approval. Failure before a verified new copy retains
+the original. Cancellation/uncertain delivery is not success, and an interrupted
+copy can be rediscovered through presence without reading the old secret.
+Explicit sign-out may fail visibly if a retained foreign item cannot be removed;
+it never falsely claims all credentials were cleared.
+
+Updating the helper changes its own cdhash and can need fresh approval, even
+with the same certificate. Do not replace it as part of ordinary app updates.
+A pre-broker rollback cannot read the new account directly; retain a
+broker-aware rollback for future releases and gate older rollback deliberately.
+No live migration or next-replacement prompt-free claim is established by this
+candidate. The owner performs those checks with the user present.
+
+**Qualification boundary.** Native synthetic builds use the same transport,
+peer authentication and storage logic with a compile-only fixed neutral
+keychain/service and no UI. They are not production credential tests. Coverage
+must distinguish two differently signed client builds using one unchanged
+broker, actual changed-value rotation, unauthorized-caller rejection,
+preauthorized staged-copy/exact-reference deletion, injected deletion-failure
+retention, and denied migration preserving the old value. Cleanup must preserve
+the original user search list and delete only the disposable test keychain.
+Mocked controller checks separately cover explicit approval, cancellation,
+refusal, no automatic provider refresh, and retained-legacy publication.
+
+The final synthetic native harness passed both migration outcomes in a verified
+non-graphical security session with no controlling terminal. Two different
+signed clients read and actually rotated neutral bytes through one unchanged
+broker; an ad-hoc caller received native denial before any item access. A
+foreign-creator fixture explicitly preauthorized only with its neutral
+keychain password passed read, staged verification, exact-reference deletion,
+then client B's read with legacy retained false. Injected deletion denial
+(-25308) retained the new copy, permitted B's subsequent rotation, and kept
+legacy retained true without retrying the old deletion. Separate native read
+denial (-25293) and unapproved deletion (-25244) preserved the original value.
+The disposable keychain and lock were removed, the original search list was
+unchanged, and the one-use signing job was unloaded.
+
+The separately signed production helper candidate is 228448 bytes, SHA-256
+`2c40354c471c7a692cc64eea473a2fe1d34630c140341010ae9967e9742c9381`.
+It has not been installed or used against a live item. Synthetic preauthorization
+is not the user's native approval; injected retention is not an observed live
+delete failure. The final package/independent admission and user-present live
+migration remain separate gates.
 
 ### Phase 2 B1/B2/B3 (admitted, installed and owner-live-accepted)
 
@@ -240,7 +345,7 @@ Those title/flow observations are not general gameplay certification.
 B5/B7/B8/B9 is the next separate package, excluded from this frozen source
 and artifact.
 
-### B6 app-owned Keychain follow-up (approved, not implemented here)
+### Historical B6 app-owned ACL follow-up
 
 The separate next package is timeboxed to 2.5 hours of B6 work: explicit
 ACL/partition policy anchored on the fixed-certificate designated requirement,
@@ -248,8 +353,9 @@ plus migration of the existing Xodus Library item. One human authorization is
 acceptable and must be introduced as Xodus needs one-time Keychain approval.
 Qualification requires two differently signed synthetic builds; only qualified
 scope may freeze at the timebox, with the rest reported explicitly. The
-Xodus Service item remains outside this app lane. This candidate does not
-change live items, claim prompt-free access or weaken the signing requirement.
+Xodus Service item remains outside this app lane. That ACL candidate was not shipped. The user subsequently selected the
+[frozen broker](#b6-frozen-credential-broker-candidate); its live migration and
+replacement remain separate owner gates.
 
 ### S3/S5/S6 game operations (admitted, installed and live-accepted)
 

@@ -38,13 +38,17 @@ at `7c3c1f0`. Game Pass subscription/shelf, self-contained script paths, Setup
 and Stop are admitted and installed at `fee7f5f`. Owner live acceptance is
 partial: cached status, Setup, successful Repair and the shelf header were
 observed. The user's native login Keychain unlock allowed acceptance to resume;
-probe selection and stale Setup readiness defects are being corrected in the
-next package, not the installed bundle. No unlock is automated. Stable
-app-owned Keychain ACL/migration is a separate approved, 2.5-hour next package
-with synthetic two-build qualification and one allowed human migration approval;
-no prompt-free replacement claim is made yet. B6 native qualification is
-paused until the owner clears the shared native authorization surface;
-live credentials are untouched.
+probe selection and stale Setup readiness corrections are admitted, installed
+and owner-live-accepted at `208939c`: Active, all Ready, and no stale setup
+banner after Check game sign-in. No unlock is automated. The earlier B6 ACL
+approach was rejected because self-signed builds have distinct Keychain
+partitions even with a stable certificate requirement. The user selected a
+separately installed, byte-frozen authenticated credential broker for the new
+three-hour B6 slice. The candidate uses explicit approval and verified staged
+copy migration; a failed old-item deletion retains the new copy with a visible
+notice, not an automatic retry. Live migration/replacement remains the owner's
+user-present gate; no prompt-free production replacement claim is made from
+synthetic tests, and live credentials remain untouched by this lane.
 No complete owned-view parity or general gameplay certification is
 claimed. Exact deployment and real provider evidence are recorded separately
 in [native integration](docs/NATIVE-INTEGRATION.md), never inferred from mocks.

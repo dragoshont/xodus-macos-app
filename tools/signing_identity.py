@@ -13,7 +13,8 @@ from shipping_pair import (FEATURES, PROFILE, PRODUCER, PRODUCER_TREE, hex_value
 
 IDENTIFIERS = {"app": "io.github.dragoshont.xodus",
                "cli": "io.github.dragoshont.xodus.cli",
-               "helper": "io.github.dragoshont.xodus.auth-host"}
+               "helper": "io.github.dragoshont.xodus.auth-host",
+               "broker": "io.github.dragoshont.xodus.credential-broker"}
 COMPARISON_RESULT = (
     "Different signed artifacts share the fixed certificate-bound designated requirement. "
     "Independent-build qualification requires two separately approved build receipts/runs; "

@@ -4,7 +4,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 if [ "$#" -lt 9 ]; then
-    printf '%s\n' 'Usage: build_app.sh engine unsignedSHA bytes provenanceSHA bytes approvedAppCommit approvedAppTree newOutputRoot (--signing-identity CERT_SHA1 | --local-ad-hoc) [--preserve-signed-cli path SHA256 bytes priorPackageReceipt receiptSHA256 receiptBytes]' >&2
+    printf '%s\n' 'Usage: build_app.sh engine unsignedSHA bytes provenanceSHA bytes approvedAppCommit approvedAppTree newOutputRoot (--signing-identity CERT_SHA1 | --local-ad-hoc) [--preserve-signed-cli path SHA256 bytes priorPackageReceipt receiptSHA256 receiptBytes] [--credential-broker path SHA256 bytes]' >&2
     exit 2
 fi
 engine=$1
@@ -19,6 +19,7 @@ shift 8
 signer=
 local_ad_hoc=false
 signed_cli=
+credential_broker=
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --signing-identity)
@@ -40,6 +41,13 @@ while [ "$#" -gt 0 ]; do
             prior_receipt_hash=$6
             prior_receipt_bytes=$7
             shift 7 ;;
+        --credential-broker)
+            test "$#" -ge 4
+            test -z "$credential_broker"
+            credential_broker=$2
+            credential_broker_hash=$3
+            credential_broker_bytes=$4
+            shift 4 ;;
         *) printf '%s\n' 'Unknown signing option; no fallback.' >&2; exit 2 ;;
     esac
 done
@@ -105,6 +113,35 @@ python3 tools/shipping_pair.py generate --source "$source" --tree "$tree" \
     --engine "$app/Contents/Resources/XodusEngine/xodus-cli" --helper "$app/Contents/MacOS/XodusAuthHost" \
     --approval "$stage/unsigned-approval.json" --output Sources/XodusPreview/ShippingPairPins.swift \
     --receipt "$stage/paired-inputs.json"
+if [ -n "$credential_broker" ]; then
+    test -n "$signer"
+    python3 tools/signing_identity.py verify --kind broker --path "$credential_broker" --identity "$signer"
+    python3 - "$credential_broker" "$credential_broker_hash" "$credential_broker_bytes" "$stage" <<'PY'
+import json, pathlib, shutil, sys
+from tools.shipping_pair import owned_bytes
+source, digest, size, stage = sys.argv[1], sys.argv[2], int(sys.argv[3]), pathlib.Path(sys.argv[4])
+identity, _ = owned_bytes(source, digest, size)
+directory = stage / "CredentialBroker"
+directory.mkdir(mode=0o700)
+destination = directory / "XodusCredentialBroker"
+shutil.copyfile(source, destination)
+destination.chmod(0o500)
+owned_bytes(destination, digest, size)
+owned_bytes(source, digest, size)
+manifest = {"version": 1, **identity}
+(stage / "Xodus.app/Contents/Resources/XodusCredentialBroker.json").write_text(
+    json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8")
+paired = stage / "paired-inputs.json"
+record = json.loads(paired.read_bytes())
+record["frozenCredentialBroker"] = manifest
+record["credentialBrokerInstallation"] = (
+    "Separate owner gate: install once at ~/Library/Application Support/Xodus/CredentialBroker/"
+    "XodusCredentialBroker; preserve exact bytes on launcher updates. Never silently replace.")
+paired.write_text(json.dumps(record, sort_keys=True) + "\n", encoding="utf-8")
+PY
+    python3 tools/signing_identity.py verify --kind broker \
+        --path "$stage/CredentialBroker/XodusCredentialBroker" --identity "$signer"
+fi
 XODUS_SHIPPING=1 swift build --jobs 1 -c release --product XodusPreview
 cp "$bin/XodusPreview" "$app/Contents/MacOS/Xodus"
 cp tools/Info.plist "$app/Contents/Info.plist"

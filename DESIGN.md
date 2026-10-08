@@ -67,10 +67,23 @@ shows only its reason, not unknown-size or future-download copy.
 The owner observed cached status, the Setup list, successful Repair with
 refreshed readiness and the Game Pass section header. After the user's native
 Keychain unlock, the owner found probe-selection and stale Setup-readiness
-defects. The next source correction keeps the same controls, bounds null-result
+defects. The installed `208939c` correction keeps the same controls, bounds null-result
 probes to three, and refreshes Setup after a successful game-sign-in check.
-It is not installed. No authorization is automated, and no prompt-free
-replacement claim is made for the separate, still-unqualified B6 policy.
+The owner accepted Active, all Ready, and removal of the stale setup banner.
+No authorization is automated.
+
+**B6 credential approval:** preserve the native PC Library header and grid.
+Presence inspection never reads a saved token or presents a native prompt.
+When migration is needed, a quiet key label says **Xodus needs one-time Keychain
+approval.** with an explicit Approve Keychain access button. Explain that the
+separate credential helper stays unchanged on app updates, while updating the
+helper itself may need another approval. Waiting has a small system progress
+indicator and Cancel approval; refusal/cancellation is visible and cannot clear
+the saved sign-in. No Microsoft refresh happens automatically after approval.
+A verified new copy with failed old-item removal ends approval normally and
+shows a secondary retained-legacy notice. Load/Refresh then uses the broker
+copy, never an automatic delete retry. This candidate is not installed or
+live-migrated; synthetic checks do not establish production prompt behavior.
 
 **Phase 2 B1/B2/B3 (`7c3c1f0`, admitted, installed and live-accepted):** retain the existing native catalog grid and
 toolbar. A nonblank Discover search places Your games above Microsoft Store;

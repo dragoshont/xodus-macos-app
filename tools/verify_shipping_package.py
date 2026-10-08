@@ -41,6 +41,17 @@ def main():
     expected_receipt = (json.dumps({"version": 1, "sha256": record["signedHelper"]["sha256"],
                                   "sourceCommit": source}, sort_keys=True) + "\n").encode()
     owned_bytes(metadata, hashlib.sha256(expected_receipt).hexdigest(), len(expected_receipt))
+    if "frozenCredentialBroker" in record:
+        broker = record["frozenCredentialBroker"]
+        require(type(broker) is dict and set(broker) == {"version", "sha256", "bytes"}
+                and type(broker["version"]) is int and broker["version"] == 1, "Invalid frozen broker pin")
+        owned_bytes(stage / "CredentialBroker/XodusCredentialBroker", broker["sha256"], broker["bytes"])
+        expected = (json.dumps(broker, sort_keys=True) + "\n").encode()
+        owned_bytes(app / "Contents/Resources/XodusCredentialBroker.json",
+                    hashlib.sha256(expected).hexdigest(), len(expected))
+    else:
+        require(not (app / "Contents/Resources/XodusCredentialBroker.json").exists(),
+                "Unreviewed broker metadata")
     source_root = stage / "source"
     for target, original in [
         (app / "Contents/Info.plist", source_root / "tools/Info.plist"),
