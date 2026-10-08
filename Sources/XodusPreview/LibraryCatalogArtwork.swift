@@ -95,7 +95,8 @@ final class LibraryCatalogArtwork: ObservableObject {
                                                                market: market, language: language)
                             detailErrors[product.ProductId] = nil
                         } catch {
-                            detailErrors[product.ProductId] = "Some game details couldn't be loaded. Try again."
+                            detailErrors[product.ProductId] =
+                                "Microsoft returned game details Xodus couldn't read. Try again."
                             logger.warning("Optional public game details were rejected; game access and actions are unchanged.")
                         }
                         images[product.ProductId] = Images(cover: cover, hero: heroes.first,
@@ -108,7 +109,10 @@ final class LibraryCatalogArtwork: ObservableObject {
                 }
                 error = nil
             } catch is CancellationError { }
-            catch { self.error = "Some library artwork couldn't be loaded. Your games and access haven't changed." }
+            catch {
+                self.error = (error as? PCGamesError)?.localizedDescription
+                    ?? "Game artwork and details couldn't be loaded. Check your connection and try again."
+            }
         }
         pending = task
         await task.value

@@ -3,6 +3,27 @@ import AVKit
 import Combine
 import SwiftUI
 
+struct CatalogAVPlayerView: NSViewRepresentable {
+    let player: AVPlayer
+
+    func makeNSView(context: Context) -> AVPlayerView {
+        let view = AVPlayerView()
+        view.controlsStyle = .floating
+        view.showsFullScreenToggleButton = true
+        view.player = player
+        return view
+    }
+
+    func updateNSView(_ view: AVPlayerView, context: Context) {
+        if view.player !== player { view.player = player }
+    }
+
+    static func dismantleNSView(_ view: AVPlayerView, coordinator: ()) {
+        view.player?.pause()
+        view.player = nil
+    }
+}
+
 @MainActor
 final class CatalogTrailerPlayback: ObservableObject {
     @Published private(set) var player: AVPlayer?
@@ -39,7 +60,7 @@ struct CatalogTrailerView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let player = playback.player {
-                VideoPlayer(player: player).aspectRatio(16.0 / 9.0, contentMode: .fit)
+                CatalogAVPlayerView(player: player).aspectRatio(16.0 / 9.0, contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .accessibilityLabel(trailer.caption)
                 HStack {

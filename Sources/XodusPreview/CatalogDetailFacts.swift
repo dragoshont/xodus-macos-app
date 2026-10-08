@@ -142,16 +142,18 @@ struct CatalogDetailFacts: Sendable {
         } ?? product.LocalizedProperties?.first
         if let actual = localized?.Language?.lowercased() {
             let requested = language.lowercased()
-            guard actual == requested || (!actual.contains("-") && requested.hasPrefix(actual + "-")) else {
+            let actualBase = actual.split(separator: "-", maxSplits: 1).first
+            let requestedBase = requested.split(separator: "-", maxSplits: 1).first
+            guard actual == requested || actualBase == requestedBase else {
                 throw PCGamesError.invalidResponse
             }
         }
         // About uses only the product-level description. SKU descriptions can
         // contain edition or console-upgrade terms and are intentionally ignored.
-        description = try Self.text(localized?.ProductDescription, maximum: 40_000, multiline: true)
-        shortDescription = try Self.text(localized?.ShortDescription, maximum: 8_000, multiline: true)
-        developer = try Self.text(localized?.DeveloperName, maximum: 512)
-        publisher = try Self.text(localized?.PublisherName, maximum: 512)
+        description = Self.text(localized?.ProductDescription, maximum: 40_000, multiline: true)
+        shortDescription = Self.text(localized?.ShortDescription, maximum: 8_000, multiline: true)
+        developer = Self.text(localized?.DeveloperName, maximum: 512)
+        publisher = Self.text(localized?.PublisherName, maximum: 512)
         let scopedMarket = product.MarketProperties?.first { $0.Markets?.contains(market) == true }
         releaseDate = scopedMarket?.OriginalReleaseDate.flatMap(GameCompatibilityResult.parseDate)
         if let usage = scopedMarket?.UsageData?.first(where: { $0.AggregateTimeSpan == "AllTime" }),
@@ -165,9 +167,8 @@ struct CatalogDetailFacts: Sendable {
             ?? ratings.compactMap(CatalogContentRating.init).first
         var videos: [CatalogTrailer] = []
         for video in (localized?.CMSVideos ?? []).prefix(6) {
-            guard let hls = video.HLS else { continue }
-            let url = try CatalogTrailer.validatedURL(hls)
-            let caption = try Self.text(video.Caption, maximum: 256) ?? "Trailer"
+            guard let hls = video.HLS, let url = try? CatalogTrailer.validatedURL(hls) else { continue }
+            let caption = Self.text(video.Caption, maximum: 256) ?? "Trailer"
             let preview = video.PreviewImage.flatMap {
                 PCGamesClient.artwork(uri: $0.Uri, width: $0.Width, height: $0.Height, role: .hero)
             }
@@ -187,24 +188,24 @@ struct CatalogDetailFacts: Sendable {
                       ($0.PlatformDependencies ?? []).contains { $0.PlatformName == "Windows.Desktop" }
                   }), let value = properties.HardwareProperties, value.hasValues else { continue }
             let normalized = CatalogPCRequirements(
-                MinimumProcessor: try Self.text(value.MinimumProcessor, maximum: 2048),
-                RecommendedProcessor: try Self.text(value.RecommendedProcessor, maximum: 2048),
-                MinimumGraphics: try Self.text(value.MinimumGraphics, maximum: 2048),
-                RecommendedGraphics: try Self.text(value.RecommendedGraphics, maximum: 2048))
+                MinimumProcessor: Self.text(value.MinimumProcessor, maximum: 2048),
+                RecommendedProcessor: Self.text(value.RecommendedProcessor, maximum: 2048),
+                MinimumGraphics: Self.text(value.MinimumGraphics, maximum: 2048),
+                RecommendedGraphics: Self.text(value.RecommendedGraphics, maximum: 2048))
             if !hardware.contains(normalized) { hardware.append(normalized) }
         }
         requirements = hardware.count == 1 ? hardware.first : nil
         requirementsVaryByEdition = hardware.count > 1
     }
 
-    private static func text(_ value: String?, maximum: Int, multiline: Bool = false) throws -> String? {
+    private static func text(_ value: String?, maximum: Int, multiline: Bool = false) -> String? {
         guard let value else { return nil }
         let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
         guard text.utf8.count <= maximum,
               !text.unicodeScalars.contains(where: {
                   CharacterSet.controlCharacters.contains($0) && !(multiline && [9, 10, 13].contains($0.value))
-              }) else { throw PCGamesError.invalidResponse }
+              }) else { return nil }
         return text
     }
 }

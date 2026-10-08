@@ -138,10 +138,11 @@ enum PreviewChecks {
     private static func detailChecks(check: (Bool, String) -> Void) {
         do {
             let data = Data("""
-                {"Products":[{"ProductId":"FIXTURE00002","LocalizedProperties":[{"Language":"en-US",
+                {"Products":[{"ProductId":"FIXTURE00002","LocalizedProperties":[{"Language":"en-gl",
                 "ProductDescription":"An original synthetic adventure.","DeveloperName":"Original Studio",
                 "PublisherName":"Original Publisher","CMSVideos":[{"HLS":"https://cdn-dynmedia-1.microsoft.com/is/content/microsoftassets/original-fixture-AVS.m3u8?packagedStreaming=true",
-                "Caption":"Original trailer","PreviewImage":{"Uri":"//store-images.s-microsoft.com/image/apps.fixture","Width":1920,"Height":1080}}]}],
+                "Caption":"Original trailer","PreviewImage":{"Uri":"//store-images.s-microsoft.com/image/apps.fixture","Width":1920,"Height":1080}},
+                {"HLS":"https://cdn.trailers.xboxservices.com/optional/manifest.m3u8","Caption":"Unsupported optional trailer"}]}],
                 "MarketProperties":[{"Markets":["US"],"OriginalReleaseDate":"2026-01-02T00:00:00.0000000Z",
                 "UsageData":[{"AggregateTimeSpan":"7Days","AverageRating":1,"RatingCount":1},
                 {"AggregateTimeSpan":"AllTime","AverageRating":4.5,"RatingCount":20}],
@@ -157,6 +158,10 @@ enum PreviewChecks {
             let facts = try CatalogDetailFacts(product: product, images: [screenshot], market: "US", language: "en-US")
             check(facts.description == "An original synthetic adventure." && facts.developer == "Original Studio",
                   "D3 optional description/developer facts decode independently of access or installation")
+            check(facts.trailers.count == 1 && facts.trailers[0].caption == "Original trailer",
+                  "Invalid optional trailer URLs are omitted without rejecting valid game details")
+            check(product.LocalizedProperties?.first?.Language == "en-gl",
+                  "DisplayCatalog's same-language global fallback remains available to an en-US request")
             check(facts.description != "Console upgrade copy must not become About.",
                   "D3 About prefers the general product description and never substitutes SKU copy")
             check(facts.publisher == "Original Publisher" && facts.releaseDate != nil,
@@ -214,6 +219,15 @@ enum PreviewChecks {
             check(normalized.requirements?.MinimumProcessor == nil &&
                   normalized.requirements?.RecommendedGraphics == "Original PC GPU",
                   "Missing whitespace-only hardware fields hide; genuine values are normalized")
+            let malformedOptionalData = Data(String(decoding: data, as: UTF8.self)
+                .replacingOccurrences(of: "Original Studio", with: "\\u0001").utf8)
+            let malformedOptionalProduct = try JSONDecoder().decode(
+                CatalogDetailPayload.self, from: malformedOptionalData).Products[0]
+            let malformedOptional = try CatalogDetailFacts(
+                product: malformedOptionalProduct, images: [], market: "US", language: "en-US")
+            check(malformedOptional.developer == nil &&
+                  malformedOptional.description == "An original synthetic adventure.",
+                  "Malformed optional text is omitted without discarding valid About metadata")
             let supported = GameCompatibilityResult(storeId: "FIXTURE00002", packageBytes: 3_200_000_000,
                 supported: true, reason: nil, checkedAt: "2026-10-07T00:00:00Z")
             check(GameDetailFacetCopy.pcPackage(installed: true, compatibility: nil) == "Installed" &&
