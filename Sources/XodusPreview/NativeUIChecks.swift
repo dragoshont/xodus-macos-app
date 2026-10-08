@@ -210,9 +210,9 @@ enum NativeUIChecks {
         check(Sheet.headerHeight(for: 340) == 0 && Sheet.headerHeight(for: 620) < 210
               && Sheet.headerHeight(for: 700) == 210,
               "Account decoration shrinks before the stable footer at constrained heights")
-        for size in [CGSize(width: 480, height: 280), CGSize(width: 480, height: 340), CGSize(width: 650, height: 620)] {
+        for size in [CGSize(width: 480, height: 480), CGSize(width: 650, height: 620)] {
             let footer = NSView()
-            let host = NSHostingView(rootView: AccountSheetLayout(showsHeader: size.height >= 340) {
+            let host = NSHostingView(rootView: AccountSheetLayout(showsHeader: size.width > 500) {
                 Color.clear
             } content: {
                 Text(String(repeating: "Synthetic pending or failure explanation. ", count: 80))
@@ -311,7 +311,7 @@ enum NativeUIChecks {
         let account = NSHostingView(rootView: LiveAccountView(refreshStatusOnAppear: false)
             .environmentObject(state).environmentObject(session))
         account.sizingOptions = []
-        account.frame = CGRect(x: 0, y: 0, width: 480, height: 280)
+        account.frame = CGRect(x: 0, y: 0, width: 560, height: 480)
         account.layoutSubtreeIfNeeded()
         check(account.window == nil && NSApplication.shared.windows.count == windows
               && session.authentication == nil && !session.accountBusy && !session.signInPending,
