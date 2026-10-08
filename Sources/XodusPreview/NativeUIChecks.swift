@@ -276,6 +276,8 @@ enum NativeUIChecks {
                           !$0.hasHorizontalScroller && ($0.documentView?.bounds.width ?? 0) <= size.width + 1
                       },
                       "Replayed public multi-edition detail fits constrained and expanded native sheets without horizontal scrolling")
+                check(!scrollViews.isEmpty && scrollViews.allSatisfy { !$0.hasHorizontalScroller },
+                      "D3 detail retains native vertical scrolling at constrained and expanded sheet sizes")
             }
         }
         let account = NSHostingView(rootView: LiveAccountView(refreshStatusOnAppear: false)

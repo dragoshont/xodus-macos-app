@@ -2,6 +2,28 @@
 import SwiftUI
 import XodusManagement
 
+enum GameDetailFacetCopy {
+    static func pcPackage(installed: Bool, compatibility: GameCompatibilityResult?) -> String {
+        if installed { return "Installed" }
+        if let bytes = compatibility?.packageBytes, bytes > 0 {
+            return bytes.formatted(.byteCount(style: .file))
+        }
+        return "Check before install"
+    }
+
+    static func macSupport(installed: Bool, compatibility: GameCompatibilityResult?) -> String {
+        guard let compatibility else { return "Check before install" }
+        if compatibility.supported {
+            return installed ? "Plays on this Mac" : "Supported on this Mac"
+        }
+        return "Not supported on this Mac"
+    }
+
+    static func installation(installed: Bool) -> String {
+        installed ? "Ready to play" : "Not installed"
+    }
+}
+
 struct LiveProductView: View {
     let product: CatalogProduct
     @ObservedObject var library: PCGamesController
@@ -57,7 +79,7 @@ struct LiveProductView: View {
                             requirements(details)
                         }
                         technicalDetails
-                    }.padding(.horizontal, 40).padding(.bottom, 32)
+                    }.padding(.horizontal, 40).padding(.bottom, 72)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -76,8 +98,10 @@ struct LiveProductView: View {
         .frame(minWidth: 820, idealWidth: 1040, maxWidth: 1200,
                minHeight: 600, idealHeight: 780, maxHeight: 850)
         .task(id: "\(product.id):\(product.market):\(product.language)") {
-            guard allowsArtworkLoading else { return }
-            await catalog.load(ids: [product.id], market: product.market, language: product.language)
+            await operations.loadCompatibility(productID: product.id)
+            if allowsArtworkLoading {
+                await catalog.load(ids: [product.id], market: product.market, language: product.language)
+            }
         }
     }
 
@@ -127,15 +151,14 @@ struct LiveProductView: View {
     }
 
     private var evidence: some View {
-        Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 14) {
+        let compatibility = operations.compatibility[product.id]
+        return Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 14) {
             facet("Access", access?.rawValue ?? "Not verified")
-            facet("PC download", operations.compatibility[product.id]?.packageBytes.flatMap { bytes in
-                bytes > 0 ? bytes : nil
-            }.map {
-                "\($0.formatted(.byteCount(style: .file))) package checked"
-            } ?? "Package not checked")
-            facet("Mac compatibility", operations.compatibility[product.id]?.badge ?? "Not checked")
-            facet("On this Mac", installed == nil ? "Not installed" : "Installed")
+            facet("PC package", GameDetailFacetCopy.pcPackage(installed: installed != nil,
+                                                               compatibility: compatibility))
+            facet("Mac support", GameDetailFacetCopy.macSupport(installed: installed != nil,
+                                                                compatibility: compatibility))
+            facet("Installation", GameDetailFacetCopy.installation(installed: installed != nil))
         }
         .font(.callout).frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -212,13 +235,12 @@ struct LiveProductView: View {
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(product.editions) { edition in
                     Text("Edition \(edition.editionID)")
-                    Text("Access: \(edition.entitlement.kind.label) — \(edition.entitlement.source)")
+                    Text("Access: \(edition.entitlement.kind.label)")
                     Text("PC package: \(edition.installability.kind.label)")
-                    Text("Compatibility: \(edition.compatibility.kind.label) — \(edition.compatibility.source)")
+                    Text("Mac support: \(edition.compatibility.kind.label)")
                 }
-                Text("Product \(product.productID)")
-                Text("Source: \(product.source), checked \(product.checkedAt)")
-                Text("Public metadata doesn't verify a package, an installed edition or Mac gameplay.")
+                Text("Product ID: \(product.productID)")
+                Text("Package availability and Mac support are confirmed before installation.")
             }
             .font(.caption).foregroundStyle(.secondary).textSelection(.enabled).padding(.top, 12)
         }

@@ -146,6 +146,8 @@ struct CatalogDetailFacts: Sendable {
                 throw PCGamesError.invalidResponse
             }
         }
+        // About uses only the product-level description. SKU descriptions can
+        // contain edition or console-upgrade terms and are intentionally ignored.
         description = try Self.text(localized?.ProductDescription, maximum: 40_000, multiline: true)
         shortDescription = try Self.text(localized?.ShortDescription, maximum: 8_000, multiline: true)
         developer = try Self.text(localized?.DeveloperName, maximum: 512)

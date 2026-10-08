@@ -148,7 +148,8 @@ enum PreviewChecks {
                 "ContentRatings":[{"RatingSystem":"ESRB","RatingId":"ESRB:T","RatingDescriptors":["ESRB:FanVio"],
                 "InteractiveElements":["ESRB:InGamPur"]}]}],
                 "DisplaySkuAvailabilities":[{"Sku":{"Properties":{"Packages":[{"PlatformDependencies":[{"PlatformName":"Windows.Desktop"}]}],
-                "HardwareProperties":{"MinimumProcessor":"Original PC CPU","RecommendedGraphics":"Original PC GPU"}}}}]}]}
+                "HardwareProperties":{"MinimumProcessor":"Original PC CPU","RecommendedGraphics":"Original PC GPU"}},
+                "LocalizedProperties":[{"Language":"en-US","SkuDescription":"Console upgrade copy must not become About."}]}}]}]}
                 """.utf8)
             let product = try JSONDecoder().decode(CatalogDetailPayload.self, from: data).Products[0]
             let screenshot = PCGamesCatalog.Product.Localized.Image(ImagePurpose: "Screenshot",
@@ -156,6 +157,8 @@ enum PreviewChecks {
             let facts = try CatalogDetailFacts(product: product, images: [screenshot], market: "US", language: "en-US")
             check(facts.description == "An original synthetic adventure." && facts.developer == "Original Studio",
                   "D3 optional description/developer facts decode independently of access or installation")
+            check(facts.description != "Console upgrade copy must not become About.",
+                  "D3 About prefers the general product description and never substitutes SKU copy")
             check(facts.publisher == "Original Publisher" && facts.releaseDate != nil,
                   "D3 public publisher/release metadata accepts the observed seven-digit ISO date shape")
             check(facts.storeRating?.average == 4.5 && facts.storeRating?.count == 20,
@@ -211,6 +214,15 @@ enum PreviewChecks {
             check(normalized.requirements?.MinimumProcessor == nil &&
                   normalized.requirements?.RecommendedGraphics == "Original PC GPU",
                   "Missing whitespace-only hardware fields hide; genuine values are normalized")
+            let supported = GameCompatibilityResult(storeId: "FIXTURE00002", packageBytes: 3_200_000_000,
+                supported: true, reason: nil, checkedAt: "2026-10-07T00:00:00Z")
+            check(GameDetailFacetCopy.pcPackage(installed: true, compatibility: nil) == "Installed" &&
+                  GameDetailFacetCopy.macSupport(installed: true, compatibility: supported) == "Plays on this Mac" &&
+                  GameDetailFacetCopy.installation(installed: true) == "Ready to play",
+                  "Installed detail facets use compatible consumer package, support and readiness copy")
+            check(GameDetailFacetCopy.pcPackage(installed: false, compatibility: nil) == "Check before install" &&
+                  GameDetailFacetCopy.macSupport(installed: false, compatibility: nil) == "Check before install",
+                  "Unknown package and Mac support use an install-time check instead of evidence terminology")
             let playback = CatalogTrailerPlayback()
             check(playback.player == nil && playback.error == nil,
                   "Constructing trailer state never creates an AVPlayer, starts autoplay or fetches a video")
