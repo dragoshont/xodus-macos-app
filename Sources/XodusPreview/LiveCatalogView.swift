@@ -202,7 +202,8 @@ struct LiveCatalogView: View {
             VStack(alignment: .leading, spacing: 14) {
                 LibraryLogoTitle(title: game.title, references: art.images[game.id]?.logos ?? [],
                                  allowsLoading: allowsArtworkLoading)
-                LibraryGameInformation(access: LibraryAccess(game), facts: facts[game.id])
+                LibraryGameInformation(access: LibraryAccess(game), gamePass: game.gamePass,
+                                       facts: facts[game.id])
                 if game.installed != nil { Label("Installed", systemImage: "internaldrive").font(.caption) }
                 LibraryGameSizeView(installed: game.installed, downloadBytes: facts[game.id]?.downloadBytes,
                                     allowsMeasurement: allowsArtworkLoading)
@@ -263,7 +264,8 @@ struct LiveCatalogView: View {
             CatalogArtworkView(reference: allowsArtworkLoading ? cover : nil,
                                status: cover == nil ? .absent : .available)
         } status: {
-            LibraryGameInformation(access: LibraryAccess(game), facts: facts[game.id], compact: true)
+            LibraryGameInformation(access: LibraryAccess(game), gamePass: game.gamePass,
+                                   facts: facts[game.id], compact: true)
             if game.installed != nil { Label("Installed", systemImage: "internaldrive").font(.caption) }
             LibraryGameSizeView(installed: game.installed, downloadBytes: facts[game.id]?.downloadBytes,
                                 allowsMeasurement: allowsArtworkLoading)

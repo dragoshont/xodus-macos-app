@@ -572,11 +572,12 @@ final class GameOperationsController: ObservableObject {
             if outcome.code == 12 { await loadCompatibility(productID: record.productID) }
             let unsupportedReason = compatibility[record.productID].flatMap { $0.supported ? nil : $0.reason }
                 ?? (progress?.phase == .failed ? progress?.message : nil)
+            let specificFailure = progress?.phase == .failed ? progress?.message : nil
             error = outcome.code == 20 && record.kind == .uninstall
                 ? "Your saves couldn't be preserved. The game wasn't uninstalled."
                 : outcome.code == 12 ? unsupportedReason
                     ?? GameScriptError.failed(outcome.code).localizedDescription
-                : GameScriptError.failed(outcome.code).localizedDescription
+                : specificFailure ?? GameScriptError.failed(outcome.code).localizedDescription
         }
         try await journal.clear()
         operation = nil

@@ -200,10 +200,23 @@ struct PCGamesTokens: Sendable {
     let refresh: String
 }
 
+enum PCGameAcquisitionKind: String, Sendable {
+    case unknown
+}
+
 struct PCGame: Identifiable, Sendable {
     let id: String
     let title: String
     let artwork: CatalogArtworkReference?
+    let acquisitionKind: PCGameAcquisitionKind
+
+    init(id: String, title: String, artwork: CatalogArtworkReference?,
+         acquisitionKind: PCGameAcquisitionKind = .unknown) {
+        self.id = id
+        self.title = title
+        self.artwork = artwork
+        self.acquisitionKind = acquisitionKind
+    }
 }
 
 struct PCGamesSnapshot: Sendable {

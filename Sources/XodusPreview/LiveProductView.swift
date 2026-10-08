@@ -43,6 +43,10 @@ struct LiveProductView: View {
     private var art: LibraryCatalogArtwork.Images? { catalog.images[product.id] }
     private var details: CatalogDetailFacts? { art?.detail }
     private var access: LibraryAccess? { owned != nil ? .owned : gamePass ? .gamePass : nil }
+    private var accessSummary: String {
+        if owned != nil, gamePass { return "Owned · In Game Pass" }
+        return access?.rawValue ?? "Not verified"
+    }
     private var landscape: [CatalogArtworkReference] {
         art?.landscape ?? product.artwork.filter { $0.role == .hero }
     }
@@ -120,7 +124,8 @@ struct LiveProductView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     LibraryLogoTitle(title: product.title, references: art?.logos ?? [],
                                      allowsLoading: allowsArtworkLoading)
-                    LibraryGameInformation(access: access, facts: art?.facts, xbox: stats.cache?.games[product.id])
+                    LibraryGameInformation(access: access, gamePass: gamePass,
+                                           facts: art?.facts, xbox: stats.cache?.games[product.id])
                     LibraryGameSizeView(installed: installed, downloadBytes: art?.facts.downloadBytes,
                                         allowsMeasurement: allowsArtworkLoading)
                     if let date = installed?.lastPlayedAt {
@@ -164,7 +169,7 @@ struct LiveProductView: View {
     private var evidence: some View {
         let compatibility = operations.compatibility[product.id]
         return Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 14) {
-            facet("Access", access?.rawValue ?? "Not verified")
+            facet("Access", accessSummary)
             facet("PC package", GameDetailFacetCopy.pcPackage(installed: installed != nil,
                                                                compatibility: compatibility))
             facet("Mac support", GameDetailFacetCopy.macSupport(installed: installed != nil,

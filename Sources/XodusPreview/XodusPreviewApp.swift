@@ -20,6 +20,8 @@ enum DevelopmentArguments {
             return arguments.count == 2
         case "--catalog-detail-check":
             return arguments.count == 4
+        case "--xbox-companion-check":
+            return arguments.count == 3
         case "--library-preview":
             if arguments.count == 2 { return true }
             if arguments.count == 3 { return arguments[2] == "--library-grid" }
@@ -48,10 +50,14 @@ final class PreviewDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         Task {
             await LibraryXboxStats.shared.shutdown()
+            await XboxCompanionController.shared.shutdown()
             let closed = await termination.shutdown(session: liveSession, runtime: runtimeSettings,
                                                     installedGames: installedGames, pcGames: pcGames,
                                                     gameOperations: gameOperations)
-            if !closed { LibraryXboxStats.shared.resumeAfterTerminationRefusal() }
+            if !closed {
+                LibraryXboxStats.shared.resumeAfterTerminationRefusal()
+                XboxCompanionController.shared.resumeAfterTerminationRefusal()
+            }
             if !closed, gameOperations?.canQuit == false {
                 let alert = NSAlert()
                 alert.messageText = "Wait before quitting Xodus"
@@ -102,6 +108,9 @@ struct XodusPreviewApp: App {
         if CommandLine.arguments.contains("--game-operation-check") { NativeChecks.launch(gameOperationsOnly: true) }
         if CommandLine.arguments.contains("--catalog-detail-check") {
             exit(PreviewChecks.checkDetailMetadata() ? 0 : 1)
+        }
+        if CommandLine.arguments.contains("--xbox-companion-check") {
+            exit(PreviewChecks.checkXboxCompanion() ? 0 : 1)
         }
         if CommandLine.arguments.contains("--self-check") {
             exit(PreviewChecks.run() ? 0 : 1)
@@ -158,14 +167,36 @@ struct XodusPreviewApp: App {
             }
             CommandMenu("Xodus") {
 #if !XODUS_SHIPPING
-                Button("Account") { state.showingAccount = true }
+                Button("Account") { state.openAccount() }
                     .disabled(state.fixtureMode)
+                    .keyboardShortcut("a", modifiers: [.command, .shift])
+                Button("Profile") { state.openAccount(.profile) }
+                    .disabled(state.fixtureMode)
+                    .keyboardShortcut("p", modifiers: [.command, .shift])
+                Button("Achievements") { state.openAccount(.achievements) }
+                    .disabled(state.fixtureMode)
+                    .keyboardShortcut("h", modifiers: [.command, .shift])
+                Button("My Consoles") { state.openAccount(.consoles) }
+                    .disabled(state.fixtureMode)
+                    .keyboardShortcut("c", modifiers: [.command, .shift])
+                Button("Engines") { state.openAccount(.engines) }
+                    .disabled(state.fixtureMode)
+                    .keyboardShortcut("e", modifiers: [.command, .shift])
                 Button("Return to live Xodus") {
                     state.fixtureMode = false
                     state.navigate(.library)
                 }.disabled(!state.fixtureMode)
 #else
-                Button("Account") { state.showingAccount = true }
+                Button("Account") { state.openAccount() }
+                    .keyboardShortcut("a", modifiers: [.command, .shift])
+                Button("Profile") { state.openAccount(.profile) }
+                    .keyboardShortcut("p", modifiers: [.command, .shift])
+                Button("Achievements") { state.openAccount(.achievements) }
+                    .keyboardShortcut("h", modifiers: [.command, .shift])
+                Button("My Consoles") { state.openAccount(.consoles) }
+                    .keyboardShortcut("c", modifiers: [.command, .shift])
+                Button("Engines") { state.openAccount(.engines) }
+                    .keyboardShortcut("e", modifiers: [.command, .shift])
 #endif
             }
         }

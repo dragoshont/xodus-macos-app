@@ -5,6 +5,34 @@ import XodusManagement
 
 @MainActor
 enum PreviewChecks {
+    static func checkXboxCompanion() -> Bool {
+        do {
+            let args = CommandLine.arguments
+            guard args.count == 4, args[1] == "--xbox-companion-check",
+                  let companionData = try GameScriptFiles.read(
+                    URL(fileURLWithPath: args[2]), maximumBytes: 2 * 1024 * 1024),
+                  let achievementData = try GameScriptFiles.read(
+                    URL(fileURLWithPath: args[3]), maximumBytes: 4 * 1024 * 1024) else {
+                throw GameScriptError.invalidReceipt
+            }
+            let companion = try XboxCompanionCache.decode(companionData)
+            let raw = try JSONDecoder().decode(XboxAchievementCache.self, from: achievementData)
+            let achievement = try XboxAchievementCache.decode(achievementData, titleID: raw.titleId)
+            guard companion.accountHash == achievement.accountHash else {
+                throw GameScriptError.invalidReceipt
+            }
+            print("Validated Xbox companion cache: profile \(companion.profile.state), " +
+                  "\(companion.friends.value?.count ?? 0) friends, " +
+                  "\(companion.consoles.value?.count ?? 0) consoles, " +
+                  "\(companion.recentGames.value?.count ?? 0) recent games; " +
+                  "\(achievement.achievements.count) achievements, complete \(achievement.complete).")
+            return true
+        } catch {
+            FileHandle.standardError.write(Data("Saved Xbox companion data was rejected.\n".utf8))
+            return false
+        }
+    }
+
     static func checkDetailMetadata() -> Bool {
         do {
             let args = CommandLine.arguments
@@ -62,6 +90,11 @@ enum PreviewChecks {
               "Ordinary startup and correctly shaped explicit check/review arguments remain supported")
         check(state.destination == .library && !state.showsRecentActivity,
               "Live startup opens the PC Library without claiming ownership or selecting activity")
+        state.openAccount(.engines)
+        check(state.showingAccount && state.accountDestination == .engines && !state.showingSetup,
+              "P6 Engines opens through the shared Account hub without adding a primary navigation tab")
+        state.showingAccount = false
+        state.accountDestination = .account
         state.navigate(.library)
         check(ArtAssets.images.count == 6, "Six original fixture image resources load")
         check(state.visibleGames.count == 4, "Library excludes catalog-only and unknown-access fixtures")
@@ -130,9 +163,63 @@ enum PreviewChecks {
         check(live.phase == .disconnected, "Presentation checks do not contact Xodus or Keychain")
         libraryChecks(check: check)
         detailChecks(check: check)
+        companionChecks(check: check)
         NativeUIChecks.run(check: check)
         print("\(count) preview checks, \(failures) failures. No backend connected.")
         return failures == 0
+    }
+
+    private static func companionChecks(check: (Bool, String) -> Void) {
+        do {
+            let hash = String(repeating: "a", count: 64)
+            let companionData = Data("""
+                {"ok":true,"accountHash":"\(hash)","checkedAt":"2026-10-09T00:00:00Z",
+                "profile":{"state":"available","value":{"gamertag":"OriginalGamer","displayName":"Original Gamer",
+                "avatarURL":"https://images-eds-ssl.xboxlive.com/image?url=fixture","gamerscore":1234,
+                "bio":null,"location":null}},
+                "friends":{"state":"available","value":[{"gamertag":"FriendOne","avatarURL":null,
+                "presenceState":"Online","presenceText":"Home"}]},
+                "consoles":{"state":"available","value":[{"id":"hashed-console","name":"Living Room Xbox",
+                "consoleType":"Xbox","powerState":"Connected","streamingEnabled":true,
+                "remoteManagementEnabled":false,"storage":[{"name":"Internal","freeBytes":100,"totalBytes":200}]}]},
+                "recentGames":{"state":"available","value":[{"titleId":"1693340366","name":"Original Game",
+                "devices":["PC","Xbox"],"lastPlayed":"2026-10-08T00:00:00Z",
+                "artworkURL":"http://store-images.s-microsoft.com/image/apps.fixture",
+                "achievementsUnlocked":1,"achievementsTotal":45,"gamerscore":15,"gamerscoreTotal":1000,
+                "productIds":["9MT5NJ5W7B8Z"]}]}}
+                """.utf8)
+            let companion = try XboxCompanionCache.decode(companionData)
+            check(companion.profile.value?.gamertag == "OriginalGamer" &&
+                  companion.friends.value?.count == 1 && companion.consoles.value?.count == 1 &&
+                  companion.recentGames.value?.first?.titleId == "1693340366",
+                  "P4/P5 companion cache keeps real profile, friends, console and play-history scopes separate")
+            check(XboxCompanionArtwork.reference(companion.profile.value?.avatarURL) != nil &&
+                  XboxCompanionArtwork.reference(companion.recentGames.value?.first?.artworkURL) != nil &&
+                  XboxCompanionArtwork.reference("https://example.com/avatar.png") == nil,
+                  "Xbox artwork permits only scoped Xbox avatar and normalized Microsoft Store origins")
+            let achievementData = Data("""
+                {"ok":true,"accountHash":"\(hash)","titleId":"1693340366",
+                "checkedAt":"2026-10-09T00:00:00Z","complete":true,
+                "achievements":[{"id":"1","name":"First","description":null,"progressState":"Achieved",
+                "unlocked":true,"unlockTime":"2026-10-08T00:00:00Z","gamerscore":15,"isSecret":false,
+                "artworkURL":"https://images-eds-ssl.xboxlive.com/image?url=achievement",
+                "rarityPercentage":10.5,"requirements":[{"id":"r","current":"1","target":"1"}]}],"error":null}
+                """.utf8)
+            let achievements = try XboxAchievementCache.decode(achievementData, titleID: "1693340366")
+            check(achievements.complete && achievements.achievements.count == 1 &&
+                  achievements.achievements[0].unlocked,
+                  "P4 achievements require exact title identity, earned state and complete-cache truth")
+            let partialData = Data(String(decoding: achievementData, as: UTF8.self)
+                .replacingOccurrences(of: "\"ok\":true", with: "\"ok\":false")
+                .replacingOccurrences(of: "\"complete\":true", with: "\"complete\":false")
+                .replacingOccurrences(of: "\"error\":null",
+                                      with: "\"error\":{\"reason\":\"page\",\"httpStatus\":503}").utf8)
+            let partial = try XboxAchievementCache.decode(partialData, titleID: "1693340366")
+            check(!partial.complete && partial.error?.reason == "page",
+                  "Partial achievement pages remain explicitly incomplete with their source error")
+        } catch {
+            check(false, "Synthetic Xbox companion contract failed: \(error.localizedDescription)")
+        }
     }
 
     private static func detailChecks(check: (Bool, String) -> Void) {
@@ -324,7 +411,7 @@ enum PreviewChecks {
                   "Game Pass filter preserves separate membership evidence")
             check(LibraryGame.collection(installed: [installed], owned: [owned], products: [],
                 gamePass: [pass], active: false).map(\.id) == [installed.storeId, owned.id],
-                  "Inactive subscription excludes feed-only titles without deleting installed or purchased games")
+                  "Inactive subscription excludes feed-only titles without deleting installed or account-held games")
             check(LibraryGame.visible(all, query: "  RIDGE  ", filter: .all, sort: .title).map(\.id) == [owned.id],
                   "Library query trims whitespace and searches only titles in the current collection")
             check(LibraryGame.visible(all, query: "", filter: .installed, sort: .recentlyPlayed).map(\.id) == [installed.storeId],
@@ -333,7 +420,14 @@ enum PreviewChecks {
                 owned: [PCGame(id: installed.storeId, title: "Account title", artwork: nil)],
                 products: [], gamePass: [try product(installed.storeId)], active: true)
             check(joined.count == 1 && joined[0].owned && joined[0].gamePass && joined[0].installed != nil,
-                  "One exact title can retain independent installation, purchase and subscription facets")
+                  "One exact title can retain independent installation, account entitlement and subscription facets")
+            check(LibraryAccess.badges(joined[0]) == [.owned, .gamePass] &&
+                  LibraryGame.visible(joined, query: "", filter: .owned, sort: .title).count == 1 &&
+                  LibraryGame.visible(joined, query: "", filter: .gamePass, sort: .title).count == 1,
+                  "Owned and Game Pass badges remain simultaneous and their filters overlap")
+            check(owned.acquisitionKind == .unknown &&
+                  joined[0].pc?.acquisitionKind == .unknown,
+                  "PC collection identity records unknown acquisition kind without inferring a paid purchase")
             let square = PCGamesClient.artwork(uri: "https://store-images.s-microsoft.com/image/apps.fixture",
                                               width: 400, height: 400, role: .boxArt)
             let squareGame = LibraryGame(id: owned.id, title: owned.title, installed: nil,
@@ -341,7 +435,7 @@ enum PreviewChecks {
             check(square != nil && squareGame.cover == nil, "Portrait Library covers do not stretch square Store icons")
             check(LibraryAccess(joined[0]) == .owned && LibraryAccess(all[0]) == nil &&
                   all.first(where: { $0.gamePass }).flatMap(LibraryAccess.init) == .gamePass,
-                  "Access badges preserve purchase priority and never turn installation into entitlement")
+                  "Primary access copy never turns installation into account entitlement")
             check(all[0].actionTitle == "Play" &&
                   all.filter { $0.installed == nil && $0.owned }.allSatisfy { $0.actionTitle == "Download" } &&
                   all.filter { $0.installed == nil && !$0.owned }.allSatisfy { $0.actionTitle == "Install" },

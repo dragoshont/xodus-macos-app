@@ -12,6 +12,7 @@ public enum CatalogArtworkStatus: String, Codable, Sendable {
 public enum CatalogArtworkSource: String, Codable, Sendable {
     case displayCatalog = "MicrosoftDisplayCatalog:v7.0"
     case titleHub = "XboxTitleHub:v2"
+    case xboxCompanion = "XboxCompanion"
 }
 
 public struct CatalogArtworkReference: Codable, Hashable, Sendable {
@@ -22,18 +23,31 @@ public struct CatalogArtworkReference: Codable, Hashable, Sendable {
     public let source: CatalogArtworkSource
 
     public func validatedURL() throws -> URL {
-        let prefix = "https://store-images.s-microsoft.com/image/"
-        let asset = url.dropFirst(prefix.count)
-        guard url.hasPrefix(prefix), url.utf8.count <= 2048,
-              asset.utf8.first.map({
-                  (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0)
-              }) == true,
-              !url.dropFirst(prefix.count).isEmpty,
-              url.dropFirst(prefix.count).utf8.allSatisfy({
-                  (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0)
-                      || [45, 46, 95].contains($0)
-              }), let result = URL(string: url) else {
-            throw ManagementError.invalidPayload
+        let result: URL
+        switch source {
+        case .displayCatalog, .titleHub:
+            let prefix = "https://store-images.s-microsoft.com/image/"
+            let asset = url.dropFirst(prefix.count)
+            guard url.hasPrefix(prefix), url.utf8.count <= 2048,
+                  asset.utf8.first.map({
+                      (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0)
+                  }) == true,
+                  !asset.isEmpty,
+                  asset.utf8.allSatisfy({
+                      (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0)
+                          || [45, 46, 95].contains($0)
+                  }), let parsed = URL(string: url) else {
+                throw ManagementError.invalidPayload
+            }
+            result = parsed
+        case .xboxCompanion:
+            guard url.utf8.count <= 2048, let parts = URLComponents(string: url),
+                  parts.scheme == "https", parts.host == "images-eds-ssl.xboxlive.com",
+                  parts.port == nil, parts.user == nil, parts.password == nil,
+                  parts.fragment == nil, !parts.path.isEmpty, let parsed = parts.url else {
+                throw ManagementError.invalidPayload
+            }
+            result = parsed
         }
 
         switch (width, height) {

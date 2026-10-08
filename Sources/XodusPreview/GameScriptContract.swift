@@ -4,6 +4,8 @@ import Foundation
 
 enum GameScriptCommand: String, Codable, Sendable {
     case serviceStatus, serviceSignIn, check, gamePassStatus, gameStats, stop, setup, install, uninstall
+    case xboxCompanion = "xbox-companion"
+    case xboxAchievements = "xbox-achievements"
 
     var file: String {
         switch self {
@@ -11,7 +13,7 @@ enum GameScriptCommand: String, Codable, Sendable {
         case .serviceSignIn: "private-xodus-service-signin.sh"
         case .check: "private-xodus-check.sh"
         case .gamePassStatus: "private-xodus-gamepass-status.sh"
-        case .gameStats: "private-xodus-manage.py"
+        case .gameStats, .xboxCompanion, .xboxAchievements: "private-xodus-manage.py"
         case .stop: "private-xodus-stop.sh"
         case .setup: "private-xodus-setup.sh"
         case .install: "private-xodus-install.sh"
@@ -94,7 +96,10 @@ struct GameScriptProgress: Decodable, Equatable, Sendable {
     static func parse(_ data: Data) throws -> Self {
         let value = try JSONDecoder().decode(Self.self, from: data)
         guard value.bytesDone >= 0, value.bytesTotal.map({ $0 >= value.bytesDone }) ?? true,
-              value.message.map({ $0.utf8.count <= 4096 }) ?? true else { throw GameScriptError.invalidProgress }
+              value.message.map({
+                  !$0.isEmpty && $0.utf8.count <= 4096 &&
+                  !$0.unicodeScalars.contains { CharacterSet.controlCharacters.contains($0) }
+              }) ?? true else { throw GameScriptError.invalidProgress }
         return value
     }
 }
@@ -186,6 +191,17 @@ struct GameScriptPaths: Sendable {
     var gamePassStatus: URL { compatibility.appendingPathComponent("gamepass.json") }
     var gameStats: URL { processed.deletingLastPathComponent().appendingPathComponent("game-stats.json") }
     var statsRefreshLedger: URL { journal.deletingLastPathComponent().appendingPathComponent("game-stats-refresh.json") }
+    var xboxCompanion: URL { processed.deletingLastPathComponent().appendingPathComponent("xbox-companion.json") }
+    var xboxAchievements: URL { processed.deletingLastPathComponent().appendingPathComponent("achievements") }
+    var xboxCompanionRefreshLedger: URL {
+        journal.deletingLastPathComponent().appendingPathComponent("xbox-companion-refresh.json")
+    }
+
+    func xboxAchievementsFile(titleID: String) throws -> URL {
+        guard titleID.range(of: #"^[0-9]{1,10}$"#, options: .regularExpression)
+                == titleID.startIndex..<titleID.endIndex else { throw GameScriptError.invalidReceipt }
+        return xboxAchievements.appendingPathComponent(titleID + ".json")
+    }
 
     func compatibilityFile(productID: String) throws -> URL {
         guard PCGamesClient.validProductID(productID) else { throw GameScriptError.invalidReceipt }
@@ -368,6 +384,12 @@ actor GameScriptRunner {
             guard arguments.count == 1, PCGamesClient.validProductID(arguments[0]) else {
                 throw GameScriptError.invalidReceipt
             }
+        } else if command == .xboxAchievements {
+            guard arguments.count == 1,
+                  arguments[0].range(of: #"^[0-9]{1,10}$"#, options: .regularExpression)
+                    == arguments[0].startIndex..<arguments[0].endIndex else {
+                throw GameScriptError.invalidReceipt
+            }
         } else {
             guard arguments.isEmpty else { throw GameScriptError.invalidReceipt }
         }
@@ -375,7 +397,7 @@ actor GameScriptRunner {
         cancellationRequested = pendingCancellation == runID
         pendingCancellation = nil
         defer { activeRunID = nil; process = nil }
-        if cancellationRequested, [.install, .check, .gameStats].contains(command) {
+        if cancellationRequested, [.install, .check, .gameStats, .xboxCompanion, .xboxAchievements].contains(command) {
             return GameScriptOutcome(code: 14, result: nil, log: nil)
         }
         let script = try GameScriptFiles.script(command, paths: paths)
@@ -387,8 +409,10 @@ actor GameScriptRunner {
         let env = InstalledGamesController.launchEnvironment(ProcessInfo.processInfo.environment)
         let child = try await Task.detached(priority: .userInitiated) {
             let child = Process()
-            child.executableURL = command == .gameStats ? script : URL(fileURLWithPath: "/bin/bash")
-            child.arguments = command == .gameStats ? ["game-stats", runID] : [script.path, runID] + arguments
+            let managed = [.gameStats, .xboxCompanion, .xboxAchievements].contains(command)
+            child.executableURL = managed ? script : URL(fileURLWithPath: "/bin/bash")
+            let operation = command == .gameStats ? "game-stats" : command.rawValue
+            child.arguments = managed ? [operation, runID] + arguments : [script.path, runID] + arguments
             child.environment = env
             child.standardInput = FileHandle.nullDevice
             child.standardOutput = FileHandle.nullDevice
@@ -399,7 +423,8 @@ actor GameScriptRunner {
         process = child
         if cancellationRequested, child.isRunning { child.terminate() }
         let deadline = ContinuousClock.now.advanced(by: command == .serviceStatus ? .seconds(30)
-            : [.check, .gamePassStatus, .gameStats, .stop, .setup].contains(command) ? .seconds(120) : .seconds(1800))
+            : [.check, .gamePassStatus, .gameStats, .xboxCompanion, .xboxAchievements,
+               .stop, .setup].contains(command) ? .seconds(120) : .seconds(1800))
         var lastProgress: GameScriptProgress?
         var observationError: GameScriptError?
         while child.isRunning {
@@ -414,7 +439,8 @@ actor GameScriptRunner {
                     if child.isRunning { child.terminate() }
                 }
             }
-            if [.serviceStatus, .serviceSignIn, .check, .gamePassStatus, .gameStats, .stop, .setup].contains(command) {
+            if [.serviceStatus, .serviceSignIn, .check, .gamePassStatus, .gameStats,
+                .xboxCompanion, .xboxAchievements, .stop, .setup].contains(command) {
                 if ContinuousClock.now >= deadline, observationError == nil {
                     observationError = .timeout
                     if child.isRunning { child.terminate() }
@@ -436,12 +462,13 @@ actor GameScriptRunner {
         let code = try GameScriptFiles.status(data)
         guard Int(child.terminationStatus) == code else { throw GameScriptError.statusMismatch }
         if let observationError { throw observationError }
-        if command == .install, code == 12,
+        if command == .install, code != 0,
            let data = try GameScriptFiles.read(paths.receipt(runID, suffix: "progress.json"), missingAllowed: true) {
             let value = try GameScriptProgress.parse(data)
             if value.phase == .failed { await progress(value) }
         }
-        let result = code == 0 && [.install, .serviceStatus, .check, .gamePassStatus, .gameStats, .stop, .setup].contains(command)
+        let result = code == 0 && [.install, .serviceStatus, .check, .gamePassStatus, .gameStats,
+                                   .xboxCompanion, .xboxAchievements, .stop, .setup].contains(command)
             ? try GameScriptFiles.read(paths.receipt(runID, suffix: "result.json")) : nil
         return GameScriptOutcome(code: code, result: result, log: GameScriptFiles.log(runID: runID, paths: paths))
     }

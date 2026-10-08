@@ -12,6 +12,15 @@ enum LiveLibraryScope {
     case games, recentActivity
 }
 
+enum AccountDestination: String, CaseIterable, Identifiable {
+    case account = "Account"
+    case profile = "Profile"
+    case achievements = "Achievements"
+    case consoles = "My Consoles"
+    case engines = "Engines"
+    var id: String { rawValue }
+}
+
 #if !XODUS_SHIPPING
 enum BrowseCategory: String, CaseIterable, Identifiable {
     case all = "All worlds", adventure = "Quiet adventures", space = "Space", puzzles = "Puzzles"
@@ -57,6 +66,7 @@ final class AppState: ObservableObject {
     @Published var message: String?
 #endif
     @Published var showingAccount = false
+    @Published var accountDestination: AccountDestination = .account
     var pendingDetailInstall: PCGame?
     @Published var showingSetup = false
     @Published var destination: Destination = .library
@@ -85,6 +95,12 @@ final class AppState: ObservableObject {
     func openRecentActivity() {
         navigate(.library)
         liveLibraryScope = .recentActivity
+    }
+
+    func openAccount(_ destination: AccountDestination = .account) {
+        showingSetup = false
+        accountDestination = destination
+        showingAccount = true
     }
 
     func loadRecentActivityIfVisible(session: LiveSession) async {
@@ -166,6 +182,7 @@ final class AppState: ObservableObject {
         selectedGame = nil
         showingWelcome = false
         showingAccount = false
+        accountDestination = .account
         message = nil
     }
 #endif

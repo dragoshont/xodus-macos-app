@@ -316,6 +316,19 @@ enum NativeUIChecks {
         check(account.window == nil && NSApplication.shared.windows.count == windows
               && session.authentication == nil && !session.accountBusy && !session.signInPending,
               "Lean Account and live-data layouts create no window or credential request")
+        for route in [AccountDestination.profile, .achievements, .consoles, .engines] {
+            state.accountDestination = route
+            let destination = NSHostingView(rootView: LiveAccountView(refreshStatusOnAppear: false)
+                .environmentObject(state).environmentObject(session))
+            destination.sizingOptions = []
+            destination.frame = CGRect(x: 0, y: 0, width: 560, height: 620)
+            destination.layoutSubtreeIfNeeded()
+            check(destination.window == nil && NSApplication.shared.windows.count == windows
+                  && !descendants(of: destination).compactMap { $0 as? NSScrollView }.isEmpty
+                  && session.authentication == nil && !session.accountBusy,
+                  "Account hub \(route.rawValue) destination lays out natively without starting authentication")
+        }
+        state.accountDestination = .account
         state.showingSetup = true
         let setupAccount = NSHostingView(rootView: LiveAccountView(refreshStatusOnAppear: false)
             .environmentObject(state).environmentObject(session))

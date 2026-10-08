@@ -17,6 +17,7 @@ struct LiveAccountView: View {
     @Environment(\.openSettings) private var openSettings
     @Environment(\.layoutDirection) private var layoutDirection
     @StateObject private var interaction = AccountInteraction()
+    @ObservedObject private var companion = XboxCompanionController.shared
 #if !XODUS_SHIPPING
     var refreshStatusOnAppear = true
 #endif
@@ -30,14 +31,17 @@ struct LiveAccountView: View {
                     Text("Xodus setup").font(.title2.bold())
                     GameSetupView(operations: state.gameOperations)
                 }
+            } else if state.accountDestination != .account {
+                accountDestination
             } else {
                 VStack(alignment: .leading, spacing: 20) {
                     HStack(spacing: 12) {
                         Image(systemName: "person.crop.circle").font(.largeTitle).foregroundStyle(.secondary)
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 5) {
-                            Text(session.accountNoticeTitle).font(.title2.bold())
+                            Text("Account").font(.title2.bold())
                                 .accessibilityIdentifier("xodus.account.status")
+                            Text(session.accountNoticeTitle).font(.headline).foregroundStyle(.secondary)
                         }
                         Spacer()
                         if session.accountBusy || session.signInPending { ProgressView().controlSize(.small) }
@@ -45,6 +49,17 @@ struct LiveAccountView: View {
                     Text(session.accountMessage)
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("xodus.account.statusExplanation")
+                    GroupBox("Xbox game-service account") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label(state.gameOperations.serviceLabel,
+                                  systemImage: state.gameOperations.serviceStatus?.signedIn == true
+                                      ? "checkmark.circle" : "person.crop.circle")
+                            Text("Gameplay, Profile, Achievements and My Consoles use this Xbox account. Microsoft Store purchasing credentials are not managed here, and the PC Library account can differ.")
+                                .font(.callout).foregroundStyle(.secondary)
+                        }
+                        .padding(.top, 2)
+                    }
+                    AccountHubDestinations()
                     GameServiceAccountView(operations: state.gameOperations, library: state.pcGames)
                     GroupBox("Downloaded artwork") {
                         VStack(alignment: .leading, spacing: 10) {
@@ -110,10 +125,13 @@ struct LiveAccountView: View {
                 }
             }
         } actions: {
-            if state.showingSetup {
+            if state.showingSetup || state.accountDestination != .account {
                 AccountActionsLayout(layoutDirection: layoutDirection) {
                     Button("Close", action: dismiss.callAsFunction).keyboardShortcut(.cancelAction)
-                    Button("Back to Account") { state.showingSetup = false }
+                    Button("Back to Account") {
+                        state.showingSetup = false
+                        state.accountDestination = .account
+                    }
                         .accessibilityIdentifier("xodus.setup.back")
                 }
             } else {
@@ -150,8 +168,15 @@ struct LiveAccountView: View {
                 .controlSize(.regular)
             }
         }
-        .task(id: state.showingSetup) {
+        .task(id: "\(state.showingSetup):\(state.accountDestination.rawValue)") {
             guard !state.showingSetup else { return }
+            if [.profile, .achievements, .consoles].contains(state.accountDestination) {
+                state.gameOperations.refreshService()
+                await state.gameOperations.waitForService()
+                await companion.refresh(for: state.gameOperations.serviceStatus)
+                return
+            }
+            guard state.accountDestination == .account else { return }
 #if !XODUS_SHIPPING
             if !refreshStatusOnAppear { return }
 #endif
@@ -163,6 +188,21 @@ struct LiveAccountView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Xodus removes its launcher sign-in and invalidates account-bound evidence. Other apps' credentials and game saves are not removed.")
+        }
+    }
+
+    @ViewBuilder private var accountDestination: some View {
+        switch state.accountDestination {
+        case .account:
+            EmptyView()
+        case .profile:
+            XboxProfileView(companion: companion)
+        case .achievements:
+            XboxAchievementsView(companion: companion, status: state.gameOperations.serviceStatus)
+        case .consoles:
+            XboxConsolesView(companion: companion)
+        case .engines:
+            EnginesView()
         }
     }
 }
@@ -203,7 +243,11 @@ struct LiveSettingsView: View {
                     Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.secondary)
                 }
             }
-            RuntimeProviderSection(settings: state.runtimeSettings, backendPath: session.backendPath)
+            Section("Engines") {
+                Text("Review CrossOver readiness and declared GPTK, Wine and graphics components on the dedicated Engines page.")
+                    .foregroundStyle(.secondary)
+                Button("Open Engines") { state.openAccount(.engines) }
+            }
             Section("Account") {
                 GameServiceAccountView(operations: state.gameOperations, library: state.pcGames)
                 LabeledContent("Status", value: session.accountLabel)

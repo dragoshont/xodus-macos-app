@@ -188,7 +188,9 @@ struct LiveLibraryView: View {
         let xbox = xboxStats.cache?.games[id]
         let facts = metadata?.genres.isEmpty == false ? metadata :
             xbox.map { LibraryCatalogFacts(genres: $0.genres, capabilities: metadata?.capabilities ?? []) } ?? metadata
-        return LibraryGameInformation(access: collection.first(where: { $0.id == id }).flatMap(LibraryAccess.init),
+        let game = collection.first(where: { $0.id == id })
+        return LibraryGameInformation(access: game.flatMap(LibraryAccess.init),
+                                      gamePass: game?.gamePass == true,
                                       facts: facts, xbox: xbox, compact: compact)
     }
 

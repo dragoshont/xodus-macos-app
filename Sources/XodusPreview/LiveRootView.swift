@@ -57,6 +57,7 @@ struct LiveRootView: View {
                     VStack(alignment: .leading, spacing: 28) {
                         GameSetupBannerView(operations: state.gameOperations) {
                             state.showingSetup = !session.signInPending
+                            state.accountDestination = .account
                             state.showingAccount = true
                         }
                         if state.destination == .library { library }
@@ -76,7 +77,7 @@ struct LiveRootView: View {
                          accountLabel: session.accountLabel,
                          accountSymbol: session.accountSymbol,
                          libraryContrast: immersiveDestination) {
-                state.showingAccount = true
+                state.openAccount()
             }
             if state.destination == .library && !state.showsRecentActivity {
                 ToolbarItem(placement: .primaryAction) {
@@ -145,6 +146,8 @@ struct LiveRootView: View {
             if startupAllowed {
                 await LibraryXboxStats.shared.refresh(for: state.gameOperations.serviceStatus,
                     signingIn: state.gameOperations.serviceSigningIn)
+                await XboxCompanionController.shared.refresh(
+                    for: state.gameOperations.serviceSigningIn ? nil : state.gameOperations.serviceStatus)
             }
         }
         .task {
@@ -161,7 +164,10 @@ struct LiveRootView: View {
             catch { return }
             await session.refreshCatalog(state.query)
         }
-        .sheet(isPresented: $state.showingAccount, onDismiss: { state.showingSetup = false }) {
+        .sheet(isPresented: $state.showingAccount, onDismiss: {
+            state.showingSetup = false
+            state.accountDestination = .account
+        }) {
 #if !XODUS_SHIPPING
             LiveAccountView(refreshStatusOnAppear: !PreviewExporter.liveDataRequested)
 #else
@@ -209,7 +215,7 @@ struct LiveRootView: View {
                 Button("Back to Library", systemImage: "chevron.left") { state.navigate(.library) }
                     .accessibilityIdentifier("xodus.library.back")
                 LiveRecentLibraryView(query: scopedQuery,
-                                      openAccount: { state.showingAccount = true },
+                                      openAccount: { state.openAccount() },
                                       findInStore: { state.findInStore($0, session: session) })
                     .accessibilityIdentifier("xodus.library.recentActivity")
             } else {

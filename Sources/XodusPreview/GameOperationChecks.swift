@@ -83,7 +83,8 @@ enum GameOperationChecks {
         check(try GameScriptProgress.parse(Data(#"{"phase":"preparing","bytesDone":0,"bytesTotal":0}"#.utf8))
             .bytesTotal == 0, "S5 zero total is valid without a percentage denominator")
         for value in [#"{"phase":"invented","bytesDone":0}"#, #"{"phase":"downloading","bytesDone":-1}"#,
-                      #"{"phase":"downloading","bytesDone":101,"bytesTotal":100}"#, #"{"phase":"downloading","bytesDone":1.5}"#] {
+                      #"{"phase":"downloading","bytesDone":101,"bytesTotal":100}"#, #"{"phase":"downloading","bytesDone":1.5}"#,
+                      #"{"phase":"failed","bytesDone":0,"message":"bad\u0001message"}"#] {
             do { _ = try GameScriptProgress.parse(Data(value.utf8)); check(false, "S5 malformed progress is refused") }
             catch { check(true, "S5 malformed progress is refused") }
         }
@@ -187,6 +188,11 @@ enum GameOperationChecks {
                 printf '{"phase":"failed","bytesDone":20,"bytesTotal":100,"message":"Neutral terminal package reason."}\\n' | publish "$receipts/$r.progress.json"
                 printf '12\\n' | publish "$receipts/$r.status"
                 exit 12
+            fi
+            if [ "$mode" = 13progress ]; then
+                printf '{"phase":"failed","bytesDone":20,"bytesTotal":100,"message":"Authorized broker returned no account credentials."}\\n' | publish "$receipts/$r.progress.json"
+                printf '13\\n' | publish "$receipts/$r.status"
+                exit 13
             fi
             case "$mode" in 10|11|12|13|14) printf '%s\\n' "$mode" | publish "$receipts/$r.status"; exit "$mode";; esac
             mkdir -p "$folder"
@@ -686,7 +692,7 @@ enum GameOperationChecks {
         check(installed.games.isEmpty && !operations.isBusy
               && FileManager.default.fileExists(atPath: repaired.folder),
               "S6 only status zero removes registration; app itself never deletes game files")
-        for code in [10, 11, 12, 13, 14] {
+        for code in [10, 11, 12, 14] {
             try writeMode(String(code))
             try await install()
             check(operations.error == GameScriptError.failed(code).localizedDescription && operations.log != nil
@@ -708,6 +714,11 @@ enum GameOperationChecks {
               && operations.compatibilityErrors[game.id] != nil,
               "B3: Code 12 falls back to its bounded terminal failed-progress message when cache is invalid")
         try privateFile(cached, compatibilityData)
+        try writeMode("13progress")
+        try await install()
+        check(operations.error == "Authorized broker returned no account credentials."
+              && operations.failureCode == 13 && installed.games.isEmpty,
+              "Install failures preserve a validated backend progress reason instead of generic code 13 copy")
         for mode in ["missing", "mismatch", "invalidprogress"] {
             try writeMode(mode)
             try await install()

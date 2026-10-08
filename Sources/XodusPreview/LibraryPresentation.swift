@@ -190,10 +190,18 @@ struct LibraryHero<Artwork: View, Poster: View, Information: View, Actions: View
 enum LibraryAccess: String {
     case owned = "Owned", gamePass = "Game Pass"
     var symbol: String { self == .owned ? "checkmark.seal" : "ticket" }
+    var help: String {
+        self == .owned
+            ? "Held by this Microsoft account. The service doesn't provide a purchase or acquisition type."
+            : "Included in the currently loaded PC Game Pass catalog."
+    }
     init?(_ game: LibraryGame) {
         if game.owned { self = .owned }
         else if game.gamePass { self = .gamePass }
         else { return nil }
+    }
+    static func badges(_ game: LibraryGame) -> [Self] {
+        (game.owned ? [.owned] : []) + (game.gamePass ? [.gamePass] : [])
     }
 }
 
@@ -220,6 +228,7 @@ private struct LibraryBadgeMaterial: ViewModifier {
 
 struct LibraryGameInformation: View {
     var access: LibraryAccess?
+    var gamePass = false
     var facts: LibraryCatalogFacts?
     var xbox: LibraryXboxStatsCache.Game?
     var localPlaySeconds: Double? = nil
@@ -228,7 +237,12 @@ struct LibraryGameInformation: View {
     var body: some View {
         VStack(alignment: .leading, spacing: compact ? 5 : 8) {
             HStack(spacing: 8) {
-                if let access { LibraryAccessBadge(access: access, compact: compact) }
+                if let access {
+                    LibraryAccessBadge(access: access, compact: compact).help(access.help)
+                }
+                if gamePass, access != .gamePass {
+                    LibraryAccessBadge(access: .gamePass, compact: compact).help(LibraryAccess.gamePass.help)
+                }
                 if let facts, !facts.genres.isEmpty {
                     Label(compact ? facts.genres[0] : facts.genres.joined(separator: " / "), systemImage: "tag")
                         .lineLimit(compact ? 1 : 2)

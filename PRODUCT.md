@@ -26,7 +26,20 @@ Develop and verify native code on the user's Mac over trusted SSH, using isolate
 
 **Proposed v1:** account connection, entitled PC library, scoped catalog discovery, edition selection, explicit eligibility and compatibility, installation planning, durable downloads/recovery, launch, safe updates/removal and redacted diagnostics.
 
-**Not promised in v1:** social features, achievements, cloud saves, checkout, cloud gaming, DLC management, all-PC-title support or a arbitrary runtime selector. Discover does not claim purchasability or ownership.
+**Not promised in v1:** party/chat/LFG, follower counts not supplied by Xbox,
+Rewards, offers/checkout, cloud saves, cloud gaming, DLC/mod management,
+all-PC-title support or arbitrary runtime downloads/removal. Discover does not
+claim purchasability or ownership.
+
+**Current parity scope:** Account is a native hub for the Xbox game-service
+Profile, real friends fields, per-title Achievements, cached My Consoles and a
+dedicated Engines page. Recent Xbox activity is play history, never an owned
+library. Remote Play is an official default-browser handoff to
+`https://www.xbox.com/remoteplay`; Xodus does not wake, power, address or stream
+from a console. The PC collection currently supplies an active account-held
+entitlement but no paid/free acquisition kind, so the app records acquisition
+as unknown and never relabels Owned as Purchased. Owned and Game Pass membership
+are independent and may appear together.
 
 **Today:** a native development app with a real management client, paired native
 authentication, public catalog, account-bound PC Library and a separate
@@ -107,7 +120,10 @@ system appearance; Dark and Light own-window review precedes shipping admission.
 Natural artwork-dependent toolbar appearance remains a compositor gate.
 
 The Library grid joins exact installed IDs, the loaded PC collection and active
-Game Pass feed evidence without promoting installation into purchase. Its saved
+Game Pass feed evidence without promoting installation into purchase. Owned
+means held by the PC-library account; its acquisition kind is currently unknown.
+Owned and In Game Pass badges remain independently visible and their filters
+overlap. Its saved
 PC library loads once on appearance after migration/presence checks; Refresh is
 in the toolbar/Command-R and Sign out is in Account. The isolated review uses
 broker-read-only loading instead, with Game Pass explicitly not loaded when no
