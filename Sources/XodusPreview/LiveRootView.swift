@@ -163,8 +163,21 @@ struct LiveRootView: View {
             LiveAccountView()
 #endif
         }
-        .sheet(item: $session.selectedProduct) { product in
-            LiveProductView(product: product, installed: state.installedGames.games.first { $0.storeId == product.id })
+        .sheet(item: $session.selectedProduct, onDismiss: {
+            if let game = state.pendingDetailInstall {
+                state.pendingDetailInstall = nil
+                if startupAllowed {
+                    Task { await state.gameOperations.prepareInstall(game) }
+                }
+            }
+        }) { product in
+            LiveProductView(product: product, library: state.pcGames,
+                            installedLibrary: state.installedGames, operations: state.gameOperations,
+                            allowsStartupTasks: startupAllowed, allowsArtworkLoading: libraryArtworkAllowed) { game in
+                guard startupAllowed, state.gameOperations.canStartMutation else { return }
+                state.pendingDetailInstall = game
+                session.selectedProduct = nil
+            }
         }
         .background { GameOperationPresentation(operations: state.gameOperations) }
         .background {

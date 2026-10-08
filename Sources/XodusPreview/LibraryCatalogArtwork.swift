@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import Foundation
+import OSLog
 import XodusManagement
 
 @MainActor
@@ -11,13 +12,16 @@ final class LibraryCatalogArtwork: ObservableObject {
         let landscape: [CatalogArtworkReference]
         let logos: [CatalogArtworkReference]
         let facts: LibraryCatalogFacts
+        let detail: CatalogDetailFacts?
         let product: CatalogProduct
     }
     @Published private(set) var images: [String: Images] = [:]
     @Published private(set) var error: String?
+    @Published private(set) var detailErrors: [String: String] = [:]
     private var requested = Set<String>()
     private var pending: Task<Void, Never>?
     private var scope: String?
+    private let logger = Logger(subsystem: "io.github.dragoshont.xodus", category: "catalog-detail")
 
     func load(ids: [String], market: String, language: String) async {
         if let pending { await pending.value }
@@ -25,6 +29,7 @@ final class LibraryCatalogArtwork: ObservableObject {
         if scope != nextScope {
             scope = nextScope
             images = [:]
+            detailErrors = [:]
             requested = []
         }
         let ids = Set(ids.filter(PCGamesClient.validProductID)).subtracting(requested).sorted()
@@ -47,6 +52,15 @@ final class LibraryCatalogArtwork: ObservableObject {
                     let products = try JSONDecoder().decode(PCGamesCatalog.self, from: response.data).Products
                     guard products.count <= batch.count, Set(products.map(\.ProductId)).count == products.count,
                           products.allSatisfy({ batch.contains($0.ProductId) }) else { throw PCGamesError.invalidResponse }
+                    var details: [String: CatalogDetailPayload.Product] = [:]
+                    do {
+                        let values = try JSONDecoder().decode(CatalogDetailPayload.self, from: response.data).Products
+                        guard values.count <= batch.count, Set(values.map(\.ProductId)).count == values.count,
+                              values.allSatisfy({ batch.contains($0.ProductId) }) else { throw PCGamesError.invalidResponse }
+                        details = Dictionary(uniqueKeysWithValues: values.map { ($0.ProductId, $0) })
+                    } catch {
+                        logger.warning("Optional public detail payload was rejected; library identity and artwork remain separate.")
+                    }
                     for product in products {
                         let art = product.LocalizedProperties?.first?.Images ?? []
                         func references(_ purposes: [String], portrait: Bool) -> [CatalogArtworkReference] {
@@ -74,10 +88,21 @@ final class LibraryCatalogArtwork: ObservableObject {
                             artwork: (heroes.first.map { [$0] } ?? []) + (cover.map { [$0] } ?? []),
                             market: market, language: language, source: "MicrosoftDisplayCatalog:v7",
                             pcCandidate: product.isPC)
+                        var detailFacts: CatalogDetailFacts?
+                        do {
+                            guard let value = details[product.ProductId] else { throw PCGamesError.invalidResponse }
+                            detailFacts = try CatalogDetailFacts(product: value, images: art,
+                                                               market: market, language: language)
+                            detailErrors[product.ProductId] = nil
+                        } catch {
+                            detailErrors[product.ProductId] = "Some game details couldn't be loaded. Try again."
+                            logger.warning("Optional public game details were rejected; game access and actions are unchanged.")
+                        }
                         images[product.ProductId] = Images(cover: cover, hero: heroes.first,
                             landscape: unique, logos: Self.logoReferences(in: art),
                             facts: LibraryCatalogFacts(properties: product.Properties,
-                                                       downloadBytes: product.pcDownloadBytes), product: detail)
+                                                       downloadBytes: product.pcDownloadBytes),
+                            detail: detailFacts, product: detail)
                     }
                     requested.formUnion(batch)
                 }
@@ -88,6 +113,11 @@ final class LibraryCatalogArtwork: ObservableObject {
         pending = task
         await task.value
         pending = nil
+    }
+
+    func retry(id: String, market: String, language: String) async {
+        requested.remove(id)
+        await load(ids: [id], market: market, language: language)
     }
 
     func preload() async -> Int {

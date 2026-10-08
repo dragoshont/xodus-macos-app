@@ -5,6 +5,43 @@ import XodusManagement
 
 @MainActor
 enum PreviewChecks {
+    static func checkDetailMetadata() -> Bool {
+        do {
+            let args = CommandLine.arguments
+            guard args.count == 5, args[1] == "--catalog-detail-check",
+                  PCGamesClient.market(args[3]) == args[3],
+                  PCGamesClient.language(args[4]) == args[4],
+                  let data = try GameScriptFiles.read(URL(fileURLWithPath: args[2]), maximumBytes: 4 * 1024 * 1024) else {
+                throw PCGamesError.invalidResponse
+            }
+            let products = try JSONDecoder().decode(PCGamesCatalog.self, from: data).Products
+            let payload = try JSONDecoder().decode(CatalogDetailPayload.self, from: data).Products
+            guard !products.isEmpty, products.count <= 20, products.count == payload.count,
+                  Set(products.map(\.ProductId)).count == products.count,
+                  Set(products.map(\.ProductId)) == Set(payload.map(\.ProductId)) else {
+                throw PCGamesError.invalidResponse
+            }
+            var videos = 0, screenshots = 0, ratings = 0, requirements = 0
+            for product in payload {
+                guard PCGamesClient.validProductID(product.ProductId),
+                      let base = products.first(where: { $0.ProductId == product.ProductId }) else {
+                    throw PCGamesError.invalidResponse
+                }
+                let facts = try CatalogDetailFacts(product: product,
+                    images: base.LocalizedProperties?.first?.Images ?? [], market: args[3], language: args[4])
+                videos += facts.trailers.count
+                screenshots += facts.screenshots.count
+                ratings += facts.storeRating == nil ? 0 : 1
+                requirements += facts.requirements == nil ? 0 : 1
+            }
+            print("Validated \(products.count) saved public products: \(videos) HLS trailers, \(screenshots) screenshots, \(ratings) Store ratings, \(requirements) PC requirement tables. No network, player or backend started.")
+            return true
+        } catch {
+            FileHandle.standardError.write(Data("Saved public detail metadata was rejected.\n".utf8))
+            return false
+        }
+    }
+
     static func run() -> Bool {
         var count = 0, failures = 0
         func check(_ condition: Bool, _ name: String) {
@@ -17,6 +54,12 @@ enum PreviewChecks {
         }
 
         let state = AppState()
+        check(!DevelopmentArguments.accepts(["--check-native"]) &&
+              !DevelopmentArguments.accepts(["--live-check", "--unknown"]),
+              "Unknown or conflicting development check arguments fail closed before ordinary startup")
+        check(DevelopmentArguments.accepts([]) && DevelopmentArguments.accepts(["--live-check"]) &&
+              DevelopmentArguments.accepts(["--library-preview", "/private/review", "--game-detail", "/private/catalog", "FIXTURE00002"]),
+              "Ordinary startup and correctly shaped explicit check/review arguments remain supported")
         check(state.destination == .library && !state.showsRecentActivity,
               "Live startup opens the PC Library without claiming ownership or selecting activity")
         state.navigate(.library)
@@ -86,9 +129,108 @@ enum PreviewChecks {
         check(live.diagnosticPreview == nil, "No diagnostics or raw engine text are captured at startup")
         check(live.phase == .disconnected, "Presentation checks do not contact Xodus or Keychain")
         libraryChecks(check: check)
+        detailChecks(check: check)
         NativeUIChecks.run(check: check)
         print("\(count) preview checks, \(failures) failures. No backend connected.")
         return failures == 0
+    }
+
+    private static func detailChecks(check: (Bool, String) -> Void) {
+        do {
+            let data = Data("""
+                {"Products":[{"ProductId":"FIXTURE00002","LocalizedProperties":[{"Language":"en-US",
+                "ProductDescription":"An original synthetic adventure.","DeveloperName":"Original Studio",
+                "PublisherName":"Original Publisher","CMSVideos":[{"HLS":"https://cdn-dynmedia-1.microsoft.com/is/content/microsoftassets/original-fixture-AVS.m3u8?packagedStreaming=true",
+                "Caption":"Original trailer","PreviewImage":{"Uri":"//store-images.s-microsoft.com/image/apps.fixture","Width":1920,"Height":1080}}]}],
+                "MarketProperties":[{"Markets":["US"],"OriginalReleaseDate":"2026-01-02T00:00:00.0000000Z",
+                "UsageData":[{"AggregateTimeSpan":"7Days","AverageRating":1,"RatingCount":1},
+                {"AggregateTimeSpan":"AllTime","AverageRating":4.5,"RatingCount":20}],
+                "ContentRatings":[{"RatingSystem":"ESRB","RatingId":"ESRB:T","RatingDescriptors":["ESRB:FanVio"],
+                "InteractiveElements":["ESRB:InGamPur"]}]}],
+                "DisplaySkuAvailabilities":[{"Sku":{"Properties":{"Packages":[{"PlatformDependencies":[{"PlatformName":"Windows.Desktop"}]}],
+                "HardwareProperties":{"MinimumProcessor":"Original PC CPU","RecommendedGraphics":"Original PC GPU"}}}}]}]}
+                """.utf8)
+            let product = try JSONDecoder().decode(CatalogDetailPayload.self, from: data).Products[0]
+            let screenshot = PCGamesCatalog.Product.Localized.Image(ImagePurpose: "Screenshot",
+                Uri: "//store-images.s-microsoft.com/image/apps.fixture", Width: 1920, Height: 1080)
+            let facts = try CatalogDetailFacts(product: product, images: [screenshot], market: "US", language: "en-US")
+            check(facts.description == "An original synthetic adventure." && facts.developer == "Original Studio",
+                  "D3 optional description/developer facts decode independently of access or installation")
+            check(facts.publisher == "Original Publisher" && facts.releaseDate != nil,
+                  "D3 public publisher/release metadata accepts the observed seven-digit ISO date shape")
+            check(facts.storeRating?.average == 4.5 && facts.storeRating?.count == 20,
+                  "Store rating uses only actual all-time average/count, never a short-period score or Metascore")
+            check(facts.contentRating?.label == "ESRB Teen" &&
+                  facts.contentRating?.interactiveElements == ["In-game purchases"],
+                  "Native content-rating copy retains real age-system and in-app-purchase semantics")
+            check(facts.trailers.count == 1 && facts.trailers[0].preview != nil,
+                  "Public HLS and preview decode without creating a player or downloading trailer bytes")
+            check(facts.screenshots.count == 1 && facts.screenshots[0].role == .hero,
+                  "Detail screenshots reuse validated bounded public-image references")
+            check(facts.requirements?.MinimumProcessor == "Original PC CPU" && !facts.requirementsVaryByEdition,
+                  "Requirements are selected only from an explicit Windows.Desktop SKU")
+            let empty = CatalogDetailPayload.Product(ProductId: "FIXTURE00002", LocalizedProperties: nil,
+                MarketProperties: nil, DisplaySkuAvailabilities: nil)
+            let absent = try CatalogDetailFacts(product: empty, images: [], market: "US", language: "en-US")
+            check(absent.description == nil && absent.trailers.isEmpty && absent.storeRating == nil &&
+                  absent.contentRating == nil && absent.requirements == nil,
+                  "Absent optional detail fields stay absent rather than invented placeholders or claims")
+            let otherMarket = try CatalogDetailFacts(product: product, images: [], market: "GB", language: "en-US")
+            check(otherMarket.releaseDate == nil && otherMarket.storeRating == nil && otherMarket.contentRating == nil,
+                  "Missing requested-market details never borrow another market's date or ratings")
+            do {
+                _ = try CatalogDetailFacts(product: product, images: [], market: "US", language: "fr-FR")
+                check(false, "Unrelated localized descriptions must be rejected")
+            } catch PCGamesError.invalidResponse {
+                check(true, "Detail metadata rejects unrelated language fallback")
+            }
+            let repeated = try CatalogDetailFacts(product: product, images: Array(repeating: screenshot, count: 20),
+                                                   market: "US", language: "en-US")
+            check(repeated.screenshots.count == 1, "Screenshot gallery deduplicates exact URLs before its twelve-image bound")
+            let consoleData = Data(String(decoding: data, as: UTF8.self)
+                .replacingOccurrences(of: "Windows.Desktop", with: "Xbox.Console").utf8)
+            let consoleProduct = try JSONDecoder().decode(CatalogDetailPayload.self, from: consoleData).Products[0]
+            let console = try CatalogDetailFacts(product: consoleProduct, images: [], market: "US", language: "en-US")
+            check(console.requirements == nil, "Console SKU hardware cannot masquerade as Windows PC requirements")
+            let alternateProperties = CatalogDetailPayload.Product.Availability.SKU.PropertiesDTO(
+                HardwareProperties: CatalogPCRequirements(MinimumProcessor: "Another PC CPU",
+                    RecommendedProcessor: nil, MinimumGraphics: nil, RecommendedGraphics: nil),
+                Packages: product.DisplaySkuAvailabilities?[0].Sku?.Properties?.Packages)
+            let differing = CatalogDetailPayload.Product(ProductId: product.ProductId,
+                LocalizedProperties: product.LocalizedProperties, MarketProperties: product.MarketProperties,
+                DisplaySkuAvailabilities: (product.DisplaySkuAvailabilities ?? []) + [
+                    .init(Sku: .init(Properties: alternateProperties))])
+            let editionFacts = try CatalogDetailFacts(product: differing, images: [], market: "US", language: "en-US")
+            check(editionFacts.requirements == nil && editionFacts.requirementsVaryByEdition,
+                  "Different PC editions disclose varying requirements rather than selecting an arbitrary SKU")
+            let whitespaceData = Data(String(decoding: data, as: UTF8.self)
+                .replacingOccurrences(of: "Original PC CPU", with: "  ")
+                .replacingOccurrences(of: "Original PC GPU", with: " Original PC GPU ").utf8)
+            let whitespaceProduct = try JSONDecoder().decode(CatalogDetailPayload.self, from: whitespaceData).Products[0]
+            let normalized = try CatalogDetailFacts(product: whitespaceProduct, images: [], market: "US", language: "en-US")
+            check(normalized.requirements?.MinimumProcessor == nil &&
+                  normalized.requirements?.RecommendedGraphics == "Original PC GPU",
+                  "Missing whitespace-only hardware fields hide; genuine values are normalized")
+            let playback = CatalogTrailerPlayback()
+            check(playback.player == nil && playback.error == nil,
+                  "Constructing trailer state never creates an AVPlayer, starts autoplay or fetches a video")
+            playback.stop()
+            check(playback.player == nil, "Closing unused trailer state remains side-effect-free")
+            for url in ["http://cdn-dynmedia-1.microsoft.com/is/content/microsoftassets/original-AVS.m3u8",
+                        "https://example.com/is/content/microsoftassets/original-AVS.m3u8",
+                        "https://cdn-dynmedia-1.microsoft.com/is/content/microsoftassets/original-AVS.m3u8?token=secret",
+                        "https://user@cdn-dynmedia-1.microsoft.com/is/content/microsoftassets/original-AVS.m3u8",
+                        "https://cdn-dynmedia-1.microsoft.com:443/is/content/microsoftassets/original-AVS.m3u8",
+                        "https://cdn-dynmedia-1.microsoft.com/is/content/microsoftassets/original-AVS.m3u8#fragment",
+                        "https://cdn-dynmedia-1.microsoft.com/is/content/microsoftassets/original-AVS.m3u8?packagedStreaming=true&packagedStreaming=true"] {
+                do {
+                    _ = try CatalogTrailer.validatedURL(url)
+                    check(false, "Invalid trailer source must be rejected")
+                } catch PCGamesError.invalidResponse {
+                    check(true, "Trailer source rejects unsafe scheme/host/credential/query without a network request")
+                }
+            }
+        } catch { check(false, "Synthetic D3 detail schema failed: \(error.localizedDescription)") }
     }
 
     private static func libraryChecks(check: (Bool, String) -> Void) {

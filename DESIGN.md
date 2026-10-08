@@ -158,7 +158,33 @@ all jobs finished normally. The user approved the direction and required the
 consumer-copy correction above before source freeze. This is not shipping
 admission. No proprietary cover, account record or capture is committed.
 
-**Detail/install/downloads (Operate):** full-bleed detail image, four independent evidence rows and one reasoned action; protected installation sheet with space/experimental consent; flat progress rows and recoverable errors. Artwork never replaces evidence.
+**Detail (Operate, D3 source candidate; visual review pending):** retain the
+original detail flow in a native resizable sheet: a 340-point landscape header,
+optional genuine title logo/portrait cover, existing native glass actions and
+four visible independent Access / PC download / Mac compatibility / On this Mac
+rows. Only a registered installed entry has Play/Stop. An uninstalled entitled
+entry has Install; dismissal hands off to the existing protected package,
+space and consent sheet, never download-and-play. Unknown access is explicit.
+Public approximate size never becomes a verified package or support check.
+
+Optional public content follows in flat sections: explicit trailer action and
+horizontal screenshots, a bounded description measure, game information and
+Windows PC requirements. Native AVKit `VideoPlayer`/`AVPlayer` streams validated
+public HLS only when requested, stops/releases its item on dismissal and reports
+failure with retry. No autoplay, video disk-cache download or Metascore. Image
+media uses the existing bounded artwork/cache pipeline. Windows requirements
+are labelled as publisher PC facts, not Mac support; conflicting editions are
+disclosed instead of selecting one arbitrarily. Missing fields hide. Xbox hours
+retain "on Xbox"; local Last played retains the installed Mac registry. Done
+and Escape remain native sheet controls. Normal application appearance and
+the previously approved native glass/Reduce Transparency treatment are retained.
+Read-only capture disables trailer playback and all private startup/actions.
+Detached checks and saved-public-response decoding are not compositor or
+observed AVPlayer playback proof.
+
+**Install/downloads (Operate):** protected installation sheet with
+space/experimental consent; flat progress rows and recoverable errors.
+Artwork never replaces evidence.
 
 **S3/S5/S6 native operations:** preserve the Library's artwork-led Installed /
 Continue Playing / Your PC games order. Install on an uninstalled PC tile opens

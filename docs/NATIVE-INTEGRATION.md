@@ -79,7 +79,71 @@ presentation/888 synthetic native checks and a shipping compile; native
 compositor proof is separate from synthetic checks. Root captured Dark/Light
 browse, populated search and empty states and confirmed every job finished
 normally. The user approved the direction with the consumer-copy batch above
-required before freeze. Final shipping admission remains pending.
+required before freeze. That correction is now frozen at
+`d2be5943943363afe9cfc4708719ef6bf057c56f`, with
+[exact-source CI](https://github.com/dragoshont/xodus-macos-app/actions/runs/37822024468)
+green. The earlier signed/captured D2 bundle remains unchanged; it does not
+contain the final copy correction. Final shipping admission remains pending.
+
+## D3 public game-detail source candidate
+
+D3 extends the native detail sheet without changing entitlement, package
+selection, compatibility or installation ownership. Optional DisplayCatalog
+detail data decodes separately from the base identity/artwork model, so rejected
+detail data cannot grant access or erase the PC Library. Description,
+developer/publisher, market-scoped release date, all-time Store average/count,
+recognized ESRB/PEGI descriptors and purchase notices are optional. Unknown
+fields are not invented. Explicit Windows.Desktop SKU CPU/GPU requirements
+are normalized and deduplicated; differing editions disclose that variation
+instead of presenting an arbitrary table. Opaque hardware codes are not
+interpreted as RAM/storage. Metascore is absent.
+
+Trailers use native `AVURLAsset`, `AVPlayerItem`, `AVPlayer` and AVKit
+`VideoPlayer`, created only from the explicit trailer action. The initial
+HLS URL is restricted to the observed HTTPS Microsoft dynmedia host/path,
+without credentials, ports, fragments or arbitrary query parameters.
+AVFoundation owns subsequent manifest/segment requests; this is not a claim
+that the image client's redirect or whole-body limits govern native streaming.
+No trailer is downloaded into the public-image disk cache. Playback failure
+is visible, Retry is explicit, and disappearance stops playback and releases
+the current item. Preview images and at most twelve deduplicated screenshots
+retain the existing bounded public-image pipeline.
+
+Four independent evidence facets remain visible. A positive backend
+`packageBytes` check is separate from the approximate public download estimate;
+zero/absent bytes do not imply a checked package. Play/Stop requires an installed
+registry entry and its existing launch guards. Owned/Game Pass Install dismisses
+detail before opening the existing protected support/space/consent flow;
+read-only startup and mutation fences guard both ends of that handoff.
+Xbox hours remain Xbox-wide; Last played uses only local registered history.
+
+The nonshipping saved-response check accepts:
+
+```text
+--catalog-detail-check <private-public-response.json> <market> <language>
+```
+
+It requires a safe current-user 0600 file, at most 4 MiB and twenty unique
+matching base/detail product IDs. Output is counts only; it performs no
+network, player or backend action. The private saved public response
+decoded one HLS trailer, five screenshots, a Store rating and one deduplicated
+Windows PC requirements table. No real response or title media is committed.
+
+The existing ordinary-startup-fenced read-only reviewer additionally accepts:
+
+```text
+--library-preview <private-output-directory> --game-detail <private-catalog.json> <productID>
+--library-preview <private-output-directory> --game-detail-info <private-catalog.json> <productID>
+```
+
+These retain the unchanged checked-catalog snapshot's provenance, empty feed
+membership, frozen-broker PC read and memory-only bounded public images.
+The second position scrolls to About the game. Trailer playback and private
+startup/actions remain disabled. Unknown or conflicting development arguments
+now exit 64 before ordinary startup, rather than treating a mistyped check flag
+as a launcher request. D3 has 159 detached presentation/schema checks;
+compilation and synthetic regression are not native visual sign-off, observed
+HLS playback or shipping admission. Root owns capture and final admission.
 
 ## Local imported-game Play
 

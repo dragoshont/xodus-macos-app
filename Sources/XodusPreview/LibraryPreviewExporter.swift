@@ -8,6 +8,7 @@ import XodusManagement
 @MainActor
 final class LibraryReviewPresentation: ObservableObject {
     @Published var showGrid = false
+    @Published var showDetailInformation = false
 }
 
 @MainActor
@@ -31,7 +32,10 @@ enum LibraryPreviewExporter {
                 let discoverBrowse = CommandLine.arguments.count == 5 && CommandLine.arguments[3] == "--discover-browse"
                 let discoverSearch = CommandLine.arguments.count == 6 && CommandLine.arguments[3] == "--discover-search"
                 let discover = discoverBrowse || discoverSearch
-                guard (CommandLine.arguments.count == 3 || grid || discover),
+                let detail = CommandLine.arguments.count == 6 &&
+                    ["--game-detail", "--game-detail-info"].contains(CommandLine.arguments[3])
+                let detailInformation = detail && CommandLine.arguments[3] == "--game-detail-info"
+                guard (CommandLine.arguments.count == 3 || grid || discover || detail),
                       CommandLine.arguments[1] == "--library-preview",
                       let appearance = ProcessInfo.processInfo.environment["XODUS_LIBRARY_PREVIEW_APPEARANCE"],
                       ["dark", "light"].contains(appearance),
@@ -80,7 +84,8 @@ enum LibraryPreviewExporter {
                 }
                 var catalogInputHash: String?
                 var catalogInputCount = 0
-                if discover {
+                var detailProductID: String?
+                if discover || detail {
                     let input = URL(fileURLWithPath: CommandLine.arguments[4])
                     guard let data = try GameScriptFiles.read(input, maximumBytes: 512 * 1024) else {
                         throw ManagementError.invalidPayload
@@ -98,15 +103,32 @@ enum LibraryPreviewExporter {
                     await LibraryCatalogArtwork.shared.load(ids: session.products.map(\.id),
                                                              market: session.market, language: session.language)
                     _ = await LibraryCatalogArtwork.shared.preload()
+                    if detail {
+                        let id = CommandLine.arguments[5]
+                        guard PCGamesClient.validProductID(id),
+                              let product = session.products.first(where: { $0.id == id }),
+                              let facts = LibraryCatalogArtwork.shared.images[id]?.detail else {
+                            throw ManagementError.invalidPayload
+                        }
+                        _ = await CatalogArtworkStore.shared.preload(facts.screenshots +
+                            facts.trailers.compactMap(\.preview))
+                        detailProductID = id
+                        session.selectedProduct = product
+                    }
                 }
                 try await Task.sleep(for: .seconds(2))
+                if detailInformation {
+                    presentation.showDetailInformation = true
+                    try await Task.sleep(for: .seconds(1))
+                }
                 if grid {
                     presentation.showGrid = true
                     try await Task.sleep(for: .seconds(1))
                 }
                 let record: [String: Any] = [
                     "status": "libraryReviewReady", "source": source, "appearance": appearance,
-                    "reviewPosition": discoverBrowse ? "discover-browse" : discoverSearch ? "discover-search" : grid ? "games" : "hero",
+                    "reviewPosition": detailInformation ? "detail-information" : detail ? "detail-overview" :
+                        discoverBrowse ? "discover-browse" : discoverSearch ? "discover-search" : grid ? "games" : "hero",
                     "pid": ProcessInfo.processInfo.processIdentifier, "width": 1440, "height": 874,
                     "actualWindowWidth": Int(window.frame.width), "actualWindowHeight": Int(window.frame.height),
                     "pcGameCount": count, "distinctSignedBuildReadFrozenBroker": distinctBrokerRead,
@@ -123,9 +145,13 @@ enum LibraryPreviewExporter {
                     "publicSizeGames": LibraryCatalogArtwork.shared.images.values.filter { $0.facts.downloadBytes != nil }.count,
                     "catalogInputSHA256": catalogInputHash ?? "",
                     "catalogInputProducts": catalogInputCount,
-                    "catalogProducts": discover ? session.products.count : 0,
+                    "catalogProducts": discover || detail ? session.products.count : 0,
                     "catalogCorpus": session.catalogCorpus,
                     "catalogQuery": discover ? state.query : "",
+                    "detailProductID": detailProductID ?? "",
+                    "detailTrailers": detailProductID.flatMap { LibraryCatalogArtwork.shared.images[$0]?.detail?.trailers.count } ?? 0,
+                    "detailScreenshots": detailProductID.flatMap { LibraryCatalogArtwork.shared.images[$0]?.detail?.screenshots.count } ?? 0,
+                    "trailerPlayerCreated": false, "trailerPlaybackAllowed": false,
                     "catalogGamePassMemberships": session.gamePassProductIDs.count,
                     "brokerWriteDeleteMigrationRequests": 0, "gameServiceActions": 0, "backendConnected": false,
                     "shippingAppReplaced": false, "nativeAuthorizationAllowedByBroker": false

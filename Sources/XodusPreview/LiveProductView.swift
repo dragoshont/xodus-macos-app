@@ -4,88 +4,224 @@ import XodusManagement
 
 struct LiveProductView: View {
     let product: CatalogProduct
-    var installed: InstalledGame? = nil
+    @ObservedObject var library: PCGamesController
+    @ObservedObject var installedLibrary: InstalledGamesController
+    @ObservedObject var operations: GameOperationsController
+    var allowsStartupTasks = true
+    var allowsArtworkLoading = true
+    let beginInstall: (PCGame) -> Void
     @EnvironmentObject private var session: LiveSession
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var catalog = LibraryCatalogArtwork.shared
-    private var hero: CatalogArtworkReference? {
-        CatalogArtworkReference.preferred(in: product.artwork, roles: [.hero])
+    @ObservedObject private var stats = LibraryXboxStats.shared
+
+    private var installed: InstalledGame? { installedLibrary.games.first { $0.storeId == product.id } }
+    private var owned: PCGame? { library.snapshot?.games.first { $0.id == product.id } }
+    private var gamePass: Bool { operations.gamePassActive && session.gamePassProductIDs.contains(product.id) }
+    private var art: LibraryCatalogArtwork.Images? { catalog.images[product.id] }
+    private var details: CatalogDetailFacts? { art?.detail }
+    private var access: LibraryAccess? { owned != nil ? .owned : gamePass ? .gamePass : nil }
+    private var landscape: [CatalogArtworkReference] {
+        art?.landscape ?? product.artwork.filter { $0.role == .hero }
     }
 
     var body: some View {
         VStack(spacing: 0) {
+            ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    if let hero {
-                        CatalogArtworkView(reference: hero, status: product.artworkStatus)
-                            .frame(height: 210)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                    HStack(alignment: .top, spacing: 18) {
-                        CatalogArtworkView(reference: CatalogArtworkReference.preferred(
-                            in: product.artwork, roles: [.boxArt, .poster, .tile, .hero]),
-                            status: product.artworkStatus, contentMode: .fit)
-                            .frame(width: 96, height: 96)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(product.title).font(.title.bold())
-                            if product.freshness == "cached" {
-                                Text("Offline details").foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 28) {
+                    header
+                    VStack(alignment: .leading, spacing: 28) {
+                        evidence
+                        if let error = catalog.detailErrors[product.id] ?? catalog.error {
+                            HStack {
+                                Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.secondary)
+                                Spacer()
+                                Button("Try Again") {
+                                    Task { await catalog.retry(id: product.id, market: product.market, language: product.language) }
+                                }.disabled(!allowsArtworkLoading)
                             }
                         }
-                        Spacer()
-                    }
-                    Text(session.productSummary(product))
-                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    LibraryGameSizeView(installed: installed,
-                                        downloadBytes: catalog.images[product.id]?.facts.downloadBytes)
-                    DisclosureGroup("Catalog info") {
-                        VStack(alignment: .leading, spacing: 18) {
-                            ForEach(product.editions) { edition in
-                                VStack(alignment: .leading, spacing: 10) {
-                                    Text("Edition \(edition.editionID)")
-                                        .font(.headline)
-                                    Grid(alignment: .leading, horizontalSpacing: 28, verticalSpacing: 14) {
-                                        facet("Access", edition.entitlement.kind.label)
-                                        facet("PC package", edition.installability.kind.label)
-                                        facet("Compatibility", edition.compatibility.kind.label)
-                                        facet("This Mac", "Not checked")
-                                    }
-                                    Text("Access: \(edition.entitlement.source)")
-                                    Text("PC package: \(edition.installability.reason ?? "No package authorization established.")")
-                                    Text("Compatibility: \(edition.compatibility.source)")
-                                    Text("This Mac: catalog metadata doesn't identify an installed edition. Library uses a separate local Installed list; a selected-folder marker check doesn't register a game.")
-                                    Divider()
+                        if let details {
+                            media(details)
+                            if let description = details.description ?? details.shortDescription {
+                                VStack(alignment: .leading, spacing: 14) {
+                                    Text("About the game").font(.title2.weight(.semibold))
+                                    Text(description).textSelection(.enabled)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .frame(maxWidth: 680, alignment: .leading)
                                 }
+                                .id("detail-information")
                             }
-                            Text("Source: \(product.source)")
-                            Text("Product \(product.productID)")
-                            Text("\(product.market) / \(product.language) - \(product.freshness) metadata")
-                            Text("Checked \(product.checkedAt)")
-                            if let resolved = product.resolvedLanguage,
-                               resolved.caseInsensitiveCompare(product.language) != .orderedSame {
-                                Text("Source metadata language: \(resolved). Requested scope: \(product.language).")
-                            }
-                            Text("Public catalog presence doesn't establish access. Installation requires verified access, a package plan and a paired gameplay runtime.")
-                            Text("Artwork: \(product.artworkStatus.rawValue). Image download failures don't change catalog metadata.")
+                            gameInfo(details)
+                            requirements(details)
                         }
-                        .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityLabel("Catalog info for \(product.title)")
+                        technicalDetails
+                    }.padding(.horizontal, 40).padding(.bottom, 32)
                 }
-                .padding(24)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            }
+#if !XODUS_SHIPPING
+            .onReceive(LibraryPreviewExporter.presentation.$showDetailInformation) { show in
+                if show { proxy.scrollTo("detail-information", anchor: .top) }
+            }
+#endif
             }
             Divider()
             HStack {
                 Spacer()
                 Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
-            }
-            .padding(20)
+            }.padding(20)
         }
-        .frame(minWidth: 480, idealWidth: 600, maxWidth: 680,
-               minHeight: 300, idealHeight: hero == nil ? 340 : 560, maxHeight: 680)
+        .frame(minWidth: 820, idealWidth: 1040, maxWidth: 1200,
+               minHeight: 600, idealHeight: 780, maxHeight: 850)
+        .task(id: "\(product.id):\(product.market):\(product.language)") {
+            guard allowsArtworkLoading else { return }
+            await catalog.load(ids: [product.id], market: product.market, language: product.language)
+        }
+    }
+
+    private var header: some View {
+        ZStack(alignment: .bottomLeading) {
+            LibraryLandscapeView(references: landscape, installed: installed, allowsLoading: allowsArtworkLoading)
+            LinearGradient(colors: [.clear, Color(nsColor: .windowBackgroundColor).opacity(0.55),
+                                    Color(nsColor: .windowBackgroundColor)],
+                           startPoint: .top, endPoint: .bottom)
+            HStack(alignment: .bottom, spacing: 24) {
+                if let cover = art?.cover ?? CatalogArtworkReference.preferred(in: product.artwork, roles: [.boxArt, .poster]) {
+                    CatalogArtworkView(reference: allowsArtworkLoading ? cover : nil, status: .available)
+                        .frame(width: 100, height: 150).clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 10)).accessibilityHidden(true)
+                }
+                VStack(alignment: .leading, spacing: 12) {
+                    LibraryLogoTitle(title: product.title, references: art?.logos ?? [],
+                                     allowsLoading: allowsArtworkLoading)
+                    LibraryGameInformation(access: access, facts: art?.facts, xbox: stats.cache?.games[product.id])
+                    LibraryGameSizeView(installed: installed, downloadBytes: art?.facts.downloadBytes,
+                                        allowsMeasurement: allowsArtworkLoading)
+                    if let date = installed?.lastPlayedAt {
+                        Text("Last played \(date.formatted(.relative(presentation: .named))) on this Mac")
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
+                    LibraryGlassCluster {
+                        if let installed {
+                            InstalledPlayButton(library: installedLibrary, operations: operations,
+                                                game: installed, usesGlass: true, prominent: true)
+                            InstalledGameActions(library: installedLibrary, operations: operations,
+                                                 game: installed, usesGlass: true)
+                        } else if owned != nil || gamePass {
+                            Button("Install") { beginInstall(owned ?? PCGame(product: product)) }
+                                .modifier(LibraryActionStyle())
+                                .disabled(!allowsStartupTasks || !operations.canStartMutation)
+                                .accessibilityLabel("Install \(product.title)")
+                        } else {
+                            Text("Access hasn't been verified.").font(.callout).foregroundStyle(.secondary)
+                        }
+                    }.controlSize(.large)
+                    if let installed { InstalledPlayError(library: installedLibrary, game: installed) }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 40).padding(.bottom, 24)
+        }.frame(height: 340).clipped().accessibilityElement(children: .contain)
+    }
+
+    private var evidence: some View {
+        Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 14) {
+            facet("Access", access?.rawValue ?? "Not verified")
+            facet("PC download", operations.compatibility[product.id]?.packageBytes.flatMap { bytes in
+                bytes > 0 ? bytes : nil
+            }.map {
+                "\($0.formatted(.byteCount(style: .file))) package checked"
+            } ?? "Package not checked")
+            facet("Mac compatibility", operations.compatibility[product.id]?.badge ?? "Not checked")
+            facet("On this Mac", installed == nil ? "Not installed" : "Installed")
+        }
+        .font(.callout).frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder private func media(_ details: CatalogDetailFacts) -> some View {
+        if !details.trailers.isEmpty || !details.screenshots.isEmpty {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Trailers and screenshots").font(.title2.weight(.semibold))
+                if let trailer = details.trailers.first {
+                    CatalogTrailerView(trailer: trailer, allowsLoading: allowsArtworkLoading,
+                                       allowsPlayback: allowsStartupTasks)
+                        .frame(maxWidth: 640, alignment: .leading)
+                }
+                if !details.screenshots.isEmpty {
+                    ScrollView(.horizontal) {
+                        LazyHStack(spacing: 16) {
+                            ForEach(Array(details.screenshots.enumerated()), id: \.element.url) { index, image in
+                                CatalogArtworkView(reference: allowsArtworkLoading ? image : nil, status: .available)
+                                    .frame(width: 320, height: 180).clipped()
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    .accessibilityLabel("Screenshot \(index + 1) of \(details.screenshots.count)")
+                            }
+                        }.scrollTargetLayout()
+                    }.scrollTargetBehavior(.viewAligned).scrollIndicators(.hidden)
+                }
+            }
+        }
+    }
+
+    private func gameInfo(_ details: CatalogDetailFacts) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if details.developer != nil || details.publisher != nil || details.releaseDate != nil ||
+                details.storeRating != nil || details.contentRating != nil {
+                Text("Game information").font(.title2.weight(.semibold))
+                Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 14) {
+                    if let developer = details.developer { facet("Developer", developer) }
+                    if let publisher = details.publisher { facet("Publisher", publisher) }
+                    if let release = details.releaseDate {
+                        facet("Release date", release.formatted(date: .abbreviated, time: .omitted))
+                    }
+                    if let rating = details.storeRating {
+                        facet("Microsoft Store rating",
+                              "\(rating.average.formatted(.number.precision(.fractionLength(1)))) / 5 · \(rating.count.formatted()) ratings")
+                    }
+                    if let rating = details.contentRating {
+                        facet("Content rating", ([rating.label] + rating.descriptors + rating.interactiveElements).joined(separator: " · "))
+                    }
+                }.font(.callout)
+            }
+        }
+    }
+
+    @ViewBuilder private func requirements(_ details: CatalogDetailFacts) -> some View {
+        if let requirements = details.requirements {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Windows PC requirements").font(.title2.weight(.semibold))
+                Text("Publisher-provided PC requirements, not a Mac compatibility assessment.")
+                    .font(.callout).foregroundStyle(.secondary)
+                Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 14) {
+                    if let cpu = requirements.MinimumProcessor { facet("Minimum CPU", cpu) }
+                    if let gpu = requirements.MinimumGraphics { facet("Minimum GPU", gpu) }
+                    if let cpu = requirements.RecommendedProcessor { facet("Recommended CPU", cpu) }
+                    if let gpu = requirements.RecommendedGraphics { facet("Recommended GPU", gpu) }
+                }.font(.callout)
+            }
+        } else if details.requirementsVaryByEdition {
+            Text("PC requirements vary by edition. Check the publisher's requirements for your edition.")
+                .font(.callout).foregroundStyle(.secondary)
+        }
+    }
+
+    private var technicalDetails: some View {
+        DisclosureGroup("Technical details") {
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(product.editions) { edition in
+                    Text("Edition \(edition.editionID)")
+                    Text("Access: \(edition.entitlement.kind.label) — \(edition.entitlement.source)")
+                    Text("PC package: \(edition.installability.kind.label)")
+                    Text("Compatibility: \(edition.compatibility.kind.label) — \(edition.compatibility.source)")
+                }
+                Text("Product \(product.productID)")
+                Text("Source: \(product.source), checked \(product.checkedAt)")
+                Text("Public metadata doesn't verify a package, an installed edition or Mac gameplay.")
+            }
+            .font(.caption).foregroundStyle(.secondary).textSelection(.enabled).padding(.top, 12)
+        }
     }
 
     private func facet(_ title: String, _ value: String) -> some View {
@@ -94,5 +230,4 @@ struct LiveProductView: View {
             Text(value).fixedSize(horizontal: false, vertical: true)
         }
     }
-
 }

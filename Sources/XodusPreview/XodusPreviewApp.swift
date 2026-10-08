@@ -9,6 +9,28 @@ private struct LibraryReviewAccessibility: ViewModifier {
         content.environment(\.xodusReviewReduceTransparency, LibraryPreviewExporter.reduceTransparencyRequested)
     }
 }
+
+enum DevelopmentArguments {
+    static func accepts(_ arguments: [String]) -> Bool {
+        guard let mode = arguments.first else { return true }
+        switch mode {
+        case "--fixture", "--self-check", "--live-check", "--media-check", "--stats-check", "--game-operation-check":
+            return arguments.count == 1
+        case "--export-preview", "--export-live", "--export-live-data":
+            return arguments.count == 2
+        case "--catalog-detail-check":
+            return arguments.count == 4
+        case "--library-preview":
+            if arguments.count == 2 { return true }
+            if arguments.count == 3 { return arguments[2] == "--library-grid" }
+            if arguments.count == 4 { return arguments[2] == "--discover-browse" }
+            return arguments.count == 5 &&
+                ["--discover-search", "--game-detail", "--game-detail-info"].contains(arguments[2])
+        default:
+            return false
+        }
+    }
+}
 #endif
 
 @MainActor
@@ -56,6 +78,10 @@ struct XodusPreviewApp: App {
             exit(64)
         }
 #else
+        guard DevelopmentArguments.accepts(Array(CommandLine.arguments.dropFirst())) else {
+            FileHandle.standardError.write(Data("Unsupported development arguments; ordinary startup was not attempted.\n".utf8))
+            exit(64)
+        }
         if Bundle.main.object(forInfoDictionaryKey: "XodusLibraryReviewBuild") as? Bool == true,
            !LibraryPreviewExporter.requested {
             FileHandle.standardError.write(Data("Use the staged read-only Library review job; ordinary startup is disabled.\n".utf8))
@@ -74,6 +100,9 @@ struct XodusPreviewApp: App {
         if CommandLine.arguments.contains("--media-check") { NativeChecks.launch(mediaOnly: true) }
         if CommandLine.arguments.contains("--stats-check") { NativeChecks.launch(statsOnly: true) }
         if CommandLine.arguments.contains("--game-operation-check") { NativeChecks.launch(gameOperationsOnly: true) }
+        if CommandLine.arguments.contains("--catalog-detail-check") {
+            exit(PreviewChecks.checkDetailMetadata() ? 0 : 1)
+        }
         if CommandLine.arguments.contains("--self-check") {
             exit(PreviewChecks.run() ? 0 : 1)
         }

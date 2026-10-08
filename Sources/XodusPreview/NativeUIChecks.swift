@@ -76,6 +76,20 @@ enum NativeUIChecks {
                           !state.pcGames.busy && !state.gameOperations.isBusy,
                           "Discover \(query.isEmpty ? "browse" : "search") lays out without backend/media actions at \(Int(width)) in \(appearance.rawValue)")
                 }
+                do {
+                    let product = try LibraryGame.details(id: "FIXTURE00002", title: "Original synthetic detail",
+                        market: "US", language: "en-US", source: "synthetic-detail-layout", pcCandidate: true)
+                    let detail = NSHostingView(rootView: LiveProductView(product: product, library: state.pcGames,
+                        installedLibrary: state.installedGames, operations: state.gameOperations,
+                        allowsStartupTasks: false, allowsArtworkLoading: false, beginInstall: { _ in })
+                        .environmentObject(session))
+                    detail.sizingOptions = []
+                    detail.appearance = NSAppearance(named: appearance)
+                    detail.frame = CGRect(x: 0, y: 0, width: width, height: 780)
+                    detail.layoutSubtreeIfNeeded()
+                    check(detail.window == nil && session.phase == .disconnected && !state.gameOperations.isBusy,
+                          "D3 missing-media detail remains detached and side-effect-free at \(Int(width)) in \(appearance.rawValue)")
+                } catch { check(false, "D3 synthetic layout fixture decodes without real data") }
             }
         }
         let runtime = RuntimeProviderSettings()
@@ -248,17 +262,20 @@ enum NativeUIChecks {
             }
         }
         if let product = session.products.first {
-            for size in [CGSize(width: 480, height: 280), CGSize(width: 600, height: 300), CGSize(width: 680, height: 620)] {
-                let host = NSHostingView(rootView: LiveProductView(product: product).environmentObject(session))
+            for size in [CGSize(width: 820, height: 600), CGSize(width: 1040, height: 780), CGSize(width: 1200, height: 850)] {
+                let host = NSHostingView(rootView: LiveProductView(product: product, library: state.pcGames,
+                    installedLibrary: state.installedGames, operations: state.gameOperations,
+                    allowsStartupTasks: false, allowsArtworkLoading: false, beginInstall: { _ in })
+                    .environmentObject(session))
                 host.sizingOptions = []
                 host.frame = CGRect(origin: .zero, size: size)
                 host.layoutSubtreeIfNeeded()
                 let scrollViews = descendants(of: host).compactMap { $0 as? NSScrollView }
-                check(host.window == nil && host.fittingSize.width <= 680 && host.fittingSize.height <= 620
+                check(host.window == nil && host.fittingSize.width <= 1200 && host.fittingSize.height <= 850
                       && scrollViews.allSatisfy {
                           !$0.hasHorizontalScroller && ($0.documentView?.bounds.width ?? 0) <= size.width + 1
                       },
-                      "Replayed public multi-edition detail fits compact and expanded native sheets without horizontal scrolling")
+                      "Replayed public multi-edition detail fits constrained and expanded native sheets without horizontal scrolling")
             }
         }
         let account = NSHostingView(rootView: LiveAccountView(refreshStatusOnAppear: false)

@@ -37,9 +37,22 @@ subscription access or play-and-download shortcut is added. A separate read-only
 review can consume an unchanged private checked-catalog snapshot and perform
 local title matching. That snapshot is not relabelled live Game Pass discovery
 or Microsoft Store network search. Root captured Dark/Light browse, search and
-empty states with normal finishes, and the user approved the direction subject
-to a consumer-copy correction. Explore games/More games and native No Results
-copy replace evidence terminology. Shipping admission remains separate.
+empty states with normal finishes. The approved consumer-copy correction is
+frozen at `d2be594`, with [exact-source CI](https://github.com/dragoshont/xodus-macos-app/actions/runs/37822024468)
+green. Explore games/More games and native No Results copy replace evidence
+terminology. Shipping admission remains separate.
+
+**Game detail (D3 source candidate; visual review pending):** the native detail
+sheet adds optional public descriptions, screenshots, developer/publisher,
+release date, content notices, Microsoft Store ratings and Windows PC CPU/GPU
+requirements. Public capabilities remain distinct from Mac compatibility.
+Trailers use native AVKit HLS streaming only after an explicit action; opening
+detail never creates a player or downloads a whole video. Missing fields hide,
+different PC editions do not become one invented requirement table, and there
+is no Metascore. Four evidence facets remain visible; registered installed
+games retain Play/Stop and uninstalled entitled games retain protected Install,
+without automatic playback. Source checks are not native capture, observed
+trailer playback or shipping acceptance.
 
 **Phase 2 B5/B7/B8/B9 (`fee7f5f`, admitted and installed; live acceptance partial):** Account
 shows cached PC Game Pass status and an explicit fenced Check. Active status

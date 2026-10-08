@@ -57,6 +57,7 @@ final class AppState: ObservableObject {
     @Published var message: String?
 #endif
     @Published var showingAccount = false
+    var pendingDetailInstall: PCGame?
     @Published var showingSetup = false
     @Published var destination: Destination = .library
     @Published var query = ""
