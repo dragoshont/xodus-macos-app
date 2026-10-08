@@ -107,6 +107,36 @@ enum PreviewChecks {
             }
             let pass = try product("FIXTURE00003")
             let catalogOnly = try product("FIXTURE00004")
+            let browseFacts = [pass.id: LibraryCatalogFacts(genres: ["Puzzle"])]
+            check(DiscoverBrowse.genres(products: [pass, catalogOnly], facts: browseFacts) == ["Puzzle"],
+                  "Discover genres come only from supplied catalog facts, not invented editorial categories")
+            check(DiscoverBrowse.visible(products: [pass, catalogOnly], facts: browseFacts, genre: nil).count == 2,
+                  "Empty-query browse retains the actual catalog order and count")
+            check(DiscoverBrowse.visible(products: [pass, catalogOnly], facts: browseFacts, genre: "Puzzle").map(\.id) == [pass.id],
+                  "Genre filtering stays within the loaded page and hides titles with missing genre")
+            check(DiscoverBrowse.visible(products: [pass], facts: browseFacts, genre: "Absent").isEmpty,
+                  "An unavailable genre has a real empty result instead of manufactured recommendations")
+            check(!DiscoverBrowse.canInstall(owned: false, gamePass: true, subscriptionActive: false),
+                  "Discover feed membership without a confirmed subscription does not enable Install")
+            check(DiscoverBrowse.canInstall(owned: true, gamePass: false, subscriptionActive: false) &&
+                  DiscoverBrowse.canInstall(owned: false, gamePass: true, subscriptionActive: true),
+                  "Purchased or confirmed Game Pass access preserves the protected Install route")
+            check(!DiscoverBrowse.canInstall(owned: false, gamePass: false, subscriptionActive: true),
+                  "An active subscription does not grant installation to arbitrary checked-catalog titles")
+            check(try CatalogReviewSnapshot(products: [pass, catalogOnly]).pcProducts(market: "US", language: "en-US").count == 2,
+                  "Read-only catalog snapshots validate unchanged public PC records in the exact market/language")
+            do {
+                _ = try CatalogReviewSnapshot(products: [pass, pass]).pcProducts(market: "US", language: "en-US")
+                check(false, "Duplicate snapshot identities must fail closed")
+            } catch ManagementError.invalidPayload {
+                check(true, "Duplicate snapshot identities fail closed without inventing catalog membership")
+            }
+            do {
+                _ = try CatalogReviewSnapshot(products: [pass]).pcProducts(market: "GB", language: "en-US")
+                check(false, "Wrong-scope catalog snapshots must fail closed")
+            } catch ManagementError.invalidPayload {
+                check(true, "Wrong-scope catalog snapshots fail closed before a public media load")
+            }
             let all = LibraryGame.collection(installed: [installed, installed], owned: [owned, owned],
                 products: [catalogOnly], gamePass: [pass, pass], active: true)
             check(all.count == 3 && Set(all.map(\.id)).count == 3,

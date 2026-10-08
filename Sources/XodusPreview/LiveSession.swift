@@ -1299,6 +1299,23 @@ final class LiveSession: ObservableObject {
         gamePassProductIDs.formUnion(page.products.map(\.id))
     }
 
+#if !XODUS_SHIPPING
+    func loadReadOnlyCatalogPreview(_ snapshot: CatalogReviewSnapshot, query: String) throws {
+        guard LibraryPreviewExporter.requested, phase == .disconnected,
+              query.utf8.count <= 128,
+              !query.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains) else {
+            throw ManagementError.invalidPayload
+        }
+        let checked = try snapshot.pcProducts(market: market, language: language)
+        invalidateCatalogScope()
+        currentQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        products = checked.filter {
+            currentQuery.isEmpty || $0.title.range(of: currentQuery, options: .caseInsensitive) != nil
+        }
+        catalogCorpus = "observedPublicProducts"
+    }
+#endif
+
     private func invalidateCatalogScope() {
         queryGeneration += 1
         queuedCatalog = nil

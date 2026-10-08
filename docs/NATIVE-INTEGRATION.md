@@ -10,7 +10,10 @@ The user approved C3's native regular-glass Library direction. Source
 Its separate signed reviewer is not installed and never refreshes Xbox stats.
 The shipping app remains independently admitted at `2d420d1`.
 
-Follow-up source, still pending shipping admission, extends the fixed private
+Follow-up source `6485592cc99294ca206c0c07a2e3f7efbe10c815` is pushed and passed
+[exact-source CI](https://github.com/dragoshont/xodus-macos-app/actions/runs/37816907637),
+110 presentation/888 synthetic native checks and shipping compilation. It is
+still pending live frontend acceptance and shipping admission. It extends the fixed private
 script protocol with `private-xodus-manage.py game-stats <generatedRunId>`:
 no extra arguments, a 120-second deadline, the usual private status/result
 receipts and exact process-exit/status agreement. The result's `accountHash`
@@ -37,6 +40,38 @@ credentials or trailers are stored; public product metadata remains a separate
 bounded request. Cache clearing fences in-flight old-generation writes. Read-only
 review/export modes disable disk persistence. Neither these checks nor Root's
 backend verification establish live acceptance of an installed follow-up app.
+
+## Discover D2 source and read-only review
+
+D2 extends the approved C3 native regular-glass chrome into Discover and keeps
+the existing public discovery/query contract, exact owned-first matching and
+protected Install/registered Play routes. Actual loaded DisplayCatalog genres
+drive the browse tiles and local page filter; search, partial errors, cancellation
+and paging retain their original backend ownership. Public metadata resets on
+market/language change.
+
+The existing fenced reviewer additionally accepts:
+
+```text
+--library-preview <private-output-directory> --discover-browse <private-catalog.json>
+--library-preview <private-output-directory> --discover-search <private-catalog.json> <query>
+```
+
+The private input is `{products:[<unchanged CatalogProduct records>]}`. Reads
+require a current-user regular 0600 file without symlink ancestors, at most
+512 KiB, at most 64 unique valid product IDs and matching public PC
+market/language/artwork/unknown-access scope. Non-PC candidates are not
+presented as PC games. The raw input digest/count and filtered rendered count
+are recorded separately in private readiness evidence.
+
+These are checked-catalog snapshots and local search, not fabricated
+`CatalogDiscovery`/`CatalogQuery` responses. No feed membership, new checkedAt,
+revision or cursor is invented. The frozen broker PC-library read and bounded
+public art remain permitted; refreshed credentials stay in memory. Ordinary
+startup and interaction stay disabled. No engine, service, stats command, private
+mutation or production media-cache write is enabled. D2 has 128 detached
+presentation/888 synthetic native checks and a shipping compile; native
+compositor capture, visual sign-off and final shipping admission remain pending.
 
 ## Local imported-game Play
 

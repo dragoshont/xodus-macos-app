@@ -17,9 +17,16 @@ final class LibraryCatalogArtwork: ObservableObject {
     @Published private(set) var error: String?
     private var requested = Set<String>()
     private var pending: Task<Void, Never>?
+    private var scope: String?
 
     func load(ids: [String], market: String, language: String) async {
         if let pending { await pending.value }
+        let nextScope = "\(PCGamesClient.market(market)):\(PCGamesClient.language(language).lowercased())"
+        if scope != nextScope {
+            scope = nextScope
+            images = [:]
+            requested = []
+        }
         let ids = Set(ids.filter(PCGamesClient.validProductID)).subtracting(requested).sorted()
         guard !ids.isEmpty else { return }
         let task = Task {

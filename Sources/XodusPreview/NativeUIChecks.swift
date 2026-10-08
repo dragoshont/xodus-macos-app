@@ -63,6 +63,19 @@ enum NativeUIChecks {
                 check(live.window == nil && session.phase == .disconnected && !state.pcGames.busy &&
                       !state.gameOperations.isBusy && !state.installedGames.loading,
                       "Library signed-out layout remains detached and side-effect-free at \(Int(width)) in \(appearance.rawValue)")
+                for query in ["", "synthetic query"] {
+                    let discover = NSHostingView(rootView: LiveCatalogView(library: state.pcGames,
+                        installed: state.installedGames, operations: state.gameOperations, query: query,
+                        allowsArtworkLoading: false, allowsStartupTasks: false, clearSearch: {})
+                        .environmentObject(session))
+                    discover.sizingOptions = []
+                    discover.appearance = NSAppearance(named: appearance)
+                    discover.frame = CGRect(x: 0, y: 0, width: width, height: 874)
+                    discover.layoutSubtreeIfNeeded()
+                    check(discover.window == nil && session.phase == .disconnected &&
+                          !state.pcGames.busy && !state.gameOperations.isBusy,
+                          "Discover \(query.isEmpty ? "browse" : "search") lays out without backend/media actions at \(Int(width)) in \(appearance.rawValue)")
+                }
             }
         }
         let runtime = RuntimeProviderSettings()

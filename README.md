@@ -28,6 +28,18 @@ adds account-bound ordinary stats refresh, throttled durably to one attempt per
 15 minutes, and bounded persistent public-image caching. These follow-ups are
 not installed or live-app-accepted; final D8 admission remains required.
 
+**Discover design refresh (D2 source; visual review pending):** empty-query browse
+uses a public title's landscape artwork and one reasoned native action, followed
+by genres actually present in the loaded catalog and portrait covers. Search
+keeps owned matches first and exact-ID deduplication. The approved Library
+regular-glass toolbar treatment is reused; no invented editorial genres,
+subscription access or play-and-download shortcut is added. A separate read-only
+review can consume an unchanged private checked-catalog snapshot and perform
+local title matching. That snapshot is not relabelled live Game Pass discovery
+or Microsoft Store network search. D2 passed 128 detached presentation and 888
+synthetic native-session checks plus shipping compilation; compositor review
+and shipping admission remain separate.
+
 **Phase 2 B5/B7/B8/B9 (`fee7f5f`, admitted and installed; live acceptance partial):** Account
 shows cached PC Game Pass status and an explicit fenced Check. Active status
 enables a separate Game Pass shelf after Your PC games and the existing

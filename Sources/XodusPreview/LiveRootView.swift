@@ -39,6 +39,9 @@ struct LiveRootView: View {
             : session.supports(.query) ? "Search your games and Microsoft Store" : "Search your games and checked catalog"
     }
     private var refreshHelp: String {
+        if state.destination == .discover {
+            return session.discoveryCheckedAt.map { "Refresh Discover - checked \($0)" } ?? "Refresh Discover"
+        }
         guard let snapshot = state.pcGames.snapshot else { return "Refresh Library" }
         let age = snapshot.updatedAt.formatted(.relative(presentation: .named))
         return "Refresh Library - updated \(age)"
@@ -56,10 +59,10 @@ struct LiveRootView: View {
                 else if state.destination == .discover { catalog }
                 else { LiveActivityView(operations: state.gameOperations) }
             }
-            .padding(state.destination == .library && !state.showsRecentActivity ? 0 : 30)
+            .padding(immersiveDestination ? 0 : 30)
         }
-        .modifier(LibraryScrollEdge(enabled: state.destination == .library && !state.showsRecentActivity))
-        .modifier(LibraryImmersion(enabled: state.destination == .library && !state.showsRecentActivity))
+        .modifier(LibraryScrollEdge(enabled: immersiveDestination))
+        .modifier(LibraryImmersion(enabled: immersiveDestination))
         .background(Color(nsColor: .windowBackgroundColor))
         .toolbar {
             XodusToolbar(selection: state.navigationSelection, searchText: $state.query,
@@ -67,7 +70,7 @@ struct LiveRootView: View {
                          searchPlaceholder: searchPlaceholder, searchEnabled: searchEnabled,
                          accountLabel: session.accountLabel,
                          accountSymbol: session.accountSymbol,
-                         libraryContrast: state.destination == .library && !state.showsRecentActivity) {
+                         libraryContrast: immersiveDestination) {
                 state.showingAccount = true
             }
             if state.destination == .library && !state.showsRecentActivity {
@@ -94,6 +97,17 @@ struct LiveRootView: View {
                         .modifier(NativeToolbarIconStyle())
                         .disabled(!startupAllowed || state.pcGames.busy)
                         .accessibilityIdentifier("xodus.pcGames.refresh")
+                }
+            }
+            if state.destination == .discover {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Refresh Discover", systemImage: "arrow.clockwise") {
+                        Task { await session.refreshCatalog(state.query) }
+                    }
+                    .labelStyle(.iconOnly).help(refreshHelp).keyboardShortcut("r")
+                    .modifier(NativeToolbarIconStyle())
+                    .disabled(!startupAllowed || !session.isReady || session.searching)
+                    .accessibilityIdentifier("xodus.catalog.refresh")
                 }
             }
         }
@@ -165,6 +179,10 @@ struct LiveRootView: View {
         await state.gameOperations.waitForService()
         await LibraryXboxStats.shared.refresh(for: state.gameOperations.serviceStatus,
             signingIn: state.gameOperations.serviceSigningIn)
+    }
+
+    private var immersiveDestination: Bool {
+        (state.destination == .library && !state.showsRecentActivity) || state.destination == .discover
     }
 
     private var library: some View {
@@ -249,161 +267,8 @@ struct LiveRootView: View {
     private var catalog: some View {
         LiveCatalogView(library: state.pcGames, installed: state.installedGames,
                         operations: state.gameOperations, query: scopedQuery,
-                        allowsArtworkLoading: startupAllowed, clearSearch: { state.query = "" })
-    }
-}
-
-struct LiveCatalogView: View {
-    @ObservedObject var library: PCGamesController
-    @ObservedObject var installed: InstalledGamesController
-    @ObservedObject var operations: GameOperationsController
-    @EnvironmentObject private var session: LiveSession
-    @Environment(\.openSettings) private var openSettings
-    let query: String
-    var allowsArtworkLoading = true
-    let clearSearch: () -> Void
-
-    private var results: CatalogSearchResults {
-        CatalogSearchResults(query: query, ownedGames: library.snapshot?.games ?? [],
-            storeProducts: session.catalogMatches(query: query) ? session.products : [],
-            gamePassProductIDs: session.gamePassProductIDs)
-    }
-
-    private var canRefresh: Bool {
-        session.isReady && (session.supports(.search)
-            || (query.isEmpty ? session.supports(.discover) : session.supports(.query)))
-    }
-    private var columns: [GridItem] { [GridItem(.adaptive(minimum: 180, maximum: 240), spacing: 24)] }
-
-    var body: some View {
-        let results = self.results
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(query.isEmpty ? "Store games" : "Search results").font(.largeTitle.bold())
-                    Text(query.isEmpty ? "Find your next PC game."
-                         : "Results for \"\(query)\"")
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                if session.searching {
-                    ProgressView().controlSize(.small)
-                    Button("Stop search") { session.stopCatalogSearch() }
-                }
-                Button("Refresh") { Task { await session.refreshCatalog(query) } }
-                    .disabled(session.searching || !canRefresh)
-            }
-            if !results.ownedMatches.isEmpty {
-                Text("Your games").font(.title2.bold())
-                if library.error != nil || library.busy {
-                    Text("Showing your last complete PC library.").font(.callout).foregroundStyle(.secondary)
-                }
-                LazyVGrid(columns: columns, spacing: 28) {
-                    ForEach(results.ownedMatches) { game in
-                        PCGameTile(game: game, installed: installed, operations: operations,
-                                   allowsArtworkLoading: allowsArtworkLoading, badge: .owned)
-                    }
-                }
-            }
-            if !query.isEmpty {
-                Text("Microsoft Store").font(.title2.bold())
-                if library.snapshot == nil {
-                    Text("Load your PC library in Library to include your games in search.")
-                        .font(.callout).foregroundStyle(.secondary)
-                }
-            }
-            if let notice = session.catalogNotice {
-                Label(notice, systemImage: session.catalogStopped ? "pause.circle" : "exclamationmark.circle")
-                    .foregroundStyle(.secondary)
-            }
-            if results.storeProducts.isEmpty && results.ownedMatches.isEmpty {
-                ContentUnavailableView {
-                    Label(session.catalogEmptyTitle,
-                          systemImage: "magnifyingglass")
-                } description: {
-                    Text(session.catalogMessage(query: query, canRefresh: canRefresh))
-                } actions: {
-                    if !session.isReady { Button("Settings", action: openSettings.callAsFunction) }
-                    if !query.isEmpty { Button("Clear search", action: clearSearch) }
-                }
-                .frame(maxWidth: .infinity, minHeight: 220)
-            } else if !results.storeProducts.isEmpty {
-                LazyVGrid(columns: columns, spacing: 28) {
-                    ForEach(results.storeProducts) { product in
-                        if let game = results.ownedGame(for: product.id) {
-                            PCGameTile(game: game, installed: installed, operations: operations,
-                                       allowsArtworkLoading: allowsArtworkLoading, badge: .owned)
-                        } else if results.badge(for: product.id) == .gamePass, operations.gamePassActive {
-                            PCGameTile(game: PCGame(product: product), installed: installed, operations: operations,
-                                       allowsArtworkLoading: allowsArtworkLoading, badge: .gamePass,
-                                       viewDetails: { session.selectedProduct = product })
-                        } else {
-                            storeTile(product, badge: results.badge(for: product.id))
-                        }
-                    }
-                }
-            } else if !session.searching && session.catalogError == nil {
-                Text("No additional Store matches.").foregroundStyle(.secondary)
-            }
-            if session.nextCursor != nil, session.catalogMatches(query: query) {
-                Button("More games") {
-                    Task { await session.refreshCatalog(query, more: true) }
-                }
-                    .disabled(!session.canLoadMoreCatalog)
-                    .accessibilityLabel("Load more catalog results")
-                    .accessibilityIdentifier("xodus.catalog.loadMore")
-            }
-            DisclosureGroup("Catalog info") {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Owned comes from your loaded PC library. Game Pass means a game appeared in the loaded PC Game Pass feed, not that your account has access.")
-                    Text("Public catalog coverage is partial. Mac compatibility hasn't been checked.")
-                    Text("\(session.market) / \(session.language)")
-                    if let checked = session.discoveryCheckedAt { Text("Checked \(checked)") }
-                    Text(session.catalogCorpus == "publicMicrosoftStoreSearch"
-                         ? "Source: Microsoft Store search and public PC metadata."
-                         : session.catalogCorpus == "pcGamePassDiscovery"
-                            ? "Source: Microsoft's public PC Game Pass feed."
-                            : "Source: previously checked public products.")
-                    if let error = session.catalogError { Text(error) }
-                    ForEach(session.discoveryFailures) { failure in
-                        Text("Product \(failure.productID): \(LiveSession.describe(ManagementError.backendError(failure.error.code, retryable: failure.error.retryable)))")
-                    }
-                }
-                .font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
-                .padding(.top, 12)
-            }
-        }
-    }
-
-    private func storeTile(_ product: CatalogProduct, badge: CatalogAccessBadge?) -> some View {
-        Button { session.selectedProduct = product } label: {
-            VStack(alignment: .leading, spacing: 12) {
-                CatalogArtworkView(reference: allowsArtworkLoading ? CatalogArtworkReference.preferred(
-                    in: product.artwork, roles: [.boxArt, .poster, .tile, .hero]) : nil,
-                    status: product.artworkStatus, contentMode: .fit)
-                    .aspectRatio(1, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(product.title).font(.headline).foregroundStyle(.primary)
-                        .lineLimit(2).frame(minHeight: 40, alignment: .topLeading)
-                    if let badge {
-                        Text(badge.rawValue).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                    }
-                    GameCompatibilityBadge(operations: operations, productID: product.id,
-                                           allowsLoading: allowsArtworkLoading)
-                    if badge == .gamePass {
-                        Text("Included with PC Game Pass").font(.callout).foregroundStyle(.secondary)
-                    }
-                    if product.freshness == "cached" {
-                        Text("Offline details").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(product.title). \(badge?.rawValue ?? "Access not checked"). \(operations.compatibility[product.id]?.badge ?? "Mac compatibility not checked"). View game.")
+                        allowsArtworkLoading: libraryArtworkAllowed,
+                        allowsStartupTasks: startupAllowed, clearSearch: { state.query = "" })
     }
 }
 

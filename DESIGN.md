@@ -54,8 +54,8 @@ NSSearchField share a `.glassEffect(.regular, in: Capsule())` principal group.
 Account, Import and Refresh use native `.glass` circular buttons. Art still
 extends under the toolbar; no opaque full-width band is restored. Reduce
 Transparency uses the semantic opaque `.background` style and native bordered
-buttons; pre-26 systems use regular material/bordered controls. Discover and
-Downloads keep their original toolbar grouping. Dark, Light and injected
+buttons; pre-26 systems use regular material/bordered controls. D2 reuses this
+grouping for Discover; Downloads keeps its original toolbar grouping. Dark, Light and injected
 app-local Reduce Transparency are separate visual-review states; injection
 never changes the user's system preference. SwiftUI's real
 `accessibilityReduceTransparency` is read-only; the review flag exercises this
@@ -120,7 +120,37 @@ The nonshipping read-only reviewer can open directly at Your Games using
 Freshness is in the Refresh help tag; unloaded Game Pass copy appears only in
 its filter's native unavailable state, not in the Library body.
 
-**Discover (Operate/explore):** immersive original environment, one title/action, empty-query categories and catalog shelf. Typing shows scoped results rather than fake empty-query results. Catalog presence never proves ownership.
+**Discover (Operate/explore, D2 source; visual sign-off pending):** v0.2 Browse
+(`3:365`) and Search (`3:288`) supply placement and flow; Apple Games supplies
+the native treatment. Empty-query browse has a 340-point, art-under-toolbar
+landscape hero with an actual title/logo and View game or a reasoned
+installed-only Play/protected Install action. The C3 native regular-glass
+principal navigation/search group and circular Account/Refresh carry across,
+with real Reduce Transparency handling and no painted capsule.
+
+Browse genres uses only DisplayCatalog facts in the loaded page, with four
+artwork-led genre tiles and a native Menu for every loaded genre/All genres.
+Filtering never claims full-catalog genre coverage. Adaptive 2:3 covers use the
+Library's 170–220-point widths, 24-point gaps and 56-point insets. Missing art,
+logos, genres and size facts do not become invented recommendations or access.
+Public metadata/image loads retain their separate bounds; metadata is
+invalidated across market/language changes, not silently reused in another scope.
+
+Typing removes the editorial hero and presents Your games before Microsoft
+Store (or Checked catalog for previously observed products). Existing debounce,
+owned-first exact-ID matching, paging, Stop search, partial/failure disclosure
+and detail/consent routes remain. Feed membership is not a subscription;
+unconfirmed access opens View game rather than enabling Install. Installed
+matches retain their Play/Stop and management actions. Install never auto-plays.
+
+The isolated, nonshipping reviewer may read an owner-supplied 0600
+`{products:[CatalogProduct]}` snapshot, validate its public PC scope and use local
+title matching. It labels Checked catalog, establishes no Game Pass membership,
+starts no engine/service/stats refresh and keeps images memory-only. It may
+open browse, populated search or genuine empty search directly at 1440x874.
+128 detached checks and shipping compilation are not compositor, contrast,
+VoiceOver or actual-system Reduce Transparency proof; Root owns capture and
+user sign-off. No proprietary cover, account record or capture is committed.
 
 **Detail/install/downloads (Operate):** full-bleed detail image, four independent evidence rows and one reasoned action; protected installation sheet with space/experimental consent; flat progress rows and recoverable errors. Artwork never replaces evidence.
 

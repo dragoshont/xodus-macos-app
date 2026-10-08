@@ -3,6 +3,7 @@ import AppKit
 import CryptoKit
 import Foundation
 import XodusCredentials
+import XodusManagement
 
 @MainActor
 final class LibraryReviewPresentation: ObservableObject {
@@ -27,7 +28,11 @@ enum LibraryPreviewExporter {
         Task {
             do {
                 let grid = CommandLine.arguments.count == 4 && CommandLine.arguments[3] == "--library-grid"
-                guard (CommandLine.arguments.count == 3 || grid), CommandLine.arguments[1] == "--library-preview",
+                let discoverBrowse = CommandLine.arguments.count == 5 && CommandLine.arguments[3] == "--discover-browse"
+                let discoverSearch = CommandLine.arguments.count == 6 && CommandLine.arguments[3] == "--discover-search"
+                let discover = discoverBrowse || discoverSearch
+                guard (CommandLine.arguments.count == 3 || grid || discover),
+                      CommandLine.arguments[1] == "--library-preview",
                       let appearance = ProcessInfo.processInfo.environment["XODUS_LIBRARY_PREVIEW_APPEARANCE"],
                       ["dark", "light"].contains(appearance),
                       let source = ProcessInfo.processInfo.environment["XODUS_LIBRARY_PREVIEW_SOURCE"],
@@ -73,6 +78,27 @@ enum LibraryPreviewExporter {
                     }
                     _ = try CredentialIdentity.verifyFile(broker, sha256: pin.sha256, bytes: pin.bytes)
                 }
+                var catalogInputHash: String?
+                var catalogInputCount = 0
+                if discover {
+                    let input = URL(fileURLWithPath: CommandLine.arguments[4])
+                    guard let data = try GameScriptFiles.read(input, maximumBytes: 512 * 1024) else {
+                        throw ManagementError.invalidPayload
+                    }
+                    let snapshot = try JSONDecoder().decode(CatalogReviewSnapshot.self, from: data)
+                    let query = discoverSearch ? CommandLine.arguments[5] : ""
+                    guard !discoverSearch || !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                        throw ManagementError.invalidPayload
+                    }
+                    try session.loadReadOnlyCatalogPreview(snapshot, query: query)
+                    state.navigate(.discover)
+                    state.query = query
+                    catalogInputHash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+                    catalogInputCount = snapshot.products.count
+                    await LibraryCatalogArtwork.shared.load(ids: session.products.map(\.id),
+                                                             market: session.market, language: session.language)
+                    _ = await LibraryCatalogArtwork.shared.preload()
+                }
                 try await Task.sleep(for: .seconds(2))
                 if grid {
                     presentation.showGrid = true
@@ -80,7 +106,7 @@ enum LibraryPreviewExporter {
                 }
                 let record: [String: Any] = [
                     "status": "libraryReviewReady", "source": source, "appearance": appearance,
-                    "reviewPosition": grid ? "games" : "hero",
+                    "reviewPosition": discoverBrowse ? "discover-browse" : discoverSearch ? "discover-search" : grid ? "games" : "hero",
                     "pid": ProcessInfo.processInfo.processIdentifier, "width": 1440, "height": 874,
                     "actualWindowWidth": Int(window.frame.width), "actualWindowHeight": Int(window.frame.height),
                     "pcGameCount": count, "distinctSignedBuildReadFrozenBroker": distinctBrokerRead,
@@ -95,6 +121,12 @@ enum LibraryPreviewExporter {
                         InstalledGameSizeStore.shared.value(for: $0) != nil
                     }.count,
                     "publicSizeGames": LibraryCatalogArtwork.shared.images.values.filter { $0.facts.downloadBytes != nil }.count,
+                    "catalogInputSHA256": catalogInputHash ?? "",
+                    "catalogInputProducts": catalogInputCount,
+                    "catalogProducts": discover ? session.products.count : 0,
+                    "catalogCorpus": session.catalogCorpus,
+                    "catalogQuery": discover ? state.query : "",
+                    "catalogGamePassMemberships": session.gamePassProductIDs.count,
                     "brokerWriteDeleteMigrationRequests": 0, "gameServiceActions": 0, "backendConnected": false,
                     "shippingAppReplaced": false, "nativeAuthorizationAllowedByBroker": false
                 ]
