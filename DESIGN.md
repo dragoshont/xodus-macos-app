@@ -120,7 +120,7 @@ The nonshipping read-only reviewer can open directly at Your Games using
 Freshness is in the Refresh help tag; unloaded Game Pass copy appears only in
 its filter's native unavailable state, not in the Library body.
 
-**Discover (Operate/explore, D2 source; visual sign-off pending):** v0.2 Browse
+**Discover (Operate/explore, D2 direction approved; not installed):** v0.2 Browse
 (`3:365`) and Search (`3:288`) supply placement and flow; Apple Games supplies
 the native treatment. Empty-query browse has a 340-point, art-under-toolbar
 landscape hero with an actual title/logo and View game or a reasoned
@@ -136,8 +136,11 @@ logos, genres and size facts do not become invented recommendations or access.
 Public metadata/image loads retain their separate bounds; metadata is
 invalidated across market/language changes, not silently reused in another scope.
 
-Typing removes the editorial hero and presents Your games before Microsoft
-Store (or Checked catalog for previously observed products). Existing debounce,
+Typing removes the editorial hero and presents Your games before More games.
+Browse says Explore games; internal source/corpus names remain private evidence,
+not consumer headings. About these games uses plain access/coverage copy. A
+valid zero-result search says No Results for the query, suggests another title
+or clearing search and never suggests reconnecting. Existing debounce,
 owned-first exact-ID matching, paging, Stop search, partial/failure disclosure
 and detail/consent routes remain. Feed membership is not a subscription;
 unconfirmed access opens View game rather than enabling Install. Installed
@@ -145,12 +148,15 @@ matches retain their Play/Stop and management actions. Install never auto-plays.
 
 The isolated, nonshipping reviewer may read an owner-supplied 0600
 `{products:[CatalogProduct]}` snapshot, validate its public PC scope and use local
-title matching. It labels Checked catalog, establishes no Game Pass membership,
+title matching. It retains checked-catalog provenance privately, establishes no Game Pass membership,
 starts no engine/service/stats refresh and keeps images memory-only. It may
 open browse, populated search or genuine empty search directly at 1440x874.
-128 detached checks and shipping compilation are not compositor, contrast,
+130 detached checks and shipping compilation are not compositor, contrast,
 VoiceOver or actual-system Reduce Transparency proof; Root owns capture and
-user sign-off. No proprietary cover, account record or capture is committed.
+user sign-off. Root captured Dark/Light browse, populated search and empty search;
+all jobs finished normally. The user approved the direction and required the
+consumer-copy correction above before source freeze. This is not shipping
+admission. No proprietary cover, account record or capture is committed.
 
 **Detail/install/downloads (Operate):** full-bleed detail image, four independent evidence rows and one reasoned action; protected installation sheet with space/experimental consent; flat progress rows and recoverable errors. Artwork never replaces evidence.
 

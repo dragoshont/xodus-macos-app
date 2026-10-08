@@ -25,6 +25,16 @@ enum DiscoverBrowse {
     }
 }
 
+enum DiscoverCopy {
+    static func noResults(_ query: String) -> String {
+        String(localized: "No Results for “\(query)”")
+    }
+    static func noOtherGames(_ query: String) -> String {
+        String(localized: "No other games match “\(query)”.")
+    }
+    static let emptyDescription = String(localized: "Try another title or clear your search.")
+}
+
 #if !XODUS_SHIPPING
 struct CatalogReviewSnapshot: Decodable {
     let products: [CatalogProduct]
@@ -70,8 +80,12 @@ struct LiveCatalogView: View {
             || (query.isEmpty ? session.supports(.discover) : session.supports(.query)))
     }
     private var storeHeading: String {
-        session.catalogCorpus == "pcGamePassDiscovery" ? "PC Game Pass"
-            : session.catalogCorpus == "publicMicrosoftStoreSearch" ? "Microsoft Store" : "Checked catalog"
+        query.isEmpty ? "Explore games" : "More games"
+    }
+    private var validEmptySearch: Bool {
+        !query.isEmpty && session.catalogMatches(query: query) && !session.searching &&
+            !session.catalogStopped && session.catalogError == nil && session.discoveryFailures.isEmpty &&
+            (!allowsStartupTasks || (session.isReady && canRefresh))
     }
     private var columns: [GridItem] { [GridItem(.adaptive(minimum: 170, maximum: 220), spacing: 24)] }
 
@@ -121,7 +135,7 @@ struct LiveCatalogView: View {
                     } else if results.ownedMatches.isEmpty {
                         unavailable
                     } else if !session.searching && session.catalogError == nil {
-                        Text("No additional Store matches.").foregroundStyle(.secondary)
+                        Text(DiscoverCopy.noOtherGames(query)).foregroundStyle(.secondary)
                     }
                     if session.nextCursor != nil, session.catalogMatches(query: query) {
                         Button("More games") { Task { await session.refreshCatalog(query, more: true) } }
@@ -213,7 +227,7 @@ struct LiveCatalogView: View {
                 Menu(selection.genre ?? "All genres") {
                     Button("All genres") { selection.genre = nil }
                     ForEach(genres, id: \.self) { genre in Button(genre) { selection.genre = genre } }
-                }.fixedSize().accessibilityLabel("Filter the loaded catalog by genre")
+                }.fixedSize().accessibilityLabel("Filter the shown games by genre")
             }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 220, maximum: 340), spacing: 24)], spacing: 16) {
                 ForEach(Array(genres.prefix(4)), id: \.self) { genre in
@@ -235,7 +249,7 @@ struct LiveCatalogView: View {
                             .contentShape(RoundedRectangle(cornerRadius: 12))
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Show \(genre) games in the loaded catalog")
+                        .accessibilityLabel("Show \(genre) games in this selection")
                         .accessibilityAddTraits(selection.genre == genre ? .isSelected : [])
                     }
                 }
@@ -287,33 +301,29 @@ struct LiveCatalogView: View {
 
     private var unavailable: some View {
         ContentUnavailableView {
-            Label(selection.genre != nil && query.isEmpty ? "No games in this genre" : session.catalogEmptyTitle,
+            Label(validEmptySearch ? DiscoverCopy.noResults(query)
+                  : selection.genre != nil && query.isEmpty ? "No games in this genre" : session.catalogEmptyTitle,
                   systemImage: "magnifyingglass")
         } description: {
-            Text(selection.genre != nil && query.isEmpty ? "Choose another genre from the loaded catalog."
+            Text(validEmptySearch ? DiscoverCopy.emptyDescription
+                 : selection.genre != nil && query.isEmpty ? "Choose another genre from the loaded selection."
                  : session.catalogMessage(query: query, canRefresh: canRefresh))
         } actions: {
             if selection.genre != nil { Button("All genres") { selection.genre = nil } }
             if !session.isReady, allowsStartupTasks { Button("Settings", action: openSettings.callAsFunction) }
-            if !query.isEmpty { Button("Clear search", action: clearSearch) }
+            if !query.isEmpty { Button("Clear Search", action: clearSearch) }
         }.frame(maxWidth: .infinity, minHeight: 220)
     }
 
     private var catalogInfo: some View {
-        DisclosureGroup("Catalog info") {
+        DisclosureGroup("About these games") {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Owned comes from your loaded PC library. Game Pass means a game appeared in the loaded PC Game Pass feed, not that your account has access.")
-                Text("Genres filter only the games in this loaded page. Catalog coverage is partial; Mac compatibility hasn't been checked.")
-                Text("\(session.market) / \(session.language)")
-                if let checked = session.discoveryCheckedAt { Text("Checked \(checked)") }
-                Text(session.catalogCorpus == "publicMicrosoftStoreSearch"
-                     ? "Source: Microsoft Store search and public PC metadata."
-                     : session.catalogCorpus == "pcGamePassDiscovery"
-                        ? "Source: Microsoft's public PC Game Pass feed." : "Source: previously checked public products.")
-                if !allowsStartupTasks { Text("Read-only catalog snapshot. Live search, installation and gameplay are disabled.") }
+                Text("Owned games come from your PC library. Game Pass games require an active subscription.")
+                Text("Genres filter the games currently shown. Search coverage is partial; Mac compatibility varies by game.")
+                if !allowsStartupTasks { Text("Read-only preview. Search uses the loaded games; installation and gameplay are disabled.") }
                 if let error = session.catalogError { Text(error) }
-                ForEach(session.discoveryFailures) { failure in
-                    Text("Product \(failure.productID): \(LiveSession.describe(ManagementError.backendError(failure.error.code, retryable: failure.error.retryable)))")
+                if !session.discoveryFailures.isEmpty {
+                    Text("Some games couldn't be loaded. Refresh to try again.")
                 }
             }
             .font(.callout).foregroundStyle(.secondary).textSelection(.enabled).padding(.top, 12)

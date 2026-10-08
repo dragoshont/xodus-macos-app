@@ -36,7 +36,7 @@ struct LiveRootView: View {
     private var searchPlaceholder: String {
         state.destination == .library ? (state.showsRecentActivity ? "Search recent activity" : "Search your PC games")
             : state.destination == .downloads ? "Search Library or Discover"
-            : session.supports(.query) ? "Search your games and Microsoft Store" : "Search your games and checked catalog"
+            : "Search Discover"
     }
     private var refreshHelp: String {
         if state.destination == .discover {

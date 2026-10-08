@@ -107,6 +107,11 @@ enum PreviewChecks {
             }
             let pass = try product("FIXTURE00003")
             let catalogOnly = try product("FIXTURE00004")
+            check(DiscoverCopy.noResults("tomb") == "No Results for “tomb”" &&
+                  DiscoverCopy.emptyDescription == "Try another title or clear your search.",
+                  "A valid zero-result search names the query and offers title/clear recovery, never reconnection")
+            check(DiscoverCopy.noOtherGames("gears") == "No other games match “gears”.",
+                  "Owned-only matches use consumer copy rather than Store/evidence terminology")
             let browseFacts = [pass.id: LibraryCatalogFacts(genres: ["Puzzle"])]
             check(DiscoverBrowse.genres(products: [pass, catalogOnly], facts: browseFacts) == ["Puzzle"],
                   "Discover genres come only from supplied catalog facts, not invented editorial categories")

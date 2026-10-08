@@ -64,14 +64,22 @@ market/language/artwork/unknown-access scope. Non-PC candidates are not
 presented as PC games. The raw input digest/count and filtered rendered count
 are recorded separately in private readiness evidence.
 
+Consumer headings are Explore games and More games; About these games carries
+plain access/coverage copy. A valid empty search names the query and offers
+another title or Clear Search, never connection recovery. Source/corpus terms
+are private evidence, not product labels.
+
 These are checked-catalog snapshots and local search, not fabricated
 `CatalogDiscovery`/`CatalogQuery` responses. No feed membership, new checkedAt,
 revision or cursor is invented. The frozen broker PC-library read and bounded
 public art remain permitted; refreshed credentials stay in memory. Ordinary
 startup and interaction stay disabled. No engine, service, stats command, private
-mutation or production media-cache write is enabled. D2 has 128 detached
+mutation or production media-cache write is enabled. D2 has 130 detached
 presentation/888 synthetic native checks and a shipping compile; native
-compositor capture, visual sign-off and final shipping admission remain pending.
+compositor proof is separate from synthetic checks. Root captured Dark/Light
+browse, populated search and empty states and confirmed every job finished
+normally. The user approved the direction with the consumer-copy batch above
+required before freeze. Final shipping admission remains pending.
 
 ## Local imported-game Play
 
