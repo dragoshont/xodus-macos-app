@@ -280,6 +280,34 @@ enum NativeUIChecks {
                       "D3 detail retains native vertical scrolling at constrained and expanded sheet sizes")
             }
         }
+        let consent = GameInstallConsent(game: PCGame(id: "FIXTURE00002", title: "Original Ridge", artwork: nil),
+            destination: URL(fileURLWithPath: "/Users/Shared/Xodus Games/Original Ridge"),
+            freeBytes: 80_000_000_000, installedID: nil,
+            compatibility: GameCompatibilityResult(storeId: "FIXTURE00002", packageBytes: 3_200_000_000,
+                supported: true, reason: nil, checkedAt: "2026-10-07T00:00:00Z"))
+        for size in [CGSize(width: 520, height: 440), CGSize(width: 640, height: 680)] {
+            let install = NSHostingView(rootView: GameInstallConsentView(
+                operations: state.gameOperations, consent: consent))
+            install.sizingOptions = []
+            install.frame = CGRect(origin: .zero, size: size)
+            install.layoutSubtreeIfNeeded()
+            let scrollViews = descendants(of: install).compactMap { $0 as? NSScrollView }
+            let buttons = descendants(of: install).compactMap { $0 as? NSButton }
+            check(install.window == nil && !scrollViews.isEmpty && buttons.count >= 2
+                  && scrollViews.allSatisfy { !$0.hasHorizontalScroller },
+                  "D4 install review uses a bounded native Form with reachable Cancel and Install actions")
+        }
+        let downloads = NSHostingView(rootView: LiveActivityView(operations: state.gameOperations)
+            .environmentObject(session))
+        downloads.sizingOptions = []
+        downloads.frame = CGRect(x: 0, y: 0, width: 820, height: 600)
+        downloads.layoutSubtreeIfNeeded()
+        check(downloads.window == nil &&
+              !descendants(of: downloads).compactMap { $0 as? NSTableView }.isEmpty &&
+              descendants(of: downloads).compactMap { $0 as? NSScrollView }.allSatisfy {
+                  !$0.hasHorizontalScroller
+              },
+              "D5 Downloads uses a native inset List without horizontal overflow")
         let account = NSHostingView(rootView: LiveAccountView(refreshStatusOnAppear: false)
             .environmentObject(state).environmentObject(session))
         account.sizingOptions = []

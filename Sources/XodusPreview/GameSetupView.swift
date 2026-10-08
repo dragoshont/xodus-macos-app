@@ -20,10 +20,11 @@ struct GameSetupBannerView: View {
 
 struct GameSetupView: View {
     @ObservedObject var operations: GameOperationsController
+    var showsTitle = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Setup").font(.headline)
+            if showsTitle { Text("Setup").font(.headline) }
             if operations.setupBusy {
                 ProgressView(operations.setupRepairing ? "Repairing Xodus" : "Checking Xodus setup")
                     .controlSize(.small)

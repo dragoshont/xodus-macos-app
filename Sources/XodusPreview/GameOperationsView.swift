@@ -24,48 +24,64 @@ struct GameServiceAccountView: View {
     @ObservedObject var library: PCGamesController
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Games").font(.headline)
-            if library.hasSavedSignIn {
-                HStack {
-                    Label("PC Library sign-in saved", systemImage: "checkmark.circle")
-                    Spacer()
-                    Button("Sign out of PC games") { Task { await library.signOut() } }
-                        .disabled(library.busy).accessibilityIdentifier("xodus.pcGames.signOut")
+        VStack(alignment: .leading, spacing: 16) {
+            GroupBox("Microsoft PC games") {
+                VStack(alignment: .leading, spacing: 10) {
+                    if library.hasSavedSignIn {
+                        HStack {
+                            Label("PC Library sign-in saved", systemImage: "checkmark.circle")
+                            Spacer()
+                            Button("Sign out") { Task { await library.signOut() } }
+                                .disabled(library.busy).accessibilityIdentifier("xodus.pcGames.signOut")
+                        }
+                    } else {
+                        Text("Use the main Microsoft sign-in to load your PC game library.")
+                            .foregroundStyle(.secondary)
+                    }
+                    Text("Library access and game-service access are checked separately.")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
             }
-            Text("Sign in to download and play. Your PC Library uses its own sign-in.")
-                .font(.callout).foregroundStyle(.secondary)
-            Label(operations.serviceLabel, systemImage: operations.serviceStatus?.signedIn == true
-                  ? "checkmark.circle" : "person.crop.circle")
-                .accessibilityIdentifier("xodus.games.accountStatus")
-            HStack {
-                Button("Check game sign-in") { operations.refreshService() }
-                    .disabled(operations.serviceBusy || operations.setupRepairing)
-                    .accessibilityIdentifier("xodus.games.checkSignIn")
-                if operations.serviceStatus?.signedIn != true {
-                    Button("Sign in for games") { operations.signInForGames() }
-                        .disabled(!operations.canSignIn)
-                        .accessibilityIdentifier("xodus.games.signIn")
+            GroupBox("Game access") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label(operations.serviceLabel, systemImage: operations.serviceStatus?.signedIn == true
+                          ? "checkmark.circle" : "person.crop.circle")
+                        .accessibilityIdentifier("xodus.games.accountStatus")
+                    Text("Required for package checks, downloads and gameplay.")
+                        .font(.callout).foregroundStyle(.secondary)
+                    HStack {
+                        Button("Check status") { operations.refreshService() }
+                            .disabled(operations.serviceBusy || operations.setupRepairing)
+                            .accessibilityIdentifier("xodus.games.checkSignIn")
+                        if operations.serviceStatus?.signedIn != true {
+                            Button("Sign in for games") { operations.signInForGames() }
+                                .disabled(!operations.canSignIn)
+                                .accessibilityIdentifier("xodus.games.signIn")
+                        }
+                        if operations.serviceBusy { ProgressView().controlSize(.small) }
+                    }
+                    if operations.serviceSigningIn {
+                        Text("Finish signing in in the Microsoft window.").foregroundStyle(.secondary)
+                    }
+                    if let error = operations.serviceError {
+                        Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("xodus.games.signInError")
+                        if operations.serviceLog != nil {
+                            Button("Show log") { operations.showServiceLog() }
+                                .accessibilityIdentifier("xodus.games.signInLog")
+                        }
+                    }
                 }
-                if operations.serviceBusy { ProgressView().controlSize(.small) }
             }
-            if operations.serviceSigningIn {
-                Text("Finish signing in in the Microsoft window.").foregroundStyle(.secondary)
+            GroupBox("PC Game Pass") {
+                GamePassAccountView(operations: operations, library: library)
+                    .padding(.top, 2)
             }
-            if let error = operations.serviceError {
-                Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("xodus.games.signInError")
-                if operations.serviceLog != nil {
-                    Button("Show log") { operations.showServiceLog() }
-                        .accessibilityIdentifier("xodus.games.signInLog")
-                }
+            GroupBox("Xodus setup") {
+                GameSetupView(operations: operations, showsTitle: false)
+                    .padding(.top, 2)
             }
-            Divider()
-            GamePassAccountView(operations: operations, library: library)
-            Divider()
-            GameSetupView(operations: operations)
         }
     }
 }
@@ -183,44 +199,67 @@ struct GameOperationProgressView: View {
 struct GameInstallConsentView: View {
     @ObservedObject var operations: GameOperationsController
     let consent: GameInstallConsent
+    @ObservedObject private var catalog = LibraryCatalogArtwork.shared
 
     var body: some View {
         let consent = operations.installConsent ?? self.consent
-        VStack(alignment: .leading, spacing: 18) {
-            Text(consent.installedID == nil ? "Install \(consent.game.title)" : "Check for update / Repair")
-                .font(.title2.bold()).fixedSize(horizontal: false, vertical: true)
-            if consent.installedID != nil { Text(consent.game.title).font(.headline) }
-            LabeledContent("Destination") { Text(consent.destination.path).textSelection(.enabled) }
-            LabeledContent("Available space", value: GameOperationProgressView.bytes(consent.freeBytes))
-            if operations.checkingCompatibility {
-                ProgressView("Checking this game\u{2026}").controlSize(.small)
-                    .accessibilityIdentifier("xodus.install.checking")
-            } else if let result = consent.compatibility {
-                Label(result.explanation, systemImage: result.supported ? "checkmark.circle" : "exclamationmark.circle")
-                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("xodus.install.compatibility")
-                if result.supported {
-                    if let bytes = result.packageBytes {
-                        Text("\(GameOperationProgressView.bytes(bytes)) download").foregroundStyle(.secondary)
-                    } else { Text("Size shown when download starts").foregroundStyle(.secondary) }
+        VStack(spacing: 0) {
+            Form {
+                Section {
+                    Text(consent.installedID == nil ? consent.game.title : "Check for update or repair")
+                        .font(.title2.bold()).fixedSize(horizontal: false, vertical: true)
+                    if consent.installedID != nil { Text(consent.game.title).font(.headline) }
                 }
-            } else if let error = consent.checkError {
-                Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                if operations.failureCode == 11 {
-                    Button("Sign in for games") {
-                        operations.installConsent = nil
-                        operations.signInForGames()
-                    }.disabled(!operations.canSignIn)
+                Section("Storage") {
+                    LabeledContent("Destination") {
+                        Text(consent.destination.path).textSelection(.enabled)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    LabeledContent("Free space now",
+                                   value: GameOperationProgressView.bytes(consent.freeBytes))
+                    if operations.checkingCompatibility,
+                       let estimate = catalog.images[consent.game.id]?.facts.downloadBytes {
+                        LabeledContent("Estimated download",
+                                       value: "About \(GameOperationProgressView.bytes(estimate))")
+                    }
+                    if let bytes = consent.compatibility?.packageBytes {
+                        LabeledContent("Verified package size",
+                                       value: GameOperationProgressView.bytes(bytes))
+                    }
+                    LabeledContent("Staging and expansion", value: "Calculated during setup")
                 }
-                if operations.log != nil { Button("Show log") { operations.showLog() } }
+                Section("Mac support") {
+                    if operations.checkingCompatibility {
+                        ProgressView("Checking the selected PC package…").controlSize(.small)
+                            .accessibilityIdentifier("xodus.install.checking")
+                    } else if let result = consent.compatibility {
+                        Label(result.explanation,
+                              systemImage: result.supported ? "checkmark.circle" : "exclamationmark.circle")
+                            .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("xodus.install.compatibility")
+                    } else if let error = consent.checkError {
+                        Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if operations.failureCode == 11 {
+                            Button("Sign in for games") {
+                                operations.installConsent = nil
+                                operations.signInForGames()
+                            }.disabled(!operations.canSignIn)
+                        }
+                        if operations.log != nil { Button("Show log") { operations.showLog() } }
+                    }
+                }
+                if consent.compatibility?.supported == true {
+                    Section {
+                        Text(consent.installedID == nil
+                             ? "Xodus verifies free space again before download. Additional working space can be required while package files are staged and expanded."
+                             : "Xodus checks changed or missing files in this folder. Your saves and installed entry are kept.")
+                            .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
             }
-            if consent.compatibility?.supported == true {
-                Text(consent.installedID == nil
-                     ? "The game will be downloaded and set up for this Mac. Some PC packages aren't supported yet."
-                     : "Xodus checks for changed or missing files in this folder. Your saves and installed entry are kept.")
-                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            }
+            .formStyle(.grouped)
+            Divider()
             HStack {
                 Spacer()
                 Button("Cancel") { Task { await operations.cancelInstallConsent() } }.keyboardShortcut(.cancelAction)
@@ -230,8 +269,21 @@ struct GameInstallConsentView: View {
                     .buttonStyle(.borderedProminent)
                     .accessibilityIdentifier("xodus.install.confirm")
             }
+            .padding(20)
         }
-        .padding(28).frame(width: 520)
+        .frame(minWidth: 520, idealWidth: 560, maxWidth: 640,
+               minHeight: 440, idealHeight: 560, maxHeight: 680)
+        .modifier(InstallFormPresentation())
+    }
+}
+
+private struct InstallFormPresentation: ViewModifier {
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.presentationSizing(.form)
+        } else {
+            content
+        }
     }
 }
 

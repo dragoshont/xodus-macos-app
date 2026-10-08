@@ -5,6 +5,9 @@ import XodusManagement
 @MainActor
 final class AccountInteraction: ObservableObject {
     @Published var confirmingSignOut = false
+    @Published var clearingArtwork = false
+    @Published var artworkNotice: String?
+    @Published var artworkError: String?
 }
 
 struct LiveAccountView: View {
@@ -43,6 +46,37 @@ struct LiveAccountView: View {
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("xodus.account.statusExplanation")
                     GameServiceAccountView(operations: state.gameOperations, library: state.pcGames)
+                    GroupBox("Downloaded artwork") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Xodus keeps a bounded cache of public covers and screenshots. Trailers are streamed and aren't stored here.")
+                                .font(.callout).foregroundStyle(.secondary)
+                            HStack {
+                                Button("Clear artwork cache") {
+                                    interaction.clearingArtwork = true
+                                    interaction.artworkNotice = nil
+                                    interaction.artworkError = nil
+                                    Task {
+                                        do {
+                                            try await CatalogArtworkStore.shared.clearCache()
+                                            interaction.artworkNotice = "Downloaded artwork cleared."
+                                        } catch {
+                                            interaction.artworkError = "Artwork couldn't be cleared. Try again."
+                                        }
+                                        interaction.clearingArtwork = false
+                                    }
+                                }
+                                .disabled(interaction.clearingArtwork)
+                                if interaction.clearingArtwork { ProgressView().controlSize(.small) }
+                            }
+                            if let notice = interaction.artworkNotice {
+                                Label(notice, systemImage: "checkmark.circle").foregroundStyle(.secondary)
+                            }
+                            if let error = interaction.artworkError {
+                                Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.top, 2)
+                    }
                     Divider()
                     if let error = session.accountError {
                         Label(error, systemImage: "exclamationmark.circle")

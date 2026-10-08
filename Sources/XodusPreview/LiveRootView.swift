@@ -49,21 +49,26 @@ struct LiveRootView: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                GameSetupBannerView(operations: state.gameOperations) {
-                    state.showingSetup = !session.signInPending
-                    state.showingAccount = true
+        Group {
+            if state.destination == .downloads {
+                LiveActivityView(operations: state.gameOperations)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 28) {
+                        GameSetupBannerView(operations: state.gameOperations) {
+                            state.showingSetup = !session.signInPending
+                            state.showingAccount = true
+                        }
+                        if state.destination == .library { library }
+                        else { catalog }
+                    }
+                    .padding(immersiveDestination ? 0 : 30)
                 }
-                if state.destination == .library { library }
-                else if state.destination == .discover { catalog }
-                else { LiveActivityView(operations: state.gameOperations) }
+                .modifier(LibraryScrollEdge(enabled: immersiveDestination))
+                .modifier(LibraryImmersion(enabled: immersiveDestination))
+                .background(Color(nsColor: .windowBackgroundColor))
             }
-            .padding(immersiveDestination ? 0 : 30)
         }
-        .modifier(LibraryScrollEdge(enabled: immersiveDestination))
-        .modifier(LibraryImmersion(enabled: immersiveDestination))
-        .background(Color(nsColor: .windowBackgroundColor))
         .toolbar {
             XodusToolbar(selection: state.navigationSelection, searchText: $state.query,
                          searchFocused: Binding(get: { searchFocused }, set: { searchFocused = $0 }),
@@ -288,9 +293,10 @@ struct LiveRootView: View {
 struct LiveActivityView: View {
     @ObservedObject var operations: GameOperationsController
     @EnvironmentObject private var session: LiveSession
+    @ObservedObject private var artwork = LibraryCatalogArtwork.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("Downloads").font(.largeTitle.bold())
                 Spacer()
@@ -298,61 +304,117 @@ struct LiveActivityView: View {
                     Task { await session.refreshActivity() }
                 }.disabled(!session.supports(.jobs) || session.activity.isReconciling)
             }
-            GameOperationProgressView(operations: operations)
-            if let notice = session.activityNotice {
-                Label(notice, systemImage: "exclamationmark.circle")
-                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            }
-            if session.activity.needsSnapshot {
-                Label("Refresh activity before changing a check.",
-                      systemImage: "arrow.clockwise").foregroundStyle(.secondary)
-            }
-            if session.activity.jobs.isEmpty {
-                if !operations.isBusy && operations.error == nil && operations.notice == nil {
-                    ContentUnavailableView("No downloads yet", systemImage: "arrow.down.circle",
-                        description: Text("Choose Install on a game in your PC Library."))
-                        .frame(maxWidth: .infinity, minHeight: 240)
+            .padding(.horizontal, 30).padding(.vertical, 24)
+            List {
+                if let operation = operations.operation {
+                    Section("Current") {
+                        HStack(alignment: .top, spacing: 16) {
+                            CatalogArtworkView(reference: artwork.images[operation.productID]?.cover,
+                                               status: artwork.images[operation.productID]?.cover == nil
+                                                   ? .absent : .available)
+                                .frame(width: 64, height: 96).clipped()
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .accessibilityHidden(true)
+                            GameOperationProgressView(operations: operations)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.vertical, 8)
+                    }
                 }
-            } else {
-                Text("Game details checks").font(.title2.bold())
-                Text("These checks don't download games.").foregroundStyle(.secondary)
-            }
-            ForEach(session.activity.jobs) { job in
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 14) {
-                        Image(systemName: job.state == .completed ? "checkmark.circle" : "arrow.triangle.2.circlepath")
-                            .font(.title2).foregroundStyle(.secondary)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(session.activityTitle(job)).font(.headline)
-                            Text("Game details check").font(.callout).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Text(job.state.rawValue.capitalized).foregroundStyle(.secondary)
-                        if !job.state.isTerminal, session.supports(.cancel) {
-                            Button("Cancel check") { Task { await session.changeJob(job, command: .cancel) } }
-                                .disabled(session.activity.needsSnapshot || session.activity.isReconciling)
-                        }
-                        if job.state == .failed, job.error?.retryable == true, job.attempt < 3, session.supports(.retry) {
-                            Button("Retry check") { Task { await session.changeJob(job, command: .retry) } }
-                                .disabled(session.activity.needsSnapshot || session.activity.isReconciling)
+                if operations.operation == nil, let error = operations.error {
+                    Section {
+                        ContentUnavailableView {
+                            Label("Download stopped", systemImage: "exclamationmark.triangle")
+                        } description: {
+                            Text(error)
+                        } actions: {
+                            if operations.log != nil {
+                                Button("Show log") { operations.showLog() }
+                            }
                         }
                     }
-                    if let error = job.error {
-                        Text(error.retryable && job.attempt < 3 && session.supports(.retry)
-                             ? "This check couldn't finish. Choose Retry check to try again."
-                             : "This check couldn't finish. Retrying isn't available here.")
-                            .font(.callout).foregroundStyle(.secondary)
+                }
+                if let notice = operations.notice {
+                    Section {
+                        Label(notice, systemImage: "checkmark.circle")
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("xodus.install.result")
                     }
-                    DisclosureGroup("Game info for \(session.activityTitle(job))") {
-                        Text("Product \(job.product.productID)").textSelection(.enabled)
-                        if let error = job.error { Text("Error: \(error.code)") }
+                }
+                if let notice = session.activityNotice {
+                    Section {
+                        Label(notice, systemImage: "exclamationmark.circle")
+                            .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
-                    .font(.caption).foregroundStyle(.secondary)
-                    Divider()
+                }
+                if session.activity.needsSnapshot {
+                    Section {
+                        Label("Refresh activity before changing a check.",
+                              systemImage: "arrow.clockwise").foregroundStyle(.secondary)
+                    }
+                }
+                if session.activity.jobs.isEmpty && !operations.isBusy &&
+                   operations.error == nil && operations.notice == nil {
+                    ContentUnavailableView {
+                        Label("No downloads", systemImage: "arrow.down.circle")
+                    } description: {
+                        Text("Choose Install from Library or Discover.")
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 280)
+                    .listRowBackground(Color.clear)
+                }
+                if !session.activity.jobs.isEmpty {
+                    Section("Recent game checks") {
+                        ForEach(session.activity.jobs) { job in
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack(spacing: 14) {
+                                    Image(systemName: job.state == .completed
+                                          ? "checkmark.circle" : "arrow.triangle.2.circlepath")
+                                        .font(.title2).foregroundStyle(.secondary)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(session.activityTitle(job)).font(.headline)
+                                        Text("Package check").font(.callout).foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Text(job.state.rawValue.capitalized).foregroundStyle(.secondary)
+                                }
+                                HStack {
+                                    if !job.state.isTerminal, session.supports(.cancel) {
+                                        Button("Cancel") { Task { await session.changeJob(job, command: .cancel) } }
+                                            .disabled(session.activity.needsSnapshot || session.activity.isReconciling)
+                                    }
+                                    if job.state == .failed, job.error?.retryable == true, job.attempt < 3,
+                                       session.supports(.retry) {
+                                        Button("Retry") { Task { await session.changeJob(job, command: .retry) } }
+                                            .disabled(session.activity.needsSnapshot || session.activity.isReconciling)
+                                    }
+                                }
+                                if let error = job.error {
+                                    Text(error.retryable && job.attempt < 3 && session.supports(.retry)
+                                         ? "This check couldn't finish. Retry when you're ready."
+                                         : "This check couldn't finish, and retry isn't available.")
+                                        .font(.callout).foregroundStyle(.secondary)
+                                }
+                                DisclosureGroup("Details") {
+                                    Text("Product ID: \(job.product.productID)").textSelection(.enabled)
+                                    if let error = job.error { Text("Error code: \(error.code)") }
+                                }
+                                .font(.caption).foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 6)
+                        }
+                    }
+                }
+                if let error = session.activityError {
+                    Section("Activity error") {
+                        Text(error).foregroundStyle(.secondary)
+                    }
                 }
             }
-            if let error = session.activityError {
-                DisclosureGroup("Error details") { Text(error).foregroundStyle(.secondary) }
+            .listStyle(.inset)
+            .task(id: operations.operation?.productID) {
+                guard let id = operations.operation?.productID else { return }
+                await artwork.load(ids: [id], market: session.market, language: session.language)
             }
         }
     }
