@@ -32,7 +32,9 @@ struct LibraryGame: Identifiable {
     let product: CatalogProduct?
     let owned: Bool
     let gamePass: Bool
-    var actionTitle: String { installed == nil ? "Install" : "Play" }
+    var actionTitle: String {
+        installed != nil ? "Play" : owned ? "Download" : "Install"
+    }
 
     var cover: CatalogArtworkReference? {
         if let art = pc?.artwork, [.boxArt, .poster].contains(art.role),

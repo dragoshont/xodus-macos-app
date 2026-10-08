@@ -172,10 +172,15 @@ struct PCGameTile: View {
                 InstalledPlayError(library: installed, game: match)
             } else {
                 Text("Not installed").font(.callout).foregroundStyle(.secondary)
-                Button("Install") { Task { await operations.prepareInstall(game) } }
+                Button {
+                    Task { await operations.prepareInstall(game) }
+                } label: {
+                    Label("Download", systemImage: "icloud.and.arrow.down")
+                }
                     .disabled(!operations.canStartMutation)
-                    .accessibilityLabel("Install \(game.title)")
-                    .accessibilityIdentifier("xodus.pcGames.install")
+                    .help("Download \(game.title)")
+                    .accessibilityLabel("Download \(game.title)")
+                    .accessibilityIdentifier("xodus.pcGames.download")
             }
             if let viewDetails { Button("View game", action: viewDetails) }
         }

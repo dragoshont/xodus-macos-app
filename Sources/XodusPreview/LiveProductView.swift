@@ -133,11 +133,22 @@ struct LiveProductView: View {
                                                 game: installed, usesGlass: true, prominent: true)
                             InstalledGameActions(library: installedLibrary, operations: operations,
                                                  game: installed, usesGlass: true)
-                        } else if owned != nil || gamePass {
-                            Button("Install") { beginInstall(owned ?? PCGame(product: product)) }
+                        } else if let owned {
+                            Button {
+                                beginInstall(owned)
+                            } label: {
+                                Label("Download", systemImage: "icloud.and.arrow.down")
+                            }
                                 .modifier(LibraryActionStyle())
                                 .disabled(!allowsStartupTasks || !operations.canStartMutation)
-                                .accessibilityLabel("Install \(product.title)")
+                                .help("Download \(product.title)")
+                                .accessibilityLabel("Download \(product.title)")
+                        } else if gamePass {
+                            Button("Install") { beginInstall(PCGame(product: product)) }
+                                .modifier(LibraryActionStyle())
+                                .disabled(!allowsStartupTasks || !operations.canStartMutation)
+                                .help("Install \(product.title) with PC Game Pass")
+                                .accessibilityLabel("Install \(product.title) with PC Game Pass")
                         } else {
                             Text("Access hasn't been verified.").font(.callout).foregroundStyle(.secondary)
                         }

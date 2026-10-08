@@ -211,14 +211,31 @@ struct LiveLibraryView: View {
                     InstalledPlayButton(library: installed, operations: operations, game: match,
                                         usesGlass: true, prominent: false)
                     InstalledGameActions(library: installed, operations: operations, game: match, usesGlass: true)
-                } else {
-                    Button(game.actionTitle) {
+                } else if game.owned {
+                    Button {
                         if let pc = game.pc { Task { await operations.prepareInstall(pc) } }
                         else if let product = game.product {
                             Task { await operations.prepareInstall(PCGame(product: product)) }
                         }
-                    }.modifier(LibraryActionStyle(primary: false))
-                    .disabled(!operations.canStartMutation).accessibilityLabel("Install \(game.title)")
+                    } label: {
+                        Label("Download", systemImage: "icloud.and.arrow.down")
+                    }
+                    .labelStyle(.iconOnly)
+                    .help("Download \(game.title)")
+                    .modifier(LibraryActionStyle(primary: false))
+                    .disabled(!operations.canStartMutation)
+                    .accessibilityLabel("Download \(game.title)")
+                    .accessibilityIdentifier("xodus.pcGames.download")
+                } else {
+                    Button("Install") {
+                        if let product = game.product {
+                            Task { await operations.prepareInstall(PCGame(product: product)) }
+                        }
+                    }
+                    .modifier(LibraryActionStyle(primary: false))
+                    .disabled(!operations.canStartMutation)
+                    .help("Install \(game.title) with PC Game Pass")
+                    .accessibilityLabel("Install \(game.title) with PC Game Pass")
                     .accessibilityIdentifier("xodus.pcGames.install")
                 }
             }

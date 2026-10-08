@@ -328,8 +328,10 @@ enum PreviewChecks {
             check(LibraryAccess(joined[0]) == .owned && LibraryAccess(all[0]) == nil &&
                   all.first(where: { $0.gamePass }).flatMap(LibraryAccess.init) == .gamePass,
                   "Access badges preserve purchase priority and never turn installation into entitlement")
-            check(all[0].actionTitle == "Play" && all.filter { $0.installed == nil }.allSatisfy { $0.actionTitle == "Install" },
-                  "Only installed entries say Play; uninstalled purchase/subscription cards say Install")
+            check(all[0].actionTitle == "Play" &&
+                  all.filter { $0.installed == nil && $0.owned }.allSatisfy { $0.actionTitle == "Download" } &&
+                  all.filter { $0.installed == nil && !$0.owned }.allSatisfy { $0.actionTitle == "Install" },
+                  "Installed games say Play, owned games say Download and subscription-only games say Install")
             let metadata = try JSONDecoder().decode(PCGamesCatalog.Product.self, from: Data("""
                 {"ProductId":"FIXTURE00002","Properties":{
                  "Categories":[" Action & adventure ","Role playing","Action & adventure"],

@@ -289,13 +289,25 @@ struct LiveCatalogView: View {
             InstalledPlayButton(library: installed, operations: operations, game: match,
                                 usesGlass: true, prominent: primary)
         } else if canInstall(game) {
-            Button("Install") {
+            Button {
                 if let pc = game.pc { Task { await operations.prepareInstall(pc) } }
                 else if let product = game.product { Task { await operations.prepareInstall(PCGame(product: product)) } }
+            } label: {
+                if game.owned {
+                    if primary {
+                        Label("Download", systemImage: "icloud.and.arrow.down")
+                    } else {
+                        Image(systemName: "icloud.and.arrow.down").accessibilityHidden(true)
+                    }
+                } else {
+                    Text("Install")
+                }
             }
             .modifier(LibraryActionStyle(primary: primary))
+            .help(game.owned ? "Download \(game.title)" : "Install \(game.title) with PC Game Pass")
             .disabled(!allowsStartupTasks || !operations.canStartMutation)
-            .accessibilityLabel("Install \(game.title)").accessibilityIdentifier("xodus.pcGames.install")
+            .accessibilityLabel(game.owned ? "Download \(game.title)" : "Install \(game.title) with PC Game Pass")
+            .accessibilityIdentifier(game.owned ? "xodus.pcGames.download" : "xodus.pcGames.install")
         }
     }
 
