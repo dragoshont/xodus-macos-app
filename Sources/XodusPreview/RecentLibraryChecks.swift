@@ -94,7 +94,7 @@ enum RecentLibraryChecks {
             await state.loadRecentActivityIfVisible(session: value)
             state.navigate(.library)
             await state.loadRecentActivityIfVisible(session: value)
-            check(try !state.showsRecentActivity && state.query.isEmpty
+            check(try !state.showsRecentActivity && state.query == "old Library search"
                   && value.recentLibrary == history && trace(scenario) == loaded,
                   "Back to main Library hides all activity without clearing it or making another request")
             state.openRecentActivity()
@@ -112,8 +112,10 @@ enum RecentLibraryChecks {
                 state.query = "previous activity filter"
                 state.navigate(destination)
                 await state.loadRecentActivityIfVisible(session: value)
-                check(try !state.showsRecentActivity && state.query.isEmpty && trace(scenario) == loaded,
-                      "Toolbar navigation clears activity scope and search without granting Store or ownership evidence")
+                let expectedQuery = destination == .library ? "old Library search"
+                    : destination == .discover ? title.name : ""
+                check(try !state.showsRecentActivity && state.query == expectedQuery && trace(scenario) == loaded,
+                      "Toolbar navigation restores destination search, not activity search or ownership evidence")
             }
             check(await value.disconnect(), "Neutral Library-semantics owner closes")
         }
@@ -152,7 +154,7 @@ enum RecentLibraryChecks {
                 check(value.selectedProduct == nil && state.query == title.name,
                       "Another explicit title-name route dismisses stale product selection")
                 state.navigate(.library)
-                check(state.query.isEmpty && !state.showsRecentActivity && value.recentLibrary == history,
+                check(state.query == "previous Library filter" && !state.showsRecentActivity && value.recentLibrary == history,
                       "Returning to Library hides retained activity without clearing or rereading it")
             } else if scenario == "recentstoreempty" {
                 check(value.products.isEmpty && value.catalogError == nil && value.discoveryFailures.isEmpty

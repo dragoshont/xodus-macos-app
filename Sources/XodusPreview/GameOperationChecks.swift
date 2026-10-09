@@ -331,6 +331,8 @@ enum GameOperationChecks {
         check(operations.gamePassBusy && installed.mutationActive && !operations.canQuit
               && !operations.canStartMutation && !operations.canSignIn && !operations.canCancel,
               "B5 explicit probe reserves the existing fence and cannot be cancelled as an installation")
+        check(operations.isBusy && !operations.hasDownloadStatus,
+              "Downloads keeps its empty action during unrelated Game Pass work")
         operations.checkGamePass(discoveryProducts: discoveryProducts, ownedGames: [game])
         await operations.loadGamePassCache()
         await operations.waitForMutation()
@@ -532,6 +534,8 @@ enum GameOperationChecks {
         try writeMode("checkslow")
         let checking = Task { await operations.prepareInstall(game) }
         try await wait { operations.checkingCompatibility }
+        check(operations.isBusy && !operations.hasDownloadStatus,
+              "Downloads keeps its empty action during a compatibility check")
         check(!operations.canQuit && installed.mutationActive && !operations.canStartMutation
               && !operations.canSignIn && !operations.canConfirmInstall,
               "B3: One active check shares the mutation/service/Quit fence and cannot enable Install early")

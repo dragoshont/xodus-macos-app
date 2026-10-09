@@ -109,6 +109,7 @@ enum PreviewChecks {
         state.category = .space
         check(state.visibleGames.map(\.art) == ["orbit"], "Empty-query category browse is scoped")
         state.navigate(.library)
+        state.query = ""
         state.accessFilter = .subscription
         check(state.visibleGames.count == 1, "Library access filter distinguishes subscription")
         state.accessFilter = nil
@@ -144,9 +145,9 @@ enum PreviewChecks {
             state.category = .space
             state.navigationSelection.wrappedValue = destination
             check(state.destination == destination && state.navigationSelection.wrappedValue == destination
-                  && state.query.isEmpty && state.accessFilter == nil && !state.sortByTitle
+                  && state.accessFilter == nil && !state.sortByTitle
                   && state.category == .all && !state.showingAccount && !state.showingWelcome,
-                  "Native toolbar binding preserves \(destination.rawValue) routing and clears only browse scope")
+                  "Native toolbar binding preserves \(destination.rawValue) routing and resets fixture filters")
         }
         let live = LiveSession()
         check(!state.fixtureMode, "Default application mode does not present fixture games")

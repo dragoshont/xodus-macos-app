@@ -17,6 +17,25 @@ to restyle Discover, detail, installation consent or Downloads.
 
 ## Surfaces
 
+**Launcher feedback follow-up (10 October, candidate):** retain each tab's search
+and the loaded Discover continuation rather than clearing the catalogue on
+revisit. Discover features a manually controlled horizontal hero carousel with
+up to five real catalogue titles; Continue Playing has native previous/next
+controls. Only the selected, visible hero may stream a muted trailer. Account,
+detail and consent sheets, game launch, inactive scenes, Reduce Motion and Low
+Power Mode suppress hero playback. Pausing retains the current player rather
+than restarting the trailer. Missing trailers retain artwork.
+macOS 14 retains static hero artwork because it lacks the scroll-visibility API;
+animated heroes require macOS 15 or later.
+
+Downloads exposes real management progress and cancellation, not fabricated
+jobs; its empty state provides a Browse games route. CrossOver onboarding opens
+the official CodeWeavers page for installation/trial and repeats publisher
+signature detection when the app becomes active. Alternative runtime settings
+remain declared configuration plans, not functional game-engine switching.
+That last capability requires an actual launch-provider contract and cannot be
+represented as shipped by changing a picker.
+
 **Library (Operate, C3 visual direction approved; nonshipping):** a 340-point full-width hero uses the most
 recent recorded, launchable installed game, with artwork under the system
 toolbar, a transparent catalog logo (up to 420x120 points, otherwise a 40-point

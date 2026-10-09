@@ -29,14 +29,34 @@ final class CatalogTrailerPlayback: ObservableObject {
     @Published private(set) var player: AVPlayer?
     @Published private(set) var error: String?
     private var observation: AnyCancellable?
+    private var endObservation: AnyCancellable?
 
-    func play(_ trailer: CatalogTrailer) {
+    func pause() { player?.pause() }
+    func resume() { player?.play() }
+
+    func play(_ trailer: CatalogTrailer, muted: Bool = false, loops: Bool = false) {
         stop()
         let asset = AVURLAsset(url: trailer.url, options: [AVURLAssetHTTPCookiesKey: []])
         let item = AVPlayerItem(asset: asset)
+        if muted {
+            item.preferredPeakBitRate = 1_500_000
+            item.preferredForwardBufferDuration = 5
+        }
         let player = AVPlayer(playerItem: item)
+        player.isMuted = muted
         observation = item.publisher(for: \.status).receive(on: DispatchQueue.main).sink { [weak self] status in
-            if status == .failed { self?.error = "The trailer couldn't be played. Try again or view the screenshots." }
+            if status == .failed {
+                self?.player?.pause()
+                self?.error = "The trailer couldn't be played. Try again or view the screenshots."
+            }
+        }
+        if loops {
+            endObservation = NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime, object: item)
+                .receive(on: DispatchQueue.main).sink { [weak self] _ in
+                    guard let player = self?.player, player.currentItem === item else { return }
+                    player.seek(to: .zero)
+                    player.play()
+                }
         }
         self.player = player
         player.play()
@@ -44,6 +64,7 @@ final class CatalogTrailerPlayback: ObservableObject {
 
     func stop() {
         observation = nil
+        endObservation = nil
         player?.pause()
         player?.replaceCurrentItem(with: nil)
         player = nil

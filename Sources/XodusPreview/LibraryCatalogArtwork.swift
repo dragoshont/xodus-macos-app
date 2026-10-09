@@ -138,7 +138,7 @@ final class LibraryCatalogArtwork: ObservableObject {
 }
 
 enum LibraryCapability: String, CaseIterable, Identifiable {
-    case singlePlayer = "Single player", multiplayer = "Online multiplayer", coop = "Co-op", crossPlatform = "Cross-platform"
+    case singlePlayer = "Single player", multiplayer = "Online multiplayer", coop = "Co-op", crossPlatform = "Cross-platform multiplayer"
     var id: Self { self }
     var symbol: String {
         switch self {

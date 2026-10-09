@@ -22,6 +22,7 @@ enum LibraryGridLayout {
 final class LibrarySelection: ObservableObject {
     @Published var filter: LibraryFilter = .all
     @Published var sort: LibrarySort = .title
+    @Published var recentGameID: UUID?
     var requestedGamePassScope: String?
 }
 

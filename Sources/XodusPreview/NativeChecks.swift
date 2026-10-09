@@ -50,6 +50,26 @@ enum NativeChecks {
             }
         }
         do {
+            let navigation = AppState()
+            navigation.query = "Library search"
+            navigation.navigate(.discover)
+            navigation.query = "Store search"
+            navigation.navigate(.library)
+            check(navigation.query == "Library search", "Library query survives tab navigation")
+            navigation.navigate(.discover)
+            check(navigation.query == "Store search", "Discover query survives tab navigation")
+            let playbackArguments = (true, true, false, false, true, true, true)
+            check(HeroMotionPolicy.permitsPlayback(allowed: playbackArguments.0, enabled: playbackArguments.1,
+                    reduceMotion: playbackArguments.2, lowPower: playbackArguments.3,
+                    active: playbackArguments.4, visible: playbackArguments.5, hasTrailer: playbackArguments.6),
+                  "Visible active hero can stream muted artwork")
+            for fence in 0..<8 {
+                check(!HeroMotionPolicy.permitsPlayback(allowed: fence != 0, enabled: fence != 1,
+                        reduceMotion: fence == 2, lowPower: fence == 3,
+                        active: fence != 4, visible: fence != 5, hasTrailer: fence != 6,
+                        supportsViewportVisibility: fence != 7),
+                      "Hero playback respects lifecycle fence \(fence)")
+            }
             try LibraryAccessChecks.run(check: check)
             if libraryAccessOnly {
                 try await PCGamesChecks.run(check: check)
@@ -557,6 +577,10 @@ enum NativeChecks {
                   && hundreds.gamePassCatalogExhausted && !hundreds.gamePassCatalogPaging
                   && hundreds.catalogError == nil,
                   "Game Pass selection follows every existing continuation page to hundreds of unique PC games")
+            let retainedIDs = hundreds.products.map(\.id)
+            await hundreds.loadCatalogOnEntry("")
+            check(hundreds.products.map(\.id) == retainedIDs && hundreds.products.count == 300,
+                  "Revisiting Discover retains the entire paged catalogue")
             let catalogueRows = LibraryGame.gamePassCatalog(installed: [], owned: [],
                                                             products: hundreds.gamePassProducts)
             check(catalogueRows.count == 300 && catalogueRows.allSatisfy { !$0.owned && $0.gamePass }

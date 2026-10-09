@@ -120,8 +120,11 @@ struct InstalledPlayButton: View {
     var usesGlass = false
     var prominent = true
     var heroStyle = false
+    private var launching: Bool {
+        library.runningGameID == game.id && library.playState == .launching
+    }
     private var title: String {
-        canStop ? "Stop" : library.runningGameID == game.id ? "Launching"
+        library.stoppingGameID == game.id ? "Stopping" : launching ? "Launching" : canStop ? "Stop"
             : library.playErrors[game.id] == nil ? "Play" : "Try again"
     }
 
@@ -144,11 +147,11 @@ struct InstalledPlayButton: View {
         .disabled(canStop ? !library.canStop(game) || !operations.canStartMutation
                   : library.runningGameID != nil || library.stoppingGameID != nil || library.editing || library.choosing
                   || library.mutationGameID == game.id || library.serviceSignInActive || library.runtimeRepairActive)
-        .accessibilityLabel(canStop ? "Stop \(game.title)" : "Play \(game.title)")
-        .accessibilityValue(library.stoppingGameID == game.id ? "Stopping" : "")
+        .accessibilityLabel(canStop ? "Stop \(game.title)" : launching ? "Launching \(game.title)" : "Play \(game.title)")
+        .accessibilityValue(library.stoppingGameID == game.id ? "Stopping" : launching ? "Launching" : "")
         .accessibilityIdentifier(canStop ? "xodus.installed.stop" : "xodus.installed.play")
-        if library.stoppingGameID == game.id {
-            ProgressView("Stopping").controlSize(.small)
+        if library.stoppingGameID == game.id || launching {
+            ProgressView(library.stoppingGameID == game.id ? "Stopping" : "Launching").controlSize(.small)
         }
     }
 }

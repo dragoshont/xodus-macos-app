@@ -70,6 +70,9 @@ final class GameOperationsController: ObservableObject {
     var isBusy: Bool {
         operation != nil || checkingCompatibility || gamePassBusy || setupBusy || installed.stoppingGameID != nil
     }
+    var hasDownloadStatus: Bool {
+        operation != nil || error != nil || notice != nil
+    }
     var canSignIn: Bool {
         !serviceBusy && !isBusy && !recoveryRequired && !installed.mutationActive
             && installed.runningGameID == nil && !terminating

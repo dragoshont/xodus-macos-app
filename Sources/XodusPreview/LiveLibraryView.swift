@@ -11,11 +11,13 @@ struct LiveLibraryView: View {
     let query: String
     var allowsStartupTasks = true
     var allowsArtworkLoading: Bool? = nil
+    var allowsHeroAnimation = true
     let browse: () -> Void
     let recentActivity: () -> Void
     @StateObject private var selection = LibrarySelection()
     @ObservedObject private var art = LibraryCatalogArtwork.shared
     @ObservedObject private var xboxStats = LibraryXboxStats.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var artworkAllowed: Bool { allowsArtworkLoading ?? allowsStartupTasks }
     private var filter: LibraryFilter {
         get { selection.filter }
@@ -54,8 +56,11 @@ struct LiveLibraryView: View {
                             logos: (xboxStats.cache?.games[game.storeId]?.logo.map { [$0] } ?? []) +
                                 (art.images[game.storeId]?.logos ?? []),
                             allowsArtworkLoading: artworkAllowed) {
-                    LibraryLandscapeView(references: art.images[game.storeId]?.landscape ?? [],
-                                         installed: game, allowsLoading: artworkAllowed)
+                    LibraryHeroMedia(trailer: art.images[game.storeId]?.detail?.trailers.first,
+                                     allowsPlayback: allowsStartupTasks && allowsHeroAnimation) {
+                        LibraryLandscapeView(references: art.images[game.storeId]?.landscape ?? [],
+                                             installed: game, allowsLoading: artworkAllowed)
+                    }
                 } poster: {
                     LibraryLandscapeView(references: art.images[game.storeId]?.cover.map { [$0] } ?? [],
                                          installed: game, allowsLoading: artworkAllowed)
@@ -192,6 +197,12 @@ struct LiveLibraryView: View {
             HStack {
                 Text("Continue Playing").font(.title2.weight(.semibold))
                 Spacer()
+                Button("Previous game", systemImage: "chevron.left") { moveRecent(by: -1) }
+                    .labelStyle(.iconOnly).buttonBorderShape(.circle)
+                    .disabled(recentIndex == 0)
+                Button("Next game", systemImage: "chevron.right") { moveRecent(by: 1) }
+                    .labelStyle(.iconOnly).buttonBorderShape(.circle)
+                    .disabled(recentIndex >= continuing.count - 1)
                 Button("See All") { filter = .installed; sort = .recentlyPlayed }
                     .accessibilityLabel("Show installed games by last played")
             }
@@ -216,12 +227,30 @@ struct LiveLibraryView: View {
                                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                             }
                             InstalledPlayError(library: installed, game: game)
-                        }.frame(width: 260, alignment: .leading)
+                        }.frame(width: 260, alignment: .leading).id(game.id)
                     }
                 }
                 .scrollTargetLayout()
             }
             .scrollIndicators(.hidden).scrollTargetBehavior(.viewAligned)
+            .scrollPosition(id: $selection.recentGameID, anchor: .leading)
+            .onChange(of: continuing.map(\.id), initial: true) { _, ids in
+                if selection.recentGameID.map({ !ids.contains($0) }) ?? true {
+                    selection.recentGameID = ids.first
+                }
+            }
+        }
+    }
+
+    private var recentIndex: Int {
+        continuing.firstIndex { $0.id == selection.recentGameID } ?? 0
+    }
+
+    private func moveRecent(by offset: Int) {
+        let index = min(max(recentIndex + offset, 0), continuing.count - 1)
+        guard continuing.indices.contains(index) else { return }
+        withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) {
+            selection.recentGameID = continuing[index].id
         }
     }
 

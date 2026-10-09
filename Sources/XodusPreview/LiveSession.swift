@@ -1147,6 +1147,8 @@ final class LiveSession: ObservableObject {
         await queueCatalog(query, command: .search, more: more)
     }
 
+    private var catalogRequestScope: String?
+
     private func queueCatalog(_ query: String, command: ManagementCommand, more: Bool) async {
         guard isReady, supports(command) else { return }
         guard validScope else { catalogError = "Use a two-letter market and a language such as en-US."; return }
@@ -1157,6 +1159,7 @@ final class LiveSession: ObservableObject {
         queuedCatalog = CatalogRequest(command: command, query: query, market: market, language: language,
             cursor: more ? nextCursor : nil, more: more, generation: generation, queryGeneration: queryGeneration)
         currentQuery = query
+        catalogRequestScope = "\(market):\(language)"
         if !more {
             products = []
             nextCursor = nil
@@ -1230,6 +1233,17 @@ final class LiveSession: ObservableObject {
             guard isCurrent(request) else { return }
             catalogError = Self.describe(error)
         }
+    }
+
+    func loadCatalogOnEntry(_ query: String) async {
+        let scopedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let corpus = scopedQuery.isEmpty && supports(.discover) ? "pcGamePassDiscovery"
+            : !scopedQuery.isEmpty && supports(.query) ? "publicMicrosoftStoreSearch" : "observedPublicProducts"
+        if currentQuery == scopedQuery, catalogCorpus == corpus,
+           catalogRequestScope == "\(market):\(language)",
+           !catalogStopped, catalogError == nil,
+           searching || discoveryCheckedAt != nil || cacheRevision != nil { return }
+        await refreshCatalog(scopedQuery)
     }
 
     func refreshCatalog(_ query: String, more: Bool = false) async {

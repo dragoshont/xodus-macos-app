@@ -13,6 +13,14 @@ struct LiveRootView: View {
 #endif
 
     private var scopedQuery: String { state.query.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var heroAnimationAllowed: Bool {
+        startupAllowed && !state.showingAccount && session.selectedProduct == nil
+            && !session.signInPending && state.gameOperations.installConsent == nil
+            && state.gameOperations.uninstallConsent == nil
+            && !state.gameOperations.preparingConsent
+            && state.installedGames.runningGameID == nil
+            && !state.installedGames.mutationActive
+    }
     private var startupAllowed: Bool {
 #if XODUS_SHIPPING
         true
@@ -51,7 +59,7 @@ struct LiveRootView: View {
         ScrollViewReader { proxy in
         Group {
             if state.destination == .downloads {
-                LiveActivityView(operations: state.gameOperations)
+                LiveActivityView(operations: state.gameOperations) { state.navigate(.discover) }
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 28) {
@@ -140,7 +148,10 @@ struct LiveRootView: View {
             }
         }
         .task(id: scenePhase == .active) {
-            if startupAllowed, scenePhase == .active { await refreshXboxStats() }
+            if startupAllowed, scenePhase == .active {
+                await refreshXboxStats()
+                await state.runtimeSettings.refreshCrossOverDependency()
+            }
         }
         .task(id: "\(state.gameOperations.serviceStatus?.accountHash ?? ""):\(state.gameOperations.serviceStatus?.signedIn == true):\(state.gameOperations.serviceSigningIn)") {
             if startupAllowed {
@@ -162,7 +173,7 @@ struct LiveRootView: View {
             guard startupAllowed, state.destination == .discover else { return }
             do { try await Task.sleep(for: .milliseconds(250)) }
             catch { return }
-            await session.refreshCatalog(state.query)
+            await session.loadCatalogOnEntry(state.query)
         }
         .sheet(isPresented: $state.showingAccount, onDismiss: {
             state.showingSetup = false
@@ -223,6 +234,7 @@ struct LiveRootView: View {
                                 operations: state.gameOperations, query: scopedQuery,
                                 allowsStartupTasks: startupAllowed,
                                 allowsArtworkLoading: libraryArtworkAllowed,
+                                allowsHeroAnimation: heroAnimationAllowed,
                                 browse: { state.navigate(.discover) },
                                 recentActivity: { state.openRecentActivity() })
             }
@@ -294,12 +306,14 @@ struct LiveRootView: View {
         LiveCatalogView(library: state.pcGames, installed: state.installedGames,
                         operations: state.gameOperations, query: scopedQuery,
                         allowsArtworkLoading: libraryArtworkAllowed,
-                        allowsStartupTasks: startupAllowed, clearSearch: { state.query = "" })
+                        allowsStartupTasks: startupAllowed, allowsHeroAnimation: heroAnimationAllowed,
+                        clearSearch: { state.query = "" })
     }
 }
 
 struct LiveActivityView: View {
     @ObservedObject var operations: GameOperationsController
+    var browseGames: () -> Void = {}
     @EnvironmentObject private var session: LiveSession
     @ObservedObject private var artwork = LibraryCatalogArtwork.shared
 
@@ -355,18 +369,20 @@ struct LiveActivityView: View {
                             .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                if session.activity.needsSnapshot {
+                if session.activity.needsSnapshot && !session.activity.jobs.isEmpty {
                     Section {
                         Label("Refresh activity before changing a check.",
                               systemImage: "arrow.clockwise").foregroundStyle(.secondary)
                     }
                 }
-                if session.activity.jobs.isEmpty && !operations.isBusy &&
-                   operations.error == nil && operations.notice == nil {
+                if session.activity.jobs.isEmpty && !operations.hasDownloadStatus {
                     ContentUnavailableView {
                         Label("No downloads", systemImage: "arrow.down.circle")
                     } description: {
-                        Text("Choose Install from Library or Discover.")
+                        Text("Install a game from Library or Discover. Download progress and cancellation appear here once an installation starts.")
+                    } actions: {
+                        Button("Browse games", action: browseGames)
+                            .accessibilityIdentifier("xodus.downloads.browse")
                     }
                     .frame(maxWidth: .infinity, minHeight: 280)
                     .listRowBackground(Color.clear)

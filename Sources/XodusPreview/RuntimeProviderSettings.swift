@@ -271,7 +271,7 @@ struct RuntimeProviderSection: View {
             }
             if let plan = settings.plan {
                 LabeledContent("Planned generation", value: plan.generationID)
-                Text("The plan did not inspect a runtime. The separate CrossOver app check is not device preflight or game verification; Play remains unavailable.")
+                Text("This plan does not change the engine used by installed games. The separate CrossOver app check is not device preflight or game verification.")
                     .foregroundStyle(.secondary)
                 Text("No existing bottle, prefix or saves were reused, migrated or deleted. This plan creates no files.")
                     .font(.caption).foregroundStyle(.secondary)

@@ -222,9 +222,15 @@ struct LiveAccountView: View {
 struct LiveSettingsView: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var session: LiveSession
+    @AppStorage("Xodus.heroAnimationsEnabled") private var heroAnimationsEnabled = true
 
     var body: some View {
         Form {
+            Section("Artwork") {
+                Toggle("Animate featured game artwork", isOn: $heroAnimationsEnabled)
+                Text("Muted trailers stream only while the featured artwork is visible. Reduce Motion and Low Power Mode use the poster instead.")
+                    .foregroundStyle(.secondary)
+            }
             Section("Xodus engine") {
 #if XODUS_SHIPPING
                 Text("Only this app's approved bundled engine and sign-in helper can be used. Gameplay runtime certification is separate.")

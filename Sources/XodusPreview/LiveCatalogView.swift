@@ -5,6 +5,7 @@ import XodusManagement
 @MainActor
 final class DiscoverSelection: ObservableObject {
     @Published var genre: String?
+    @Published var featuredID: String?
 }
 
 enum DiscoverBrowse {
@@ -63,9 +64,11 @@ struct LiveCatalogView: View {
     @Environment(\.openSettings) private var openSettings
     @ObservedObject private var art = LibraryCatalogArtwork.shared
     @StateObject private var selection = DiscoverSelection()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let query: String
     var allowsArtworkLoading = true
     var allowsStartupTasks = true
+    var allowsHeroAnimation = true
     let clearSearch: () -> Void
 
     private var results: CatalogSearchResults {
@@ -95,7 +98,7 @@ struct LiveCatalogView: View {
     var body: some View {
         let results = self.results
         VStack(alignment: .leading, spacing: 28) {
-            if query.isEmpty, let featured = visible.first { hero(game(featured)) }
+            if query.isEmpty, !visible.isEmpty { featuredCarousel }
             VStack(alignment: .leading, spacing: 28) {
                 if query.isEmpty {
                     if !genres.isEmpty { browseGenres }
@@ -196,13 +199,67 @@ struct LiveCatalogView: View {
             pcCandidate: game.pc != nil || game.product?.pcCatalogCandidate == true)
     }
 
-    private func hero(_ game: LibraryGame) -> some View {
+    private var featuredGames: [CatalogProduct] { Array(visible.prefix(5)) }
+
+    private var featuredCarousel: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .bottomTrailing) {
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: 0) {
+                        ForEach(featuredGames) { product in
+                            hero(game(product), selected: selection.featuredID == product.id)
+                                .frame(width: geometry.size.width).id(product.id)
+                        }
+                    }
+                    .scrollTargetLayout()
+                }
+                .scrollIndicators(.hidden).scrollTargetBehavior(.paging)
+                .scrollPosition(id: $selection.featuredID)
+                if featuredGames.count > 1 {
+                    HStack(spacing: 12) {
+                        Button("Previous featured game", systemImage: "chevron.left") { moveFeatured(-1) }
+                            .disabled(featuredIndex == 0)
+                        Text("\(featuredIndex + 1) of \(featuredGames.count)")
+                            .font(.caption).monospacedDigit()
+                            .accessibilityLabel("Featured game \(featuredIndex + 1) of \(featuredGames.count)")
+                        Button("Next featured game", systemImage: "chevron.right") { moveFeatured(1) }
+                            .disabled(featuredIndex == featuredGames.count - 1)
+                    }
+                    .buttonBorderShape(.circle)
+                    .modifier(LibraryActionStyle(primary: false))
+                    .padding(24)
+                }
+            }
+        }
+        .frame(height: 340)
+        .onChange(of: featuredGames.map(\.id), initial: true) { _, ids in
+            if selection.featuredID.map({ !ids.contains($0) }) ?? true { selection.featuredID = ids.first }
+        }
+    }
+
+    private var featuredIndex: Int {
+        featuredGames.firstIndex { $0.id == selection.featuredID } ?? 0
+    }
+
+    private func moveFeatured(_ offset: Int) {
+        let index = featuredIndex + offset
+        guard featuredGames.indices.contains(index) else { return }
+        withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
+            selection.featuredID = featuredGames[index].id
+        }
+    }
+
+    private func hero(_ game: LibraryGame, selected: Bool) -> some View {
         ZStack(alignment: .bottomLeading) {
-            LibraryLandscapeView(references: landscape(game), installed: game.installed,
-                                 allowsLoading: allowsArtworkLoading)
+            LibraryHeroMedia(trailer: art.images[game.id]?.detail?.trailers.first,
+                             allowsPlayback: allowsStartupTasks && allowsHeroAnimation && selected) {
+                LibraryLandscapeView(references: landscape(game), installed: game.installed,
+                                     allowsLoading: allowsArtworkLoading)
+            }
             LinearGradient(colors: [.clear, Color(nsColor: .windowBackgroundColor).opacity(0.5),
                                     Color(nsColor: .windowBackgroundColor)],
                            startPoint: .top, endPoint: .bottom)
+                .allowsHitTesting(false)
             VStack(alignment: .leading, spacing: 14) {
                 LibraryLogoTitle(title: game.title, references: art.images[game.id]?.logos ?? [],
                                  allowsLoading: allowsArtworkLoading)

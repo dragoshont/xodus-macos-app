@@ -71,6 +71,7 @@ final class AppState: ObservableObject {
     @Published var showingSetup = false
     @Published var destination: Destination = .library
     @Published var query = ""
+    private var destinationQueries: [Destination: String] = [:]
     @Published private(set) var liveLibraryScope: LiveLibraryScope = .games
 
     var showsRecentActivity: Bool {
@@ -82,8 +83,9 @@ final class AppState: ObservableObject {
     }
 
     func navigate(_ value: Destination) {
+        if !showsRecentActivity { destinationQueries[destination] = query }
         destination = value
-        query = ""
+        query = destinationQueries[value] ?? ""
         liveLibraryScope = .games
 #if !XODUS_SHIPPING
         accessFilter = nil
@@ -94,6 +96,7 @@ final class AppState: ObservableObject {
 
     func openRecentActivity() {
         navigate(.library)
+        query = ""
         liveLibraryScope = .recentActivity
     }
 

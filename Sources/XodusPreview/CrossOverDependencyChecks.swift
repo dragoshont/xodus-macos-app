@@ -162,7 +162,7 @@ enum CrossOverDependencyChecks {
             let presentation = RuntimeProviderSettings(detectCrossOver: { state })
             await presentation.refreshCrossOverDependency()
             check(state.explanation.contains("license") && state.explanation.contains(
-                state.isVerified ? "game launch remains unavailable" : "official"),
+                state.isVerified ? "Game readiness is checked separately" : "official"),
                   "RT04 Shared dependency copy distinguishes app identity from license and gameplay evidence")
             for width in [CGFloat(440), CGFloat(560)] {
                 let host = NSHostingView(rootView: RuntimeDependencyStatus(settings: presentation,
