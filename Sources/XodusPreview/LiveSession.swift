@@ -48,15 +48,20 @@ final class LiveSession: ObservableObject {
     @Published private(set) var gamePassCatalogLoading = false
     @Published private(set) var gamePassCatalogError: String?
     @Published private(set) var gamePassCatalogCheckedAt: String?
+    @Published private(set) var gamePassCatalogPaging = false
+    @Published private(set) var gamePassCatalogHasMore = false
+    @Published private(set) var gamePassCatalogExhausted = false
 
     var gamePassLibraryNotice: String {
         if gamePassCatalogError != nil {
-            return "PC Game Pass catalog couldn't finish refreshing. Saved catalog records are retained, not current access grants. Missing titles don't prove non-membership."
+            return "Some PC Game Pass games couldn't load. Saved catalogue entries are retained; refresh to try again. Account and edition access is checked before installation."
         }
         if gamePassProducts.isEmpty {
-            return "PC Game Pass per-game account access isn't verified. A subscription probe and public catalog alone don't supply an eligible personal game list."
+            return "Load the PC Game Pass catalogue to browse available games. Your account and selected edition are checked before installation."
         }
-        return "Partial public PC Game Pass catalog, not account access proof. Saved records may be unconfirmed; missing titles don't prove non-membership. Refresh cannot resolve the selected edition's account access with the current contract."
+        return gamePassCatalogHasMore
+            ? "More PC Game Pass games are available to load. Catalogue membership is separate from your account's access."
+            : "PC Game Pass catalogue. Availability varies by account, edition and region; access and Mac support are checked before installation."
     }
     @Published var selectedProduct: CatalogProduct?
     @Published var errorMessage: String?
@@ -90,6 +95,7 @@ final class LiveSession: ObservableObject {
     private var cacheRevision: UInt64?
     private var discoveryRevision: String?
     private var gamePassRevision: String?
+    private var gamePassPagingID: UUID?
     private let configuration: BackendConfiguration?
     private let signInPollingBudget: Duration
     private var signInDeadline: ContinuousClock.Instant?
@@ -778,6 +784,10 @@ final class LiveSession: ObservableObject {
         gamePassCatalogLoading = false
         gamePassCatalogError = nil
         gamePassCatalogCheckedAt = nil
+        gamePassCatalogPaging = false
+        gamePassPagingID = nil
+        gamePassCatalogHasMore = false
+        gamePassCatalogExhausted = false
         diagnosticPreview = nil
         diagnosticPreviewing = false
         diagnosticSaved = false
@@ -1207,6 +1217,52 @@ final class LiveSession: ObservableObject {
         } else { await search(scopedQuery, more: more) }
     }
 
+    func loadGamePassCatalog(refresh: Bool = false) async {
+        guard isReady, supports(.discover), validScope, !gamePassCatalogPaging,
+              !Task.isCancelled else { return }
+        let owner = UUID(), token = generation, scopeMarket = market, scopeLanguage = language
+        gamePassPagingID = owner
+        gamePassCatalogPaging = true
+        defer {
+            if gamePassPagingID == owner {
+                gamePassPagingID = nil
+                gamePassCatalogPaging = false
+            }
+        }
+        func current() -> Bool {
+            !Task.isCancelled && generation == token && gamePassPagingID == owner &&
+                market == scopeMarket && language == scopeLanguage && isReady
+        }
+        if searching { await catalogTask?.value }
+        guard current() else { return }
+        if refresh || catalogCorpus != "pcGamePassDiscovery" || !currentQuery.isEmpty ||
+            discoveryCheckedAt == nil {
+            gamePassCatalogExhausted = false
+            await refreshCatalog("")
+        } else if gamePassCatalogExhausted && nextCursor == nil {
+            return
+        }
+        guard current(), catalogCorpus == "pcGamePassDiscovery", currentQuery.isEmpty,
+              catalogError == nil, !catalogStopped else { return }
+        var cursors = Set<String>()
+        for _ in 0..<32 {
+            guard current(), catalogCorpus == "pcGamePassDiscovery", currentQuery.isEmpty,
+                  catalogError == nil, !catalogStopped, let cursor = nextCursor else { return }
+            guard products.count + discoveryFailures.count < 512 else {
+                gamePassCatalogError = "The catalogue reached this build's limit. Some games remain unloaded."
+                return
+            }
+            guard cursors.insert(cursor).inserted else {
+                gamePassCatalogError = "Xbox returned a repeated catalogue page. Refresh to try again."
+                return
+            }
+            await refreshCatalog("", more: true)
+        }
+        if current(), nextCursor != nil {
+            gamePassCatalogError = "The catalogue is partially loaded. Choose Load remaining games to continue."
+        }
+    }
+
     func catalogMatches(query: String) -> Bool {
         currentQuery == query.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -1220,6 +1276,8 @@ final class LiveSession: ObservableObject {
         catalogError = nil
         gamePassCatalogLoading = false
         gamePassCatalogError = "Catalog refresh stopped"
+        gamePassPagingID = nil
+        gamePassCatalogPaging = false
     }
 
     private func queryStore(_ request: CatalogRequest) async {
@@ -1314,6 +1372,8 @@ final class LiveSession: ObservableObject {
             discoveryFailures = page.failures
         }
         nextCursor = page.nextCursor
+        gamePassCatalogHasMore = page.nextCursor != nil
+        gamePassCatalogExhausted = page.nextCursor == nil
         discoveryRevision = page.corpusRevision
         discoveryCheckedAt = page.checkedAt
         catalogCorpus = page.corpus
@@ -1360,6 +1420,10 @@ final class LiveSession: ObservableObject {
         gamePassCatalogLoading = false
         gamePassCatalogError = nil
         gamePassCatalogCheckedAt = nil
+        gamePassPagingID = nil
+        gamePassCatalogPaging = false
+        gamePassCatalogHasMore = false
+        gamePassCatalogExhausted = false
         discoveryFailures = []
         discoveryCheckedAt = nil
         catalogCorpus = "observedPublicProducts"

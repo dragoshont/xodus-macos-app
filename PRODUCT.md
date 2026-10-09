@@ -49,6 +49,16 @@ grant. Only successful preflight and explicit confirmation can proceed.
 The first SDD candidate removed this working route; the frontend follow-up
 restores it without admitting unresolved titles to the personal Library.
 
+The Game Pass filter is a **PC Game Pass catalogue** scope, not an owned-only
+intersection. It follows the existing discovery continuation until the current
+feed is exhausted, interrupted or this build's bounded limit is reached.
+Catalogue cards join exact account-held and installed identities so both
+Owned and Game Pass badges can coexist; browsing does not establish package
+access or add unverified entries to the qualified All/Owned collection.
+Progress, partial failures and manual refresh/continue remain explicit. Cover
+grids top-align artwork regardless of metadata height; installed cards keep
+Play visible at rest, with Installed as secondary status.
+
 **Proposed v1:** account connection, entitled PC library, scoped catalog discovery, edition selection, explicit eligibility and compatibility, installation planning, durable downloads/recovery, launch, safe updates/removal and redacted diagnostics.
 
 **Not promised in v1:** party/chat/LFG, follower counts not supplied by Xbox,

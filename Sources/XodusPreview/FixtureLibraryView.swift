@@ -92,7 +92,7 @@ struct FixtureLibraryView: View {
                         } description: { Text("Invented library data only. Change the filter or fixture scenario.") }
                         actions: { Button("Show all fixture games") { filter = .all; state.query = ""; state.inventory = .complete } }
                     } else {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 170, maximum: 220), spacing: 24)],
+                        LazyVGrid(columns: LibraryGridLayout.columns,
                                   alignment: .leading, spacing: 30) {
                             ForEach(games) { game in
                                 LibraryCover(title: game.title, open: { state.selectedGame = game }) {

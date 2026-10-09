@@ -12,6 +12,12 @@ enum LibrarySort: String, CaseIterable, Identifiable {
     var id: Self { self }
 }
 
+enum LibraryGridLayout {
+    static var columns: [GridItem] {
+        [GridItem(.adaptive(minimum: 170, maximum: 220), spacing: 24, alignment: .top)]
+    }
+}
+
 @MainActor
 final class LibrarySelection: ObservableObject {
     @Published var filter: LibraryFilter = .all
@@ -98,6 +104,17 @@ struct LibraryGame: Identifiable {
         return visible(records, query: query, filter: .installed, sort: sort)
     }
 
+    static func gamePassCatalog(installed: [InstalledGame], owned: [PCGame],
+                                products: [CatalogProduct]) -> [Self] {
+        let held = Dictionary(owned.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let local = Dictionary(installed.map { ($0.storeId, $0) }, uniquingKeysWith: { first, _ in first })
+        var seen = Set<String>()
+        return products.filter { $0.pcCatalogCandidate && seen.insert($0.id).inserted }.map {
+            Self(id: $0.id, title: $0.title, installed: local[$0.id], pc: held[$0.id],
+                 product: $0, owned: held[$0.id] != nil, gamePass: true)
+        }
+    }
+
     static func continuing(_ qualified: [Self], launchableIDs: Set<UUID>) -> [InstalledGame] {
         qualified.compactMap(\.installed)
             .filter { $0.lastPlayedAt != nil && launchableIDs.contains($0.id) }
@@ -149,7 +166,7 @@ struct LibraryControls: View {
 
     private var heading: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text("Your Games").font(.title2.weight(.semibold))
+            Text(filter == .gamePass ? "PC Game Pass" : "Your Games").font(.title2.weight(.semibold))
             Text(count.formatted()).font(.title3).foregroundStyle(.secondary)
         }
     }
@@ -377,6 +394,7 @@ struct LibraryScrollEdge: ViewModifier {
 struct LibraryCover<Artwork: View, Actions: View, Status: View>: View {
     let title: String
     var openLabel = "Open"
+    var alwaysShowsActions = false
     let open: () -> Void
     @ViewBuilder let artwork: () -> Artwork
     @ViewBuilder let status: () -> Status
@@ -384,7 +402,7 @@ struct LibraryCover<Artwork: View, Actions: View, Status: View>: View {
     @StateObject private var interaction = LibraryCoverInteraction()
     @FocusState private var focused: Bool
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
-    private var showsActions: Bool { interaction.hovered || focused || voiceOver }
+    private var showsActions: Bool { alwaysShowsActions || interaction.hovered || focused || voiceOver }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {

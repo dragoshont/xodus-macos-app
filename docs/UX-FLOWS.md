@@ -33,6 +33,23 @@ launch it. Actual preflight and explicit confirmation still gate installation.
 The earlier SDD candidate removed this working route; the frontend follow-up
 restores it and removes the disconnected Install-policy assertion.
 
+Selecting Game Pass changes the heading to **PC Game Pass** and browses the
+loaded public PC membership catalogue, including titles not separately held
+in the user's collection. The view follows existing continuation pages instead
+of stopping after the first 16. It shows real count/loading/partial states and
+never claims a fixed number of titles or complete account entitlement coverage.
+Owned and Game Pass remain independent; selecting All/Owned returns to the
+qualified personal Library. Per-game Check Game Pass access remains preflight,
+not download confirmation.
+
+Cover artwork shares a top-aligned native adaptive grid across Library,
+Discover and fixtures. Different title/metadata heights do not raise or lower
+posters. Play remains visible on installed cards; Installed is secondary status,
+not an inert action button. Apple HIG references: [Collections](https://developer.apple.com/design/human-interface-guidelines/collections),
+[Lists and tables](https://developer.apple.com/design/human-interface-guidelines/lists-and-tables),
+[Buttons](https://developer.apple.com/design/human-interface-guidelines/buttons)
+and [Progress indicators](https://developer.apple.com/design/human-interface-guidelines/progress-indicators).
+
 **Current shipping boundary:** the proposed artwork-led screens below are not
 synthetic production content. The live source uses native window-background
 setup/empty/loading/error/data views until rights-cleared real art exists.

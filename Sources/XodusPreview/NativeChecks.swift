@@ -537,6 +537,37 @@ enum NativeChecks {
                   "Successful continuation retains earlier failures without ownership promotion")
             await discovery.disconnect()
 
+            let hundreds = session("discoveryhundreds")
+            await hundreds.connect()
+            await hundreds.loadGamePassCatalog()
+            check(hundreds.gamePassProducts.count == 300
+                  && hundreds.gamePassProductIDs.count == 300
+                  && hundreds.nextCursor == nil && !hundreds.gamePassCatalogHasMore
+                  && hundreds.gamePassCatalogExhausted && !hundreds.gamePassCatalogPaging
+                  && hundreds.catalogError == nil,
+                  "Game Pass selection follows every existing continuation page to hundreds of unique PC games")
+            let catalogueRows = LibraryGame.gamePassCatalog(installed: [], owned: [],
+                                                            products: hundreds.gamePassProducts)
+            check(catalogueRows.count == 300 && catalogueRows.allSatisfy { !$0.owned && $0.gamePass }
+                  && LibraryGame.collection(installed: [], owned: [], products: [],
+                    gamePass: hundreds.gamePassProducts, active: true).isEmpty,
+                  "Full Game Pass browsing does not invent ownership or promote unresolved grants into personal access")
+            await hundreds.loadGamePassCatalog()
+            check(hundreds.gamePassProducts.count == 300 && !hundreds.gamePassCatalogPaging,
+                  "Completed Game Pass paging is reused without render-triggered reload or duplicate games")
+            await hundreds.disconnect()
+            check(!hundreds.gamePassCatalogPaging && !hundreds.gamePassCatalogHasMore
+                  && !hundreds.gamePassCatalogExhausted && hundreds.gamePassProducts.isEmpty,
+                  "Disconnect retires the full catalogue scope and paging state")
+
+            let repeatedPage = session("discoveryrepeatedpage")
+            await repeatedPage.connect()
+            await repeatedPage.loadGamePassCatalog()
+            check(repeatedPage.gamePassProducts.count == 16
+                  && repeatedPage.gamePassCatalogError != nil && !repeatedPage.gamePassCatalogPaging,
+                  "Repeated catalogue cursors stop with explicit partial coverage instead of looping or duplicating games")
+            await repeatedPage.disconnect()
+
             let partialFeed = session("discoveryrefresh")
             await partialFeed.connect()
             await partialFeed.refreshCatalog("")

@@ -10,6 +10,41 @@ enum NativeUIChecks {
         catch { check(false, "Native image threshold/thumbnail checks complete without network access") }
         let application = NSApplication.shared
         let windows = application.windows.count
+        let colours: [Color] = [.red, .green, .blue]
+        let covers = LazyVGrid(columns: LibraryGridLayout.columns, alignment: .leading, spacing: 30) {
+            ForEach(0..<3) { index in
+                LibraryCover(title: index == 1 ? "A longer two-line game title" : "Game \(index)",
+                             open: {}) {
+                    colours[index]
+                } status: {
+                    Text(Array(repeating: "Metadata", count: index + 1).joined(separator: "\n"))
+                } actions: { EmptyView() }
+            }
+        }
+        .frame(width: 558, height: 520, alignment: .topLeading).background(.white)
+        if let image = ImageRenderer(content: covers).cgImage,
+           let context = CGContext(data: nil, width: image.width, height: image.height,
+                bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) {
+            context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+            if let bytes = context.data?.assumingMemoryBound(to: UInt8.self) {
+                let starts = [85, 279, 473].enumerated().map { channel, x in
+                    (0..<image.height).first { y in
+                        let offset = (y * image.width + x) * 4
+                        let colour = (0..<3).map { Int(bytes[offset + $0]) }
+                        return colour[channel] > 128 &&
+                            colour.enumerated().allSatisfy {
+                                $0.offset == channel || $0.element < colour[channel] - 50
+                            }
+                    }
+                }
+                check(starts.allSatisfy { $0 != nil } && Set(starts.compactMap { $0 }).count == 1,
+                      "Actual native cover grid aligns artwork despite unequal title and metadata heights")
+            } else { check(false, "Native cover-grid pixels are available for alignment measurement") }
+        } else { check(false, "Native cover grid renders offscreen without a window") }
+        check(application.windows.count == windows,
+              "Artwork alignment regression creates no native window or foreground action")
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             for reduceTransparency in [false, true] {
                 let chrome = NSHostingView(rootView: HStack {

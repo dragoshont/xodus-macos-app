@@ -911,7 +911,8 @@ enum MockBackend {
             if scenario.hasPrefix("recent") { supported.formUnion([.libraryRecent, .query]) }
             if scenario == "verify" || scenario.hasPrefix("verify-") { supported.insert(.authVerify) }
             if scenario == "diagnostics" { supported.insert(.diagnostics) }
-            if ["discoveryfail", "discoveryrecover", "discoverypcflag", "discoveryrefresh"].contains(scenario) { supported.insert(.discover) }
+            if ["discoveryfail", "discoveryrecover", "discoverypcflag", "discoveryrefresh",
+                "discoveryhundreds", "discoveryrepeatedpage"].contains(scenario) { supported.insert(.discover) }
             if ["queryfail", "badqueryfail", "queryempty", "queryslow", "querynodetails",
                 "querynulldetails", "querycoalesce", "startupquery", "publiccapture", "uifailures", "discoverypcflag"].contains(scenario) { supported.insert(.query) }
             if scenario == "startupquery" { supported.insert(.search) }
@@ -1339,6 +1340,46 @@ enum MockBackend {
                                 catch { exit(3) }
                             }
                         }
+                        continue
+                    }
+                    if ["discoveryhundreds", "discoveryrepeatedpage"].contains(scenario),
+                       command == "catalog.discover" {
+                        guard request["params"]?["limit"]?.uint64 == 16,
+                              var page = frames.first(where: {
+                                  $0["data"]?["corpus"]?.string == "pcGamePassDiscovery"
+                              })?["data"]?.object,
+                              let template = page["products"]?.array?.first?.object,
+                              let revision = page["corpusRevision"]?.string else { exit(3) }
+                        let prefix = "d1-\(revision)-"
+                        let cursor = request["params"]?["cursor"]?.string
+                        let start: Int
+                        if let cursor {
+                            guard cursor.hasPrefix(prefix),
+                                  let offset = Int(cursor.dropFirst(prefix.count)) else { exit(3) }
+                            start = offset
+                        } else { start = 0 }
+                        guard start >= 0 && start < 300 else { exit(3) }
+                        let end = min(start + 16, 300)
+                        page["products"] = .array((start..<end).map { index in
+                            let id = String(format: "NEUTRAL%05d", index)
+                            var item = template
+                            item["productID"] = .string(id)
+                            item["title"] = .string("Neutral PC game \(index)")
+                            item["source"] = .string("syntheticPublicSource")
+                            item["pcCatalogCandidate"] = .bool(true)
+                            item["artwork"] = .array([])
+                            item["artworkStatus"] = .string("absent")
+                            item["editions"] = .array((item["editions"]?.array ?? []).map { edition in
+                                var value = edition.object ?? [:]
+                                value["productID"] = .string(id)
+                                return .object(value)
+                            })
+                            return .object(item)
+                        })
+                        page["failures"] = .array([])
+                        let next = scenario == "discoveryrepeatedpage" && start > 0 ? start : end
+                        page["nextCursor"] = next < 300 ? .string("\(prefix)\(next)") : .null
+                        try emit(.object(result(request, data: .object(page))))
                         continue
                     }
                     if scenario == "discoveryrefresh", command == "catalog.discover" {

@@ -52,6 +52,14 @@ enum LibraryAccessChecks {
         check(LibraryGame.visible(both, query: "", filter: .owned, sort: .title).count == 1
               && LibraryGame.visible(both, query: "", filter: .gamePass, sort: .title).count == 1,
               "SDD-LIB-05: Owned and Game Pass catalog filters overlap without double counting")
+        let catalogue = LibraryGame.gamePassCatalog(installed: [installedHeld], owned: [held],
+            products: [overlap, overlap, publicPC, console])
+        check(catalogue.count == 2 && catalogue.first?.owned == true
+              && LibraryAccess.badges(catalogue[0]) == [.owned, .gamePass]
+              && catalogue.last?.owned == false,
+              "Game Pass catalogue includes unowned PC members and independently marks overlapping held access")
+        check(LibraryGame.visible(catalogue, query: "Public PC", filter: .gamePass, sort: .title).count == 1,
+              "Game Pass filter searches the catalogue instead of only the owned-library overlap")
         check(LibraryGame.continuing(both, launchableIDs: [local.id]).map(\.id) == [local.id]
               && LibraryGame.localRecords(installed: [installedHeld], qualified: both, query: "", sort: .title).isEmpty,
               "SDD-LIB-04/05: exact held installation is featured and is not duplicated in unverified local records")

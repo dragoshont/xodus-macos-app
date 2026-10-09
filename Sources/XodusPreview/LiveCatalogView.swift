@@ -90,7 +90,7 @@ struct LiveCatalogView: View {
             !session.catalogStopped && session.catalogError == nil && session.discoveryFailures.isEmpty &&
             (!allowsStartupTasks || (session.isReady && canRefresh))
     }
-    private var columns: [GridItem] { [GridItem(.adaptive(minimum: 170, maximum: 220), spacing: 24)] }
+    private var columns: [GridItem] { LibraryGridLayout.columns }
 
     var body: some View {
         let results = self.results
@@ -264,7 +264,8 @@ struct LiveCatalogView: View {
 
     private func card(_ game: LibraryGame) -> some View {
         let cover = art.images[game.id]?.cover ?? game.cover
-        return LibraryCover(title: game.title, openLabel: "View", open: { open(game) }) {
+        return LibraryCover(title: game.title, openLabel: "View",
+                            alwaysShowsActions: game.installed != nil, open: { open(game) }) {
             CatalogArtworkView(reference: allowsArtworkLoading ? cover : nil,
                                status: cover == nil ? .absent : .available)
         } status: {

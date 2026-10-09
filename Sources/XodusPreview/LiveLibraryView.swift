@@ -32,10 +32,16 @@ struct LiveLibraryView: View {
                                active: operations.gamePassActive)
     }
     private var visible: [LibraryGame] {
-        LibraryGame.visible(collection, query: query, filter: filter, sort: sort)
+        LibraryGame.visible(filter == .gamePass ? gamePassCatalog : collection,
+                            query: query, filter: filter, sort: sort)
+    }
+    private var gamePassCatalog: [LibraryGame] {
+        LibraryGame.gamePassCatalog(installed: installed.games, owned: library.representedGames,
+                                    products: session.gamePassProducts)
     }
     private var continuing: [InstalledGame] {
-        LibraryGame.continuing(visible, launchableIDs: installed.launchableIDs)
+        LibraryGame.continuing(LibraryGame.visible(collection, query: query, filter: filter, sort: sort),
+                              launchableIDs: installed.launchableIDs)
     }
     private var localRecords: [LibraryGame] {
         LibraryGame.localRecords(installed: installed.games, qualified: collection, query: query, sort: sort)
@@ -88,8 +94,15 @@ struct LiveLibraryView: View {
                         ContentUnavailableView.search(text: query)
                     } else if filter == .gamePass {
                         ContentUnavailableView {
-                            Label("Game Pass access not verified", systemImage: "ticket")
-                        } description: { Text("Public catalog membership and subscription status don't confirm access to each PC edition. Loaded account-held games can show catalog membership; missing titles aren't proof they're outside Game Pass.") }
+                            Label(session.gamePassCatalogLoading || session.gamePassCatalogPaging
+                                  ? "Loading PC Game Pass" : "PC Game Pass catalogue unavailable",
+                                  systemImage: "ticket")
+                        } description: { Text(session.gamePassLibraryNotice) }
+                        actions: {
+                            Button("Load Game Pass games") {
+                                Task { await session.loadGamePassCatalog(refresh: true) }
+                            }.disabled(!allowsStartupTasks || !session.isReady || session.gamePassCatalogPaging)
+                        }
                     } else if !collection.isEmpty {
                         ContentUnavailableView {
                             Label("No \(filter.rawValue.lowercased()) games", systemImage: "gamecontroller")
@@ -102,30 +115,35 @@ struct LiveLibraryView: View {
                         actions: { Button("Load PC games") { library.refresh() }.disabled(library.busy || library.needsKeychainApproval) }
                     }
                 } else {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 170, maximum: 220), spacing: 24)],
+                    LazyVGrid(columns: LibraryGridLayout.columns,
                               alignment: .leading, spacing: 30) {
                         ForEach(visible) { game in card(game) }
                     }
                 }
-                if session.gamePassCatalogLoading {
-                    ProgressView("Loading public PC Game Pass catalog")
+                if filter == .gamePass {
+                    if session.gamePassCatalogLoading || session.gamePassCatalogPaging {
+                        ProgressView("Loading PC Game Pass · \(session.gamePassProducts.count.formatted()) games")
+                    }
+                    Label(session.gamePassLibraryNotice, systemImage: "info.circle")
+                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    HStack {
+                        Button("Refresh Game Pass") {
+                            Task { await session.loadGamePassCatalog(refresh: true) }
+                        }
+                        if session.gamePassCatalogHasMore {
+                            Button("Load remaining games") {
+                                Task { await session.loadGamePassCatalog() }
+                            }
+                        }
+                    }
+                    .disabled(!allowsStartupTasks || !session.isReady || session.gamePassCatalogPaging || session.searching)
                 }
-                Label(session.gamePassLibraryNotice, systemImage: "info.circle")
-                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                if let checked = operations.gamePassStatus?.checkedAt.flatMap(GameCompatibilityResult.parseDate) {
-                    Text("\(operations.gamePassFromCache ? "Saved scoped licence probe" : "Scoped licence probe") · checked \(Text(checked, style: .relative)) ago")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                if let checked = session.gamePassCatalogCheckedAt.flatMap(GameCompatibilityResult.parseDate) {
-                    Text("Public PC Game Pass catalog · checked \(Text(checked, style: .relative)) ago")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                if !localRecords.isEmpty {
+                if filter != .gamePass, !localRecords.isEmpty {
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Local installations · access not verified").font(.title2.weight(.semibold))
                         Text("These records are outside Your Games. Files and saves are preserved. Installation doesn't prove current account access; Play still uses the existing game-service checks.")
                             .font(.callout).foregroundStyle(.secondary)
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 170, maximum: 220), spacing: 24)],
+                        LazyVGrid(columns: LibraryGridLayout.columns,
                                   alignment: .leading, spacing: 30) {
                             ForEach(localRecords) { game in card(game) }
                         }
@@ -138,19 +156,24 @@ struct LiveLibraryView: View {
                     Label(error, systemImage: "exclamationmark.circle").font(.callout).foregroundStyle(.secondary)
                 }
             }
-            .task(id: (collection.map(\.id) + localRecords.map(\.id)).sorted().joined(separator: ",")) {
+            .task(id: (collection.map(\.id) + localRecords.map(\.id) + visible.map(\.id)).sorted().joined(separator: ",")) {
                 guard artworkAllowed else { return }
                 await art.load(ids: collection.map(\.id) + localRecords.compactMap { $0.installed?.storeId }
-                    .filter(PCGamesClient.validProductID), market: session.market, language: session.language)
+                    .filter(PCGamesClient.validProductID) + visible.map(\.id).filter(PCGamesClient.validProductID),
+                    market: session.market, language: session.language)
             }
             .padding(.horizontal, 56).padding(.vertical, 22)
         }
         .task { if allowsStartupTasks { await library.loadOnAppear() } }
+        .task(id: "\(filter.rawValue):\(session.isReady):\(session.market):\(session.language)") {
+            guard allowsStartupTasks, filter == .gamePass else { return }
+            await session.loadGamePassCatalog()
+        }
         .onChange(of: session.isReady) { _, ready in
             if !ready { selection.requestedGamePassScope = nil }
         }
         .task(id: "\(operations.gamePassActive):\(session.isReady):\(session.searching):\(session.market):\(session.language)") {
-            guard allowsStartupTasks, operations.gamePassActive, session.isReady,
+            guard allowsStartupTasks, filter != .gamePass, operations.gamePassActive, session.isReady,
                   session.supports(.discover), session.gamePassProducts.isEmpty, !session.searching else { return }
             let scope = "\(session.market):\(session.language)"
             guard selection.requestedGamePassScope != scope else { return }
@@ -216,12 +239,12 @@ struct LiveLibraryView: View {
         let xbox = xboxStats.cache?.games[id]
         let facts = metadata?.genres.isEmpty == false ? metadata :
             xbox.map { LibraryCatalogFacts(genres: $0.genres, capabilities: metadata?.capabilities ?? []) } ?? metadata
-        let game = collection.first(where: { $0.id == id })
+        let game = (filter == .gamePass ? gamePassCatalog : collection).first(where: { $0.id == id })
         return VStack(alignment: .leading, spacing: 5) {
             LibraryGameInformation(access: game.flatMap(LibraryAccess.init),
                                    gamePass: game?.gamePass == true,
                                    facts: facts, xbox: xbox, compact: compact)
-            if game != nil && !library.accessIsCurrent {
+            if game?.owned == true && !library.accessIsCurrent {
                 Label("Saved access · refresh required", systemImage: "clock")
                     .font(compact ? .caption : .callout).foregroundStyle(.secondary)
             }
@@ -232,12 +255,13 @@ struct LiveLibraryView: View {
         let artworkID = game.installed?.storeId ?? game.id
         return LibraryCover(title: game.title,
                      openLabel: "View",
+                     alwaysShowsActions: game.installed != nil,
                      open: { open(game) }) {
             CatalogArtworkView(reference: artworkAllowed ? art.images[artworkID]?.cover ?? game.cover : nil,
                                status: (art.images[artworkID]?.cover ?? game.cover) == nil ? .absent : .available)
         } status: {
             information(id: game.id, compact: true)
-            if !game.owned {
+            if !game.owned && !game.gamePass {
                 Label("Access not verified", systemImage: "exclamationmark.shield").font(.caption)
             }
             if game.installed != nil { Label("Installed", systemImage: "internaldrive").font(.caption) }
@@ -266,16 +290,19 @@ struct LiveLibraryView: View {
                     .disabled(!operations.canStartMutation || !library.accessIsCurrent)
                     .accessibilityLabel("Download \(game.title)")
                     .accessibilityIdentifier("xodus.pcGames.download")
-                } else {
-                    Button("Install") {
+                } else if game.gamePass {
+                    Button("Check Game Pass access") {
                         if let product = game.product {
                             Task { await operations.prepareInstall(PCGame(product: product)) }
                         }
                     }
                     .modifier(LibraryActionStyle(primary: false))
-                    .disabled(!operations.canStartMutation)
-                    .help("Install \(game.title) with PC Game Pass")
-                    .accessibilityLabel("Install \(game.title) with PC Game Pass")
+                    .disabled(!allowsStartupTasks || !operations.canStartMutation ||
+                        !DiscoverBrowse.canReviewInstall(owned: false, accessIsCurrent: false,
+                            gamePass: true, subscriptionActive: operations.gamePassActive,
+                            pcCandidate: game.product?.pcCatalogCandidate == true))
+                    .help("Check package access and Mac support. No download starts before confirmation.")
+                    .accessibilityLabel("Check Game Pass access for \(game.title)")
                     .accessibilityIdentifier("xodus.pcGames.install")
                 }
             }
