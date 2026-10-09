@@ -44,7 +44,7 @@ struct LiveRecentLibraryView: View {
                 }
                 Spacer()
                 if session.recentLibraryLoading || session.recentLibraryBootstrapRunning {
-                    ProgressView().controlSize(.small)
+                    ProgressView().controlSize(.small).accessibilityLabel("Loading recent activity")
                 }
                 if session.recentLibrary != nil {
                     Picker("Reported platform", selection: $selection.platform) {

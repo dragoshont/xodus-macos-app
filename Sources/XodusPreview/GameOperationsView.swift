@@ -58,7 +58,10 @@ struct GameServiceAccountView: View {
                                 .disabled(!operations.canSignIn)
                                 .accessibilityIdentifier("xodus.games.signIn")
                         }
-                        if operations.serviceBusy { ProgressView().controlSize(.small) }
+                        if operations.serviceBusy {
+                            ProgressView().controlSize(.small)
+                                .accessibilityLabel(operations.serviceSigningIn ? "Signing in for games" : "Checking game access")
+                        }
                     }
                     if operations.serviceSigningIn {
                         Text("Finish signing in in the Microsoft window.").foregroundStyle(.secondary)
@@ -111,7 +114,9 @@ struct GamePassAccountView: View {
                     || operations.uninstallConsent != nil || probeID == nil)
                 .accessibilityLabel("Check PC Game Pass")
                 .accessibilityIdentifier("xodus.gamePass.check")
-                if operations.gamePassBusy { ProgressView().controlSize(.small) }
+                if operations.gamePassBusy {
+                    ProgressView().controlSize(.small).accessibilityLabel("Checking PC Game Pass")
+                }
             }
             if operations.gamePassFromCache {
                 Text("Saved status on this Mac. Check to refresh.").font(.callout).foregroundStyle(.secondary)
@@ -159,7 +164,7 @@ struct GameOperationProgressView: View {
                         Text("\(Self.bytes(value.bytesDone)) of \(Self.bytes(total)) (\(Int(Double(value.bytesDone) / Double(total) * 100))%)")
                             .font(.callout).foregroundStyle(.secondary)
                     } else {
-                        ProgressView().controlSize(.small)
+                        ProgressView().controlSize(.small).accessibilityLabel("Download progress")
                         if let value = operations.progress {
                             Text("\(Self.bytes(value.bytesDone)) downloaded").font(.callout).foregroundStyle(.secondary)
                         }
