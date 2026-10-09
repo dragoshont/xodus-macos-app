@@ -387,13 +387,23 @@ enum PreviewChecks {
                   "Genre filtering stays within the loaded page and hides titles with missing genre")
             check(DiscoverBrowse.visible(products: [pass], facts: browseFacts, genre: "Absent").isEmpty,
                   "An unavailable genre has a real empty result instead of manufactured recommendations")
-            check(!DiscoverBrowse.canInstall(owned: false, gamePass: true, subscriptionActive: false),
-                  "Discover feed membership without a confirmed subscription does not enable Install")
-            check(DiscoverBrowse.canInstall(owned: true, gamePass: false, subscriptionActive: false) &&
-                  DiscoverBrowse.canInstall(owned: false, gamePass: true, subscriptionActive: true),
-                  "Purchased or confirmed Game Pass access preserves the protected Install route")
-            check(!DiscoverBrowse.canInstall(owned: false, gamePass: false, subscriptionActive: true),
-                  "An active subscription does not grant installation to arbitrary checked-catalog titles")
+            check(!DiscoverBrowse.canReviewInstall(owned: false, accessIsCurrent: false,
+                      gamePass: true, subscriptionActive: false, pcCandidate: true),
+                  "Public Game Pass membership without active subscription status cannot open package review")
+            check(DiscoverBrowse.canReviewInstall(owned: true, accessIsCurrent: true,
+                      gamePass: false, subscriptionActive: false, pcCandidate: true) &&
+                  DiscoverBrowse.canReviewInstall(owned: false, accessIsCurrent: false,
+                      gamePass: true, subscriptionActive: true, pcCandidate: true),
+                  "Live Discover/detail action policy retains held and Game Pass package review, not automatic authorization")
+            check(!DiscoverBrowse.canReviewInstall(owned: false, accessIsCurrent: false,
+                      gamePass: false, subscriptionActive: true, pcCandidate: true),
+                  "An active subscription cannot enable arbitrary public-product review")
+            check(!DiscoverBrowse.canReviewInstall(owned: true, accessIsCurrent: false,
+                      gamePass: true, subscriptionActive: true, pcCandidate: true),
+                  "Stale held-account access cannot silently broaden into a current Download")
+            check(!DiscoverBrowse.canReviewInstall(owned: false, accessIsCurrent: false,
+                      gamePass: true, subscriptionActive: true, pcCandidate: false),
+                  "Console-only catalog membership cannot enable PC package review")
             check(try CatalogReviewSnapshot(products: [pass, catalogOnly]).pcProducts(market: "US", language: "en-US").count == 2,
                   "Read-only catalog snapshots validate unchanged public PC records in the exact market/language")
             do {

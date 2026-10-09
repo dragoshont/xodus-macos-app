@@ -69,6 +69,10 @@ enum LibraryAccessChecks {
         check(LibraryAccess.summary(owned: false, catalogMembership: true, current: true)
                 == "Access not verified · Game Pass catalog",
               "SDD-LIB-02/07: live detail facet never presents public membership as account access")
+        check(DiscoverBrowse.canReviewInstall(owned: false, accessIsCurrent: false,
+                  gamePass: true, subscriptionActive: true, pcCandidate: true)
+              && collection.allSatisfy { $0.id != publicPC.id },
+              "SDD-LIB-02: shared live action policy opens protected Game Pass review without admitting public-only personal access")
         check(LibraryAccess.summary(owned: true, catalogMembership: true, current: false)
                 == "Saved Owned · refresh required · Game Pass catalog",
               "SDD-LIB-06: live detail facet labels retained access stale independently of catalog membership")

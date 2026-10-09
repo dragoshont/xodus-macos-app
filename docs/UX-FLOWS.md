@@ -25,6 +25,14 @@ for account/selected-edition resolution, separately from Mac package support.
 The approved Figma composition, toolbar and existing protected actions remain;
 no native walkthrough of this source correction has occurred.
 
+**Game Pass review affordance:** Discover and game detail keep **Check Game Pass
+access** for a PC catalogue member when subscription status is active. The shared
+frontend policy opens the existing package/compatibility/storage review only;
+it does not establish access, add the game to Your Games, start a download or
+launch it. Actual preflight and explicit confirmation still gate installation.
+The earlier SDD candidate removed this working route; the frontend follow-up
+restores it and removes the disconnected Install-policy assertion.
+
 **Current shipping boundary:** the proposed artwork-led screens below are not
 synthetic production content. The live source uses native window-background
 setup/empty/loading/error/data views until rights-cleared real art exists.

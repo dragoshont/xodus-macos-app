@@ -45,6 +45,11 @@ struct LiveProductView: View {
     private var art: LibraryCatalogArtwork.Images? { catalog.images[product.id] }
     private var details: CatalogDetailFacts? { art?.detail }
     private var access: LibraryAccess? { owned != nil ? .owned : gamePass ? .gamePass : nil }
+    private var canReviewGamePass: Bool {
+        DiscoverBrowse.canReviewInstall(owned: owned != nil, accessIsCurrent: library.accessIsCurrent,
+            gamePass: gamePass, subscriptionActive: operations.gamePassActive,
+            pcCandidate: owned != nil || product.pcCatalogCandidate)
+    }
     private var accessSummary: String {
         LibraryAccess.summary(owned: owned != nil, catalogMembership: gamePass, current: library.accessIsCurrent)
     }
@@ -154,8 +159,13 @@ struct LiveProductView: View {
                                 .help("Download \(product.title)")
                                 .accessibilityLabel("Download \(product.title)")
                         } else if gamePass {
-                            Text("Game Pass catalog membership doesn't verify this account's access to this edition.")
-                                .font(.callout).foregroundStyle(.secondary)
+                            Button("Check Game Pass access") {
+                                beginInstall(PCGame(product: product))
+                            }
+                            .modifier(LibraryActionStyle())
+                            .disabled(!allowsStartupTasks || !operations.canStartMutation || !canReviewGamePass)
+                            .help("Check package access and Mac support. No download starts before confirmation.")
+                            .accessibilityLabel("Check Game Pass access for \(product.title)")
                         } else {
                             Text("Access hasn't been verified.").font(.callout).foregroundStyle(.secondary)
                         }

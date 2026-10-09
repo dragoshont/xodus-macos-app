@@ -42,6 +42,13 @@ labels refresh failures. No freshness TTL, paid acquisition or expiry date is
 invented. See the exact source acceptance boundary in
 [requirements](docs/REQUIREMENTS.md#sdd-lib-source-acceptance).
 
+Discover and detail retain the existing protected **Check Game Pass access**
+route for a PC catalog member with active subscription status. This opens the
+existing package/compatibility/storage review, not a download or an access
+grant. Only successful preflight and explicit confirmation can proceed.
+The first SDD candidate removed this working route; the frontend follow-up
+restores it without admitting unresolved titles to the personal Library.
+
 **Proposed v1:** account connection, entitled PC library, scoped catalog discovery, edition selection, explicit eligibility and compatibility, installation planning, durable downloads/recovery, launch, safe updates/removal and redacted diagnostics.
 
 **Not promised in v1:** party/chat/LFG, follower counts not supplied by Xbox,

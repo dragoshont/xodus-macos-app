@@ -39,7 +39,7 @@ is authorized by these statuses.
 | Criterion | Source status and acceptance boundary |
 | --- | --- |
 | SDD-LIB-01 | Implemented: complete current account-held PC entries join installed or not; acquisition remains Unknown, never Purchased. |
-| SDD-LIB-02 | Partial/contract blocked: overlapping held access and public PC catalog membership are distinct, both filters overlap. Game-Pass-only current account access cannot be established by the available scoped probe and partial public feed. It is not admitted by inference. |
+| SDD-LIB-02 | Partial/contract blocked for personal admission: held access and public PC catalog membership remain distinct. Discover/detail retain protected Check Game Pass access review for PC members with active status, using existing package preflight and explicit confirmation. This review is not an access grant. The first candidate removed that route; the frontend follow-up restores it and tests the shared policy used by both live views. |
 | SDD-LIB-03 | Implemented under available evidence: public/local-only, console candidates, inactive/trial/expired collection rows and confirmed revoked/mismatched-account access are excluded. |
 | SDD-LIB-04 | Implemented: unverified installed/imported records appear separately with a warning, never in Your Games counts or eligible hero/recent. Registry, game and save bytes are untouched. Existing protected Play/management routes remain reachable. |
 | SDD-LIB-05 | Implemented: personal join drives counts/search/filter/sort and installed hero/Continue Playing; Store discovery remains separate. |
@@ -73,6 +73,15 @@ completeness needs authoritative evidence; absent fields stay unknown. The
 existing global scoped licence probe cannot authorize every public catalog
 tile or resolve Minecraft playable-edition access. No per-tile automatic
 licence checks or guessed dates are introduced.
+
+**Frontend-only review correction:** the shared `canReviewInstall` policy is
+called by live Discover and product-detail controls and checked by the focused
+suite. Isolated SDK 27 validation passed 105 Library-access checks, 174 preview
+checks, Debug product build and shipping-configuration Release product compile.
+These results supersede the stale disconnected Game Pass Install assertion;
+they establish a protected review affordance, not Game-Pass-only personal
+Library admission. No signing, deployment, real package check or GUI operation
+was performed.
 
 ## Quality and inclusion gates
 

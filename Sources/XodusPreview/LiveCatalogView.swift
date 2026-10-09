@@ -20,8 +20,11 @@ enum DiscoverBrowse {
         return products.filter { facts[$0.id]?.genres.contains(genre) == true }
     }
 
-    static func canInstall(owned: Bool, gamePass: Bool, subscriptionActive: Bool) -> Bool {
-        owned || (gamePass && subscriptionActive)
+    static func canReviewInstall(owned: Bool, accessIsCurrent: Bool, gamePass: Bool,
+                                 subscriptionActive: Bool, pcCandidate: Bool) -> Bool {
+        guard pcCandidate else { return false }
+        if owned { return accessIsCurrent }
+        return gamePass && subscriptionActive
     }
 }
 
@@ -187,9 +190,10 @@ struct LiveCatalogView: View {
             + (game.cover.map { [$0] } ?? [])
     }
 
-    private func canInstall(_ game: LibraryGame) -> Bool {
-        // Public membership/global probe are not a per-product account grant.
-        game.owned && library.accessIsCurrent
+    private func canReviewInstall(_ game: LibraryGame) -> Bool {
+        DiscoverBrowse.canReviewInstall(owned: game.owned, accessIsCurrent: library.accessIsCurrent,
+            gamePass: game.gamePass, subscriptionActive: operations.gamePassActive,
+            pcCandidate: game.pc != nil || game.product?.pcCatalogCandidate == true)
     }
 
     private func hero(_ game: LibraryGame) -> some View {
@@ -210,7 +214,7 @@ struct LiveCatalogView: View {
                 LibraryGlassCluster {
                     actions(game, primary: true)
                     Button("View game") { open(game) }
-                        .modifier(LibraryActionStyle(primary: game.installed == nil && !canInstall(game)))
+                        .modifier(LibraryActionStyle(primary: game.installed == nil && !canReviewInstall(game)))
                 }.controlSize(.large)
             }
             .frame(maxWidth: 800, alignment: .leading)
@@ -290,7 +294,7 @@ struct LiveCatalogView: View {
         if let match = game.installed {
             InstalledPlayButton(library: installed, operations: operations, game: match,
                                 usesGlass: true, prominent: primary)
-        } else if canInstall(game) {
+        } else if canReviewInstall(game) {
             Button {
                 if let pc = game.pc { Task { await operations.prepareInstall(pc) } }
                 else if let product = game.product { Task { await operations.prepareInstall(PCGame(product: product)) } }
@@ -302,13 +306,13 @@ struct LiveCatalogView: View {
                         Image(systemName: "icloud.and.arrow.down").accessibilityHidden(true)
                     }
                 } else {
-                    Text("Install")
+                    Text("Check Game Pass access")
                 }
             }
             .modifier(LibraryActionStyle(primary: primary))
-            .help(game.owned ? "Download \(game.title)" : "Install \(game.title) with PC Game Pass")
+            .help(game.owned ? "Review download for \(game.title)" : "Check package access and Mac support for \(game.title). No download starts before confirmation.")
             .disabled(!allowsStartupTasks || !operations.canStartMutation)
-            .accessibilityLabel(game.owned ? "Download \(game.title)" : "Install \(game.title) with PC Game Pass")
+            .accessibilityLabel(game.owned ? "Download \(game.title)" : "Check Game Pass access for \(game.title)")
             .accessibilityIdentifier(game.owned ? "xodus.pcGames.download" : "xodus.pcGames.install")
         }
     }
