@@ -101,7 +101,7 @@ struct LibraryHeroMedia<Poster: View>: View {
     }
 }
 
-private struct HeroScrollVisibility: ViewModifier {
+struct HeroScrollVisibility: ViewModifier {
     let changed: (Bool) -> Void
 
     func body(content: Content) -> some View {

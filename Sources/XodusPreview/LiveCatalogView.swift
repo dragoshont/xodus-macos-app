@@ -6,6 +6,7 @@ import XodusManagement
 final class DiscoverSelection: ObservableObject {
     @Published var genre: String?
     @Published var featuredID: String?
+    @Published var featuredVisible = false
 }
 
 enum DiscoverBrowse {
@@ -232,6 +233,8 @@ struct LiveCatalogView: View {
             }
         }
         .frame(height: 340)
+        .modifier(HeroScrollVisibility { selection.featuredVisible = $0 })
+        .onDisappear { selection.featuredVisible = false }
         .onChange(of: featuredGames.map(\.id), initial: true) { _, ids in
             if selection.featuredID.map({ !ids.contains($0) }) ?? true { selection.featuredID = ids.first }
         }
@@ -252,7 +255,8 @@ struct LiveCatalogView: View {
     private func hero(_ game: LibraryGame, selected: Bool) -> some View {
         ZStack(alignment: .bottomLeading) {
             LibraryHeroMedia(trailer: art.images[game.id]?.detail?.trailers.first,
-                             allowsPlayback: allowsStartupTasks && allowsHeroAnimation && selected) {
+                             allowsPlayback: allowsStartupTasks && allowsHeroAnimation
+                                 && selection.featuredVisible && selected) {
                 LibraryLandscapeView(references: landscape(game), installed: game.installed,
                                      allowsLoading: allowsArtworkLoading)
             }
