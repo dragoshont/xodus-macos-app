@@ -8,6 +8,7 @@ enum XboxCompanionCopy {
         "Your progress across Xbox and PC. Choose a game to see its achievements."
     static let remotePlay =
         "Remote Play opens on Xbox's website in your browser."
+    static let connectionsTitle = "Friends and following"
 }
 
 struct AccountHubDestinations: View {
@@ -104,7 +105,7 @@ struct XboxProfileView: View {
 
     @ViewBuilder private func friends(_ section: XboxCompanionSection<[XboxFriend]>) -> some View {
         if let friends = section.value, section.available {
-            GroupBox("Friends") {
+            GroupBox(XboxCompanionCopy.connectionsTitle) {
                 if friends.isEmpty {
                     Text("No friends were returned.").foregroundStyle(.secondary)
                 } else {

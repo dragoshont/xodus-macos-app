@@ -32,7 +32,7 @@ all-PC-title support or arbitrary runtime downloads/removal. Discover does not
 claim purchasability or ownership.
 
 **Current parity scope:** Account is a native hub for the Xbox game-service
-Profile, real friends fields, per-title Achievements, cached My Consoles and a
+Profile, real Xbox connection fields, per-title Achievements, cached My Consoles and a
 dedicated Engines page. Recent Xbox activity is play history, never an owned
 library. Remote Play is an official default-browser handoff to
 `https://www.xbox.com/remoteplay`; Xodus does not wake, power, address or stream

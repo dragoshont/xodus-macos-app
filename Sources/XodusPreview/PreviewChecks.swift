@@ -225,7 +225,8 @@ enum PreviewChecks {
             check(XboxCompanionCopy.achievementsIntro ==
                     "Your progress across Xbox and PC. Choose a game to see its achievements." &&
                   XboxCompanionCopy.remotePlay ==
-                    "Remote Play opens on Xbox's website in your browser.",
+                    "Remote Play opens on Xbox's website in your browser." &&
+                  XboxCompanionCopy.connectionsTitle == "Friends and following",
                   "Companion views use consumer-facing achievement and browser-handoff copy")
         } catch {
             check(false, "Synthetic Xbox companion contract failed: \(error.localizedDescription)")
