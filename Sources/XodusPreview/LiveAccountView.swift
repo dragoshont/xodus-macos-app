@@ -54,7 +54,7 @@ struct LiveAccountView: View {
                             Label(state.gameOperations.serviceLabel,
                                   systemImage: state.gameOperations.serviceStatus?.signedIn == true
                                       ? "checkmark.circle" : "person.crop.circle")
-                            Text("Gameplay, Profile, Achievements and My Consoles use this Xbox account. Microsoft Store purchasing credentials are not managed here, and the PC Library account can differ.")
+                            Text("Gameplay, Profile, Achievements and My Consoles use this Xbox account. \(XboxCompanionCopy.accountScope)")
                                 .font(.callout).foregroundStyle(.secondary)
                         }
                         .padding(.top, 2)

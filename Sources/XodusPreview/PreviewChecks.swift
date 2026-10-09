@@ -217,6 +217,16 @@ enum PreviewChecks {
             let partial = try XboxAchievementCache.decode(partialData, titleID: "1693340366")
             check(!partial.complete && partial.error?.reason == "page",
                   "Partial achievement pages remain explicitly incomplete with their source error")
+            check(XboxViewFormatting.consoleType("XboxSeriesX") == "Xbox Series X" &&
+                  XboxViewFormatting.consoleType("future-console-code") == "Xbox console" &&
+                  XboxViewFormatting.powerState("ConnectedStandby") == "Standby" &&
+                  XboxViewFormatting.powerState("future-power-code") == "Status unavailable",
+                  "Console presentation humanizes known codes and keeps unknown state unavailable")
+            check(XboxCompanionCopy.achievementsIntro ==
+                    "Your progress across Xbox and PC. Choose a game to see its achievements." &&
+                  XboxCompanionCopy.remotePlay ==
+                    "Remote Play opens on Xbox's website in your browser.",
+                  "Companion views use consumer-facing achievement and browser-handoff copy")
         } catch {
             check(false, "Synthetic Xbox companion contract failed: \(error.localizedDescription)")
         }

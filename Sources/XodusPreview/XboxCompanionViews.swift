@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import SwiftUI
 
+enum XboxCompanionCopy {
+    static let accountScope =
+        "Your Xbox account can differ from the Microsoft account used to buy PC games."
+    static let achievementsIntro =
+        "Your progress across Xbox and PC. Choose a game to see its achievements."
+    static let remotePlay =
+        "Remote Play opens on Xbox's website in your browser."
+}
+
 struct AccountHubDestinations: View {
     @EnvironmentObject private var state: AppState
 
@@ -57,7 +66,7 @@ struct XboxProfileView: View {
     }
 
     private var accountScope: some View {
-        Text("Profile and social data use the Xbox game-service account. It can differ from the Microsoft Store account used for PC-library access.")
+        Text("Profile and social data use your Xbox account. \(XboxCompanionCopy.accountScope)")
             .font(.callout).foregroundStyle(.secondary)
     }
 
@@ -188,7 +197,7 @@ struct XboxAchievementsView: View {
                 Text("Achievements").font(.title2.bold())
                 Spacer()
             }
-            Text("Achievements use exact Xbox title identifiers from recent activity, not title-name matching or PC ownership.")
+            Text(XboxCompanionCopy.achievementsIntro)
                 .font(.callout).foregroundStyle(.secondary)
             if let titleID = selection.titleID, let game = games.first(where: { $0.titleId == titleID }) {
                 achievementList(game)
@@ -308,7 +317,7 @@ struct XboxConsolesView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("My Consoles").font(.title2.bold())
-            Text("Console data uses the Xbox game-service account. Xodus does not wake, power, install to, or stream from a console.")
+            Text("Your consoles from the Xbox game-service account.")
                 .font(.callout).foregroundStyle(.secondary)
             if let section = companion.cache?.consoles, let consoles = section.value, section.available {
                 if consoles.isEmpty {
@@ -321,11 +330,12 @@ struct XboxConsolesView: View {
                                 HStack {
                                     Text(console.name).font(.headline)
                                     Spacer()
-                                    if let state = console.powerState { Text(state).foregroundStyle(.secondary) }
+                                    Text(XboxViewFormatting.powerState(console.powerState))
+                                        .foregroundStyle(.secondary)
                                 }
-                                if let type = console.consoleType { LabeledContent("Type", value: type) }
+                                LabeledContent("Type", value: XboxViewFormatting.consoleType(console.consoleType))
                                 if let enabled = console.streamingEnabled {
-                                    LabeledContent("Remote play", value: enabled ? "Enabled" : "Unavailable")
+                                    LabeledContent("Remote play", value: enabled ? "Enabled" : "Not enabled")
                                 }
                                 if let enabled = console.remoteManagementEnabled {
                                     LabeledContent("Remote management", value: enabled ? "Enabled" : "Unavailable")
@@ -346,7 +356,7 @@ struct XboxConsolesView: View {
             }
             GroupBox("Remote play") {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Xbox Remote Play opens the official Xbox website in your default browser. Console identifiers are never added to the URL.")
+                    Text(XboxCompanionCopy.remotePlay)
                         .font(.callout).foregroundStyle(.secondary)
                     HStack {
                         Link("Play now", destination: remotePlay)
@@ -378,7 +388,7 @@ struct EnginesView: View {
     }
 }
 
-private enum XboxViewFormatting {
+enum XboxViewFormatting {
     static func date(_ value: String) -> Date? {
         let parser = ISO8601DateFormatter()
         parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -391,6 +401,24 @@ private enum XboxViewFormatting {
         case let (free?, nil): "\(ByteCountFormatter.string(fromByteCount: free, countStyle: .file)) free"
         case let (nil, total?): "\(ByteCountFormatter.string(fromByteCount: total, countStyle: .file)) total"
         default: "Storage details unavailable"
+        }
+    }
+    static func consoleType(_ value: String?) -> String {
+        switch value {
+        case "XboxSeriesX": "Xbox Series X"
+        case "XboxSeriesS": "Xbox Series S"
+        case "XboxOneX": "Xbox One X"
+        case "XboxOneS": "Xbox One S"
+        case "XboxOne": "Xbox One"
+        default: "Xbox console"
+        }
+    }
+    static func powerState(_ value: String?) -> String {
+        switch value {
+        case "ConnectedStandby": "Standby"
+        case "On": "On"
+        case "Off": "Off"
+        default: "Status unavailable"
         }
     }
 }
