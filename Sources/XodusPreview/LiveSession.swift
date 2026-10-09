@@ -525,14 +525,38 @@ final class LiveSession: ObservableObject {
 
     var accountFailureSummary: String? {
         guard let failure = lastSignInFailure else { return nil }
-        guard let code = failure.code?.rawValue else {
-            return "Stage: stageUnavailable. No successful sign-in or credential commit was assumed."
-        }
         if let diagnostic = failure.diagnostic {
-            return "Sign-in failure code: \(code). Stage: \(diagnostic.stage). Reason: \(diagnostic.rawValue). "
-                + Self.describeConsentFailure(diagnostic)
+            switch diagnostic {
+            case .bootstrapInvalid, .clientUnavailable:
+                return "Microsoft sign-in couldn't start. Check account status before trying again."
+            case .credentialStorageUnavailable:
+                return "macOS couldn't access the sign-in Keychain. Unlock it or review its permission window, then check account status."
+            case .storedCredentialInvalid:
+                return "Saved sign-in data couldn't be validated. Check account status before trying again; don't remove credentials."
+            case .providerRequestFailed:
+                return "Microsoft couldn't be reached while preparing sign-in. Check your connection and account status."
+            case .workerOutcomeUnavailable:
+                return "The sign-in attempt ended without a confirmed result. Check account status before trying again."
+            case .pipelineFailed:
+                return "Microsoft sign-in couldn't finish. Check account status before trying again."
+            default:
+                return "Microsoft's sign-in response couldn't be verified. Check account status; sign-in details are available below."
+            }
+        }
+        guard let code = failure.code?.rawValue else {
+            return "The last sign-in attempt couldn't be confirmed. Check account status before trying again."
         }
         return Self.describeSignInFailure(code: code)
+    }
+
+    var accountFailureDetails: String? {
+        guard let failure = lastSignInFailure else { return nil }
+        let code = failure.code?.rawValue ?? "Not reported"
+        if let diagnostic = failure.diagnostic {
+            return "Code: \(code). Stage: \(diagnostic.stage). Reason: \(diagnostic.rawValue). "
+                + Self.describeConsentFailure(diagnostic)
+        }
+        return "Code: \(code). Stage: Not reported."
     }
 
     var accountFailureObservation: String? {
@@ -567,17 +591,17 @@ final class LiveSession: ObservableObject {
         let reason: String
         switch code {
         case "AUTH_CANCELLED":
-            reason = "The sign-in flow was cancelled. No new connection was assumed."
+            reason = "Sign-in was cancelled. Check account status before starting again."
         case "AUTH_EXPIRED":
-            reason = "The sign-in flow expired. No completion was assumed."
+            reason = "The sign-in request expired. Check account status, then try again."
         case "AUTH_INVALID":
-            reason = "The sign-in session could not be validated. The failing step is not identified by this engine."
+            reason = "The sign-in session couldn't be verified. Check account status before trying again."
         case "NETWORK_UNAVAILABLE":
-            reason = "The sign-in flow could not reach a required service. No completion was assumed."
+            reason = "Microsoft sign-in couldn't reach a required service. Check your connection and account status."
         default:
-            reason = "No successful sign-in or credential commit was assumed."
+            reason = "The sign-in result couldn't be confirmed. Check account status before trying again."
         }
-        return "Sign-in failure code: \(code). Stage: stageUnavailable. \(reason)"
+        return reason
     }
 
     private static func describeConsentFailure(_ failure: NativeConsentFailure) -> String {

@@ -118,7 +118,7 @@ struct LiveCatalogView: View {
                         Text(storeHeading).font(.title2.weight(.semibold))
                         Spacer()
                         if session.searching {
-                            ProgressView().controlSize(.small)
+                            ProgressView().controlSize(.small).accessibilityLabel("Searching for games")
                             Button("Stop search") { session.stopCatalogSearch() }
                                 .accessibilityIdentifier("xodus.catalog.stop")
                         }

@@ -255,7 +255,9 @@ struct LiveRootView: View {
                     .accessibilityIdentifier("xodus.library.inspectFolder")
                     .accessibilityAddTraits(.isButton)
                     .accessibilityAction { session.chooseInstallationFolder() }
-                if session.inspectionBusy { ProgressView().controlSize(.small) }
+                if session.inspectionBusy {
+                    ProgressView().controlSize(.small).accessibilityLabel("Inspecting installation")
+                }
                 Spacer()
             }
             Text(session.supports(.inspectInstallation)

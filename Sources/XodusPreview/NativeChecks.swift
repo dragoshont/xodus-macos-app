@@ -283,13 +283,16 @@ enum NativeChecks {
                   "Failed sign-in preparation does not leave a current signed-out display")
             let preparationSummary = uncertain.errorMessage ?? ""
             check(preparationSummary.hasPrefix("Microsoft sign-in could not start.")
-                  && preparationSummary.contains("AUTH_INVALID") && preparationSummary.contains("Stage: stageUnavailable")
+                  && preparationSummary.contains("Check account status")
+                  && !preparationSummary.contains("AUTH_INVALID") && !preparationSummary.contains("stageUnavailable")
                   && !preparationSummary.contains("disconnect") && !preparationSummary.contains("saved sign-in")
                   && !preparationSummary.contains("Original preparation upstream sentinel"),
                   "Request-level sign-in failure never implies invalid saved credentials or deletion advice")
             let preparationFailure = uncertain.lastSignInFailure
             check(preparationFailure?.code == .invalid && preparationFailure?.diagnostic == nil
-                  && preparationFailure?.observation == nil && uncertain.accountFailureSummary?.contains("stageUnavailable") == true,
+                  && preparationFailure?.observation == nil
+                  && uncertain.accountFailureDetails?.contains("AUTH_INVALID") == true
+                  && uncertain.accountFailureDetails?.contains("Stage: Not reported") == true,
                   "A terminal request error latches only its closed code and an unavailable stage")
             await uncertain.refreshAccount()
             check(uncertain.accountStatusCurrent && uncertain.canSignIn,
@@ -303,24 +306,28 @@ enum NativeChecks {
                 await failed.connect()
                 await failed.refreshAccount()
                 await failed.beginSignIn()
-                let summary = failed.accountFailureSummary ?? ""
+                let summary = failed.accountFailureDetails ?? ""
+                let visibleSummary = failed.accountFailureSummary ?? ""
+                check(!visibleSummary.isEmpty && !visibleSummary.contains("AUTH_INVALID")
+                      && !visibleSummary.contains("stageUnavailable") && !visibleSummary.contains("Stage:"),
+                      "Primary Account failure copy is human-readable; raw code and missing-stage facts stay in disclosure details")
                 check(failed.authentication?.flow?.state == .failed && failed.isReady && !failed.signInPending
                       && !summary.isEmpty && !summary.contains("Original synthetic upstream wording")
                       && !summary.contains("disconnect") && !summary.contains("saved sign-in"),
                       "Failed auth flow surfaces a local safe reason without raw upstream message or success")
                 check(scenario == "failedflow" ? summary.contains("AUTH_INVALID")
-                      : summary.contains("Stage: stageUnavailable") && !summary.contains("AUTH_INVALID"),
+                      : summary.contains("Stage: Not reported") && !summary.contains("AUTH_INVALID"),
                       "Auth summary preserves the validated failure code and never invents a missing cause")
                 check(failed.canSignIn && !failed.accountBusy,
                       "Terminal failure preserves the explicit user retry gate without an automatic retry")
                 let snapshot = failed.lastSignInFailure
                 await failed.refreshAccount()
                 check(failed.authentication?.state == .signedOut && failed.authentication?.flow == nil
-                      && failed.lastSignInFailure == snapshot && failed.accountFailureSummary == summary,
+                      && failed.lastSignInFailure == snapshot && failed.accountFailureDetails == summary,
                       "Fresh signed-out/no-flow status cannot erase the last terminal failure")
                 await failed.disconnect()
                 check(failed.authentication == nil && failed.lastSignInFailure == snapshot
-                      && failed.accountFailureSummary == summary,
+                      && failed.accountFailureDetails == summary,
                       "Disconnect preserves only the fixed terminal diagnostic for observation")
             }
 
@@ -329,7 +336,11 @@ enum NativeChecks {
                 await failed.connect()
                 await failed.refreshAccount()
                 await failed.beginSignIn()
-                let summary = failed.accountFailureSummary ?? ""
+                let summary = failed.accountFailureDetails ?? ""
+                let visibleSummary = failed.accountFailureSummary ?? ""
+                check(!visibleSummary.isEmpty && !visibleSummary.contains(diagnostic.rawValue)
+                      && !visibleSummary.contains("AUTH_INVALID") && !visibleSummary.contains("Stage:"),
+                      "Known sign-in diagnostics retain specific safe details without exposing machine states as primary copy")
                 check(failed.authentication?.flow?.error?.nativeConsentFailure == diagnostic
                       && summary.contains("Stage: \(diagnostic.stage)") && summary.contains("Reason: \(diagnostic.rawValue)")
                       && !summary.contains("Original synthetic upstream wording") && failed.isReady
@@ -390,10 +401,10 @@ enum NativeChecks {
                     await failed.connect()
                     await failed.refreshAccount()
                     await failed.beginSignIn()
-                    let summary = failed.accountFailureSummary ?? ""
+                    let summary = failed.accountFailureDetails ?? ""
                     check(failed.isReady && failed.authentication?.flow?.error?.nativeConsentFailure == nil
                           && failed.authentication?.entitlementAuthorized == false && !failed.signInPending
-                          && summary.contains("Stage: stageUnavailable") && !summary.contains("Reason:")
+                          && summary.contains("Stage: Not reported") && !summary.contains("Reason:")
                           && !summary.contains("Original extra-field sentinel")
                           && !summary.contains("Original synthetic upstream wording")
                           && failed.accountFailureTitle != "Microsoft sign-in could not start.",
@@ -406,9 +417,9 @@ enum NativeChecks {
                 await failed.connect()
                 await failed.refreshAccount()
                 await failed.beginSignIn()
-                let summary = failed.accountFailureSummary ?? ""
+                let summary = failed.accountFailureDetails ?? ""
                 check(failed.isReady && failed.authentication?.flow?.error?.nativeConsentFailure == nil
-                      && summary.contains("Stage: stageUnavailable") && !summary.contains("Reason:")
+                      && summary.contains("Stage: Not reported") && !summary.contains("Reason:")
                       && !summary.contains("Original extra-field sentinel") && !summary.contains("Original synthetic upstream wording"),
                       "Malformed/extra/unknown/incompatible diagnostics yield honest unavailable stage without secret sentinel")
                 await failed.disconnect()

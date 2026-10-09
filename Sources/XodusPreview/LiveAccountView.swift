@@ -44,7 +44,10 @@ struct LiveAccountView: View {
                             Text(session.accountNoticeTitle).font(.headline).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        if session.accountBusy || session.signInPending { ProgressView().controlSize(.small) }
+                        if session.accountBusy || session.signInPending {
+                            ProgressView().controlSize(.small)
+                                .accessibilityLabel(session.signInPending ? "Sign-in in progress" : "Checking account status")
+                        }
                     }
                     Text(session.accountMessage)
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -81,7 +84,9 @@ struct LiveAccountView: View {
                                     }
                                 }
                                 .disabled(interaction.clearingArtwork)
-                                if interaction.clearingArtwork { ProgressView().controlSize(.small) }
+                                if interaction.clearingArtwork {
+                                    ProgressView().controlSize(.small).accessibilityLabel("Clearing downloaded artwork")
+                                }
                             }
                             if let notice = interaction.artworkNotice {
                                 Label(notice, systemImage: "checkmark.circle").foregroundStyle(.secondary)
@@ -103,6 +108,13 @@ struct LiveAccountView: View {
                             Text("Last sign-in error").font(.headline)
                             Text(summary).fixedSize(horizontal: false, vertical: true)
                                 .accessibilityIdentifier("xodus.account.failureSummary")
+                        }
+                        .foregroundStyle(.secondary).textSelection(.enabled)
+                    }
+                    if let details = session.accountFailureDetails {
+                        DisclosureGroup("Sign-in details") {
+                            Text(details).fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("xodus.account.failureDetails")
                             if let observation = session.accountFailureObservation {
                                 Text(observation).fixedSize(horizontal: false, vertical: true)
                                     .accessibilityIdentifier("xodus.account.failureObservation")
@@ -268,7 +280,9 @@ struct LiveSettingsView: View {
                 HStack {
                     Button("Check public product") { Task { await session.lookupProduct() } }
                         .disabled(!session.supports(.enqueue) || session.lookupBusy)
-                    if session.lookupBusy { ProgressView().controlSize(.small) }
+                    if session.lookupBusy {
+                        ProgressView().controlSize(.small).accessibilityLabel("Looking up game details")
+                    }
                 }
                 Text("Checks public metadata only. It does not buy, authorize, download or install a game.")
                     .font(.caption).foregroundStyle(.secondary)

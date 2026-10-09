@@ -34,7 +34,7 @@ struct GamePassLibraryView: View {
                     } else if visibleProducts.isEmpty {
                         ContentUnavailableView.search(text: query)
                     } else {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 180, maximum: 240), spacing: 24)], spacing: 28) {
+                        LazyVGrid(columns: LibraryGridLayout.columns, spacing: 28) {
                             ForEach(visibleProducts) { product in
                                 PCGameTile(game: PCGame(product: product), installed: installed, operations: operations,
                                            allowsArtworkLoading: allowsStartupTasks,
