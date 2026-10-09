@@ -24,6 +24,24 @@ Develop and verify native code on the user's Mac over trusted SSH, using isolate
 
 ## Capabilities and constraints
 
+**SDD personal-Library slice (9 October, source only):** Your Games is now
+access-qualified from the last complete account-held PC collection, never from
+installation or public discovery alone. Unverified local installations remain
+reachable in a separate native group; their files and saves are not changed.
+Personal counts, filters, search, hero and Continue Playing use the same join.
+Failed refresh preserves a visibly stale complete snapshot and disables new
+downloads; confirmed revocation or account mismatch retires its access.
+
+The current `gamepass-status` contract is a scoped licence probe, not a complete
+subscription/expiry API or an account-bound per-edition access grant. Therefore
+Game-Pass-only candidates **cannot currently be admitted to Your Games**. Held
+games may also show explicitly public **Game Pass catalog** membership, not
+extra account authorization. Partial discovery omits no-title verdicts, filters
+on the actual PC-candidate field, retains bounded unconfirmed records and
+labels refresh failures. No freshness TTL, paid acquisition or expiry date is
+invented. See the exact source acceptance boundary in
+[requirements](docs/REQUIREMENTS.md#sdd-lib-source-acceptance).
+
 **Proposed v1:** account connection, entitled PC library, scoped catalog discovery, edition selection, explicit eligibility and compatibility, installation planning, durable downloads/recovery, launch, safe updates/removal and redacted diagnostics.
 
 **Not promised in v1:** party/chat/LFG, follower counts not supplied by Xbox,

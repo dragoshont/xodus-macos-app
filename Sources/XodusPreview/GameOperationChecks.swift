@@ -505,6 +505,7 @@ enum GameOperationChecks {
         try privateFile(cached, compatibilityData)
         for mode in ["checkunsupported", "check11", "checkmissing", "checkwrongid"] {
             try writeMode(mode)
+            let priorSupport = operations.compatibility[game.id]
             await operations.prepareInstall(game)
             check(operations.installConsent != nil && !operations.canConfirmInstall
                   && !operations.isBusy && !installed.mutationActive && operations.canQuit,
@@ -516,6 +517,12 @@ enum GameOperationChecks {
             } else {
                 check(operations.installConsent?.checkError != nil && operations.log != nil,
                       "B3: Failed/mismatched check surfaces failure and generated-run Show log")
+                if mode == "check11" {
+                    check(operations.installConsent?.checkError?.contains("authorization") == true
+                          && operations.compatibility[game.id] == priorSupport
+                          && game.acquisitionKind == .unknown,
+                          "SDD-LIB-07: actual package refusal preserves collection and prior support facts")
+                }
             }
             if let consent = operations.installConsent { operations.confirmInstall(consent) }
             check(!FileManager.default.fileExists(atPath: root.appendingPathComponent("arguments").path),

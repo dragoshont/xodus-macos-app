@@ -94,9 +94,10 @@ enum PCGamesChecks {
              "DisplaySkuAvailabilities": [["Sku": ["Properties": ["Packages": [
                 ["PlatformDependencies": [["PlatformName": platform]]]]]]]]]
         }
-        func authResponses(uhs: String = "123", storeUHS: String = "123") throws -> [PCGamesHTTPResponse] {
+        func authResponses(uhs: String = "123", storeUHS: String = "123",
+                           xid: String = "456") throws -> [PCGamesHTTPResponse] {
             [try response(["Token": "neutral-user", "DisplayClaims": ["xui": [["uhs": uhs]]]]),
-             try response(["Token": "neutral-xbox", "DisplayClaims": ["xui": [["uhs": uhs, "xid": "456"]]]]),
+             try response(["Token": "neutral-xbox", "DisplayClaims": ["xui": [["uhs": uhs, "xid": xid]]]]),
              try response(["Token": "neutral-store", "DisplayClaims": ["xui": [["uhs": storeUHS]]]])]
         }
         let first = "FIXTURE00001", second = "FIXTURE00002", third = "FIXTURE00003"
@@ -262,6 +263,42 @@ enum PCGamesChecks {
         let deviceResponse = try response(["device_code": "neutral-device", "user_code": "ABCD-EFGH",
             "verification_uri": "https://www.microsoft.com/link", "expires_in": 900, "interval": 5])
         let tokenResponse = try response(["access_token": "neutral-access", "refresh_token": "neutral-refresh-rotated"])
+        let completeResponses = [tokenResponse] + (try authResponses()) + [
+            try page([item(first)]), try response(["Products": [catalogProduct(first)]])]
+        for mode in ["accountChange", "revoked", "partial", "removed"] {
+            let tail: [PCGamesHTTPResponse]
+            switch mode {
+            case "accountChange": tail = [tokenResponse] + (try authResponses(xid: "999"))
+            case "revoked": tail = [try response(["error": "invalid_grant"], status: 400)]
+            case "partial": tail = [tokenResponse] + (try authResponses()) + [
+                try page([item(first)], cursor: "incomplete"), try response([:], status: 503)]
+            default: tail = [tokenResponse] + (try authResponses()) + [try page([])]
+            }
+            let transport = PCGamesMockTransport(completeResponses + tail)
+            let controller = PCGamesController(store: PCGamesMockStore("neutral-refresh"),
+                                               client: PCGamesClient(transport: transport))
+            await controller.restorePresence()
+            controller.refresh()
+            await controller.waitForOperation()
+            check(controller.accessIsCurrent && controller.representedGames.map(\.id) == [first],
+                  "SDD-LIB-06: complete account snapshot is the live qualified source before \(mode)")
+            controller.refresh()
+            check(!controller.accessIsCurrent,
+                  "SDD-LIB-06: refresh in flight cannot authorize new installs")
+            await controller.waitForOperation()
+            if mode == "partial" {
+                check(controller.snapshot?.games.map(\.id) == [first] && !controller.accessIsCurrent
+                      && controller.error != nil && !controller.needsSignIn,
+                      "SDD-LIB-06: failed paging retains last-complete representation with stale access")
+            } else if mode == "removed" {
+                check(controller.representedGames.isEmpty && controller.error == nil
+                      && controller.snapshot?.games.isEmpty == true,
+                      "SDD-LIB-03/06: completed removal replaces old access, not a failed empty refresh")
+            } else {
+                check(controller.needsSignIn && controller.snapshot == nil && controller.representedGames.isEmpty,
+                      "SDD-LIB-03/06: \(mode) retires account A access rather than showing it as current")
+            }
+        }
         let pollingTransport = PCGamesMockTransport([
             deviceResponse, try response(["error": "authorization_pending"], status: 400),
             try response(["error": "slow_down"], status: 400), tokenResponse])

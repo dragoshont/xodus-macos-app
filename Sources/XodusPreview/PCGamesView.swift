@@ -13,7 +13,7 @@ struct PCGamesView: View {
     let recentActivity: () -> Void
 
     private var visibleGames: [PCGame] {
-        (library.snapshot?.games ?? []).filter { query.isEmpty || $0.title.localizedStandardContains(query) }
+        library.representedGames.filter { query.isEmpty || $0.title.localizedStandardContains(query) }
     }
 
     var body: some View {
@@ -82,7 +82,8 @@ struct PCGamesView: View {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 180, maximum: 240), spacing: 24)], spacing: 28) {
                             ForEach(visibleGames) { game in
                                 PCGameTile(game: game, installed: installed, operations: operations,
-                                           allowsArtworkLoading: allowsStartupTasks, badge: query.isEmpty ? nil : .owned)
+                                           allowsArtworkLoading: allowsStartupTasks, badge: query.isEmpty ? nil : .owned,
+                                           accessIsCurrent: library.accessIsCurrent)
                             }
 
                         }
@@ -95,8 +96,13 @@ struct PCGamesView: View {
                         if library.error != nil { Text("Showing the last complete library.") }
                     }
                     .font(.callout).foregroundStyle(.secondary) }
-                    if !showsCollection, library.error != nil {
-                        Text("Showing the last complete library.").font(.callout).foregroundStyle(.secondary)
+                    if !showsCollection {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Account-held PC collection · updated \(Text(snapshot.updatedAt, style: .relative)) ago")
+                            if !library.accessIsCurrent {
+                                Text("Showing the last complete library. Access is not current; refresh before a new download.")
+                            }
+                        }.font(.callout).foregroundStyle(.secondary)
                     }
                 } else if showsCollection, !library.busy {
                     Text("Load your library to see your PC games.").foregroundStyle(.secondary)
@@ -154,6 +160,7 @@ struct PCGameTile: View {
     var allowsArtworkLoading = true
     var badge: CatalogAccessBadge?
     var viewDetails: (() -> Void)?
+    var accessIsCurrent = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -177,7 +184,7 @@ struct PCGameTile: View {
                 } label: {
                     Label("Download", systemImage: "icloud.and.arrow.down")
                 }
-                    .disabled(!operations.canStartMutation)
+                    .disabled(!operations.canStartMutation || !accessIsCurrent)
                     .help("Download \(game.title)")
                     .accessibilityLabel("Download \(game.title)")
                     .accessibilityIdentifier("xodus.pcGames.download")

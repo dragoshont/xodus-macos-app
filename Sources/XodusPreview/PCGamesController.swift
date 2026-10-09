@@ -25,6 +25,11 @@ final class PCGamesController: ObservableObject {
     private var terminating = false
     private var attemptedAutomaticLoad = false
 
+    var representedGames: [PCGame] { needsSignIn ? [] : snapshot?.games ?? [] }
+    var accessIsCurrent: Bool {
+        snapshot != nil && hasSavedSignIn && !needsSignIn && !busy && error == nil && !needsKeychainApproval
+    }
+
     init(store: any PCGamesRefreshStore = PCGamesCredentialStore(), client: PCGamesClient = PCGamesClient(),
          market: String = PCGamesClient.market(Locale.current.region?.identifier),
          language: String = PCGamesClient.language(Locale.preferredLanguages.first ?? "en-US")) {
@@ -112,13 +117,17 @@ final class PCGamesController: ObservableObject {
                 try current(token)
                 try await store.save(tokens.refresh)
                 try current(token)
-                let result = try await client.library(accessToken: tokens.access, market: market, language: language)
+                let result = try await client.library(accessToken: tokens.access, market: market, language: language,
+                                                      expectedAccountID: snapshot?.accountID)
                 try current(token)
                 snapshot = result
             } catch is CancellationError { }
             catch {
                 guard generation == token, !terminating else { return }
-                if error as? PCGamesError == .signInRequired { needsSignIn = true }
+                if error as? PCGamesError == .signInRequired || error as? PCGamesError == .identityMismatch {
+                    needsSignIn = true
+                    snapshot = nil
+                }
                 if error as? PCGamesError == .keychainApprovalRequired { needsKeychainApproval = true }
                 self.error = Self.message(error)
             }

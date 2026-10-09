@@ -66,7 +66,7 @@ struct LiveCatalogView: View {
     let clearSearch: () -> Void
 
     private var results: CatalogSearchResults {
-        CatalogSearchResults(query: query, ownedGames: library.snapshot?.games ?? [],
+        CatalogSearchResults(query: query, ownedGames: library.representedGames,
             storeProducts: session.catalogMatches(query: query) ? session.products : [],
             gamePassProductIDs: session.gamePassProductIDs)
     }
@@ -188,8 +188,8 @@ struct LiveCatalogView: View {
     }
 
     private func canInstall(_ game: LibraryGame) -> Bool {
-        DiscoverBrowse.canInstall(owned: game.owned, gamePass: game.gamePass,
-                                 subscriptionActive: operations.gamePassActive)
+        // Public membership/global probe are not a per-product account grant.
+        game.owned && library.accessIsCurrent
     }
 
     private func hero(_ game: LibraryGame) -> some View {

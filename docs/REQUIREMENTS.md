@@ -29,6 +29,51 @@ Status: **proposed v1 requirements**, not implemented functionality. "Must" belo
 | PARITY-03 | Consoles and remote-play handoff | Show only cached consoles actually returned by Xbox. Console IDs are never placed in URLs. Remote Play opens `https://www.xbox.com/remoteplay` in the default browser; Xodus provides no wake, power, install-to-console or native streaming command. |
 | PARITY-04 | Dedicated Engines destination | Account, Settings and keyboard commands open one Engines page that reuses the governed runtime configuration UI. CrossOver observation, declared GPTK/Wine and graphics identities remain independent, and unsupported download/removal/runner actions stay absent. |
 
+## SDD-LIB source acceptance
+
+Frozen scope: R01/R03/R04/R05/R06 personal-library correctness, not the complete
+43-row parity/release program. These are source/synthetic-check outcomes, **not
+installed-product acceptance**. No GUI, sign-in, deployment or package issuance
+is authorized by these statuses.
+
+| Criterion | Source status and acceptance boundary |
+| --- | --- |
+| SDD-LIB-01 | Implemented: complete current account-held PC entries join installed or not; acquisition remains Unknown, never Purchased. |
+| SDD-LIB-02 | Partial/contract blocked: overlapping held access and public PC catalog membership are distinct, both filters overlap. Game-Pass-only current account access cannot be established by the available scoped probe and partial public feed. It is not admitted by inference. |
+| SDD-LIB-03 | Implemented under available evidence: public/local-only, console candidates, inactive/trial/expired collection rows and confirmed revoked/mismatched-account access are excluded. |
+| SDD-LIB-04 | Implemented: unverified installed/imported records appear separately with a warning, never in Your Games counts or eligible hero/recent. Registry, game and save bytes are untouched. Existing protected Play/management routes remain reachable. |
+| SDD-LIB-05 | Implemented: personal join drives counts/search/filter/sort and installed hero/Continue Playing; Store discovery remains separate. |
+| SDD-LIB-06 | Implemented bounds; broader access contract pending: failed collection paging retains last-complete visibly stale representation, not install authorization. Account changes/revocation retire access. PC public feed loading/partial/failure is explicit; omissions do not revoke retained metadata. Cache is bounded to 512 public identities and existing market/language/disconnect boundaries. No subscription expiry completeness is claimed. |
+| SDD-LIB-07 | Implemented source distinction: code 11 is package authorization/account-or-edition resolution, not unowned or Mac-unsupported. The package-check controller preserves prior compatibility/collection facts; code 12 remains separate. |
+| SDD-LIB-08 | Unresolved: exact Launcher `9PGW18NPBZV5` and playable Windows `9NBLGGH2JHXJ` are distinct public identities; metadata is not access proof. Older `BZ8MZF8444Z5` has no observed PC SKU. No title-name substitution, new OAuth or broad licence experiments. Root owns further exact identity/access tracing. |
+
+Focused neutral command: `swift run XodusPreview --library-access-check`.
+It reaches the live `LibraryGame.collection`, local-record and presentation
+selection seam plus `PCGamesController` with synthetic transport. Full native
+checks additionally exercise public discovery failures and real controller
+package-check failure paths using synthetic scripts.
+
+**Observed neutral SDK 27 validation (9 October):** regression-first focused
+test reproduced seven failures before the fix. Final source passed 104 focused
+Library access checks, 15 core checks, 2,978 management checks, 172 preview
+checks, 934 native-session checks, 152 native-host checks and 19 credential-wire
+checks. Debug build and the shipping-configuration Release `XodusPreview`
+compile passed without signing or packaging. The existing full `tools/check.sh`
+gate stopped at the shipping test target because this Mac's Command Line Tools
+SDK cannot resolve `XCTest`; that gate is **not PASS** and requires the existing
+full-Xcode CI runner. No replacement test framework was introduced. These
+synthetic/offscreen results are not a native installed walkthrough, genuine
+Game-Pass-only authorization, Minecraft edition resolution or deployment.
+
+**Exact missing backend evidence, not an invented schema:** an access response
+must bind the account to the PC collection beneficiary/game-service identity
+and retain exact product, selected SKU/package identity, access kind, observed
+active/unresolved/revoked state, check time and source. Any declared expiry or
+completeness needs authoritative evidence; absent fields stay unknown. The
+existing global scoped licence probe cannot authorize every public catalog
+tile or resolve Minecraft playable-edition access. No per-tile automatic
+licence checks or guessed dates are introduced.
+
 ## Quality and inclusion gates
 
 | ID | Requirement | Measurable acceptance |

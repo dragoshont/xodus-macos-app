@@ -410,23 +410,23 @@ enum PreviewChecks {
             }
             let all = LibraryGame.collection(installed: [installed, installed], owned: [owned, owned],
                 products: [catalogOnly], gamePass: [pass, pass], active: true)
-            check(all.count == 3 && Set(all.map(\.id)).count == 3,
-                  "Refreshed Library joins exact identities once across repeated inputs")
-            check(all.first?.installed != nil && all.first?.owned == false,
-                  "Importing a game never changes its ownership evidence")
+            check(all.count == 1 && Set(all.map(\.id)).count == 1,
+                  "Refreshed Library joins only qualified identities once across repeated inputs")
+            check(all.first?.installed == nil && all.first?.owned == true,
+                  "An unverified import cannot enter the access-qualified Library")
             check(!all.contains { $0.id == catalogOnly.id },
                   "Library never imports unrelated Store discovery into an entitled collection")
             check(LibraryGame.visible(all, query: "", filter: .owned, sort: .title).map(\.id) == [owned.id],
                   "Owned filter is based only on the complete PC account collection")
-            check(LibraryGame.visible(all, query: "", filter: .gamePass, sort: .title).map(\.id) == [pass.id],
-                  "Game Pass filter preserves separate membership evidence")
+            check(LibraryGame.visible(all, query: "", filter: .gamePass, sort: .title).isEmpty,
+                  "Public Game Pass-only candidates are not account access evidence")
             check(LibraryGame.collection(installed: [installed], owned: [owned], products: [],
-                gamePass: [pass], active: false).map(\.id) == [installed.storeId, owned.id],
-                  "Inactive subscription excludes feed-only titles without deleting installed or account-held games")
+                gamePass: [pass], active: false).map(\.id) == [owned.id],
+                  "Inactive subscription and unverified installation do not enter Your Games")
             check(LibraryGame.visible(all, query: "  RIDGE  ", filter: .all, sort: .title).map(\.id) == [owned.id],
                   "Library query trims whitespace and searches only titles in the current collection")
-            check(LibraryGame.visible(all, query: "", filter: .installed, sort: .recentlyPlayed).map(\.id) == [installed.storeId],
-                  "Installed and last-played filtering uses local registry evidence only")
+            check(LibraryGame.visible(all, query: "", filter: .installed, sort: .recentlyPlayed).isEmpty,
+                  "Personal Installed filtering still requires qualified access")
             let joined = LibraryGame.collection(installed: [installed],
                 owned: [PCGame(id: installed.storeId, title: "Account title", artwork: nil)],
                 products: [], gamePass: [try product(installed.storeId)], active: true)
@@ -444,10 +444,11 @@ enum PreviewChecks {
             let squareGame = LibraryGame(id: owned.id, title: owned.title, installed: nil,
                 pc: PCGame(id: owned.id, title: owned.title, artwork: square), product: nil, owned: true, gamePass: false)
             check(square != nil && squareGame.cover == nil, "Portrait Library covers do not stretch square Store icons")
-            check(LibraryAccess(joined[0]) == .owned && LibraryAccess(all[0]) == nil &&
-                  all.first(where: { $0.gamePass }).flatMap(LibraryAccess.init) == .gamePass,
-                  "Primary access copy never turns installation into account entitlement")
-            check(all[0].actionTitle == "Play" &&
+            check(LibraryAccess(joined[0]) == .owned && LibraryAccess(all[0]) == .owned &&
+                  LibraryGame.localRecords(installed: [installed], qualified: all, query: "", sort: .title)
+                    .allSatisfy { LibraryAccess($0) == nil },
+                  "Local-only copy never turns installation into account entitlement")
+            check(joined[0].actionTitle == "Play" &&
                   all.filter { $0.installed == nil && $0.owned }.allSatisfy { $0.actionTitle == "Download" } &&
                   all.filter { $0.installed == nil && !$0.owned }.allSatisfy { $0.actionTitle == "Install" },
                   "Installed games say Play, owned games say Download and subscription-only games say Install")

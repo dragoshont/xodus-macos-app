@@ -45,6 +45,19 @@ final class LiveSession: ObservableObject {
     @Published private(set) var discoveryCheckedAt: String?
     @Published private(set) var gamePassProductIDs = Set<String>()
     @Published private(set) var gamePassProducts: [CatalogProduct] = []
+    @Published private(set) var gamePassCatalogLoading = false
+    @Published private(set) var gamePassCatalogError: String?
+    @Published private(set) var gamePassCatalogCheckedAt: String?
+
+    var gamePassLibraryNotice: String {
+        if gamePassCatalogError != nil {
+            return "PC Game Pass catalog couldn't finish refreshing. Saved catalog records are retained, not current access grants. Missing titles don't prove non-membership."
+        }
+        if gamePassProducts.isEmpty {
+            return "PC Game Pass per-game account access isn't verified. A subscription probe and public catalog alone don't supply an eligible personal game list."
+        }
+        return "Partial public PC Game Pass catalog, not account access proof. Saved records may be unconfirmed; missing titles don't prove non-membership. Refresh cannot resolve the selected edition's account access with the current contract."
+    }
     @Published var selectedProduct: CatalogProduct?
     @Published var errorMessage: String?
     @Published var catalogError: String?
@@ -762,6 +775,9 @@ final class LiveSession: ObservableObject {
         gamePassProductIDs = []
         gamePassProducts = []
         gamePassRevision = nil
+        gamePassCatalogLoading = false
+        gamePassCatalogError = nil
+        gamePassCatalogCheckedAt = nil
         diagnosticPreview = nil
         diagnosticPreviewing = false
         diagnosticSaved = false
@@ -1202,6 +1218,8 @@ final class LiveSession: ObservableObject {
         searching = false
         catalogStopped = true
         catalogError = nil
+        gamePassCatalogLoading = false
+        gamePassCatalogError = "Catalog refresh stopped"
     }
 
     private func queryStore(_ request: CatalogRequest) async {
@@ -1246,7 +1264,12 @@ final class LiveSession: ObservableObject {
 
     private func browseDiscovery(_ request: CatalogRequest) async {
         guard let client, request.generation == generation else { return }
-        defer { if isCurrent(request) { searching = false } }
+        gamePassCatalogLoading = true
+        gamePassCatalogError = nil
+        defer {
+            gamePassCatalogLoading = false
+            if isCurrent(request) { searching = false }
+        }
         do {
             let page = try await client.request(.discover, params: [
                 "market": .string(request.market), "language": .string(request.language), "limit": .integer(16),
@@ -1254,22 +1277,29 @@ final class LiveSession: ObservableObject {
             ], timeout: .seconds(45)).decode(CatalogDiscovery.self)
             guard isCurrent(request) else { return }
             try applyDiscoveryPage(page, request: request)
+            if !page.failures.isEmpty { gamePassCatalogError = "Partial catalog refresh" }
         } catch {
             guard isCurrent(request) else { return }
             if case let ManagementError.discoveryFailed(page) = error {
                 do { try applyDiscoveryPage(page, request: request) }
-                catch { catalogError = Self.describe(error); return }
+                catch {
+                    catalogError = Self.describe(error)
+                    gamePassCatalogError = catalogError
+                    return
+                }
             }
             catalogError = Self.describe(error)
+            gamePassCatalogError = catalogError
         }
     }
 
     private func applyDiscoveryPage(_ page: CatalogDiscovery, request: CatalogRequest) throws {
         try page.validatePublicScope(market: request.market, language: request.language, limit: 16)
-        let retainedIDs = gamePassRevision == page.corpusRevision ? gamePassProductIDs : []
-        guard retainedIDs.union(page.products.map(\.id)).count <= 512 else {
+        let pcProducts = page.products.filter(\.pcCatalogCandidate)
+        guard gamePassProductIDs.union(pcProducts.map(\.id)).count <= 512 else {
             throw ManagementError.backendError("REVISION_CONFLICT", retryable: true)
         }
+        if !pcProducts.isEmpty { gamePassCatalogCheckedAt = page.checkedAt }
         let existingIDs = Set(products.map(\.id) + discoveryFailures.map(\.id))
         let incomingIDs = Set(page.products.map(\.id) + page.failures.map(\.id))
         if request.more {
@@ -1289,14 +1319,14 @@ final class LiveSession: ObservableObject {
         catalogCorpus = page.corpus
         cacheRevision = nil
         if gamePassRevision != page.corpusRevision {
-            gamePassProductIDs = []
-            gamePassProducts = []
+            // A partial revision's omissions cannot revoke prior membership metadata.
+            // Retain bounded public records, with the explicit unconfirmed/partial notice.
             gamePassRevision = page.corpusRevision
         }
-        let incoming = Dictionary(uniqueKeysWithValues: page.products.map { ($0.id, $0) })
+        let incoming = Dictionary(uniqueKeysWithValues: pcProducts.map { ($0.id, $0) })
         gamePassProducts = gamePassProducts.map { incoming[$0.id] ?? $0 }
-            + page.products.filter { !gamePassProductIDs.contains($0.id) }
-        gamePassProductIDs.formUnion(page.products.map(\.id))
+            + pcProducts.filter { !gamePassProductIDs.contains($0.id) }
+        gamePassProductIDs.formUnion(pcProducts.map(\.id))
     }
 
 #if !XODUS_SHIPPING
@@ -1327,6 +1357,9 @@ final class LiveSession: ObservableObject {
         gamePassProductIDs = []
         gamePassProducts = []
         gamePassRevision = nil
+        gamePassCatalogLoading = false
+        gamePassCatalogError = nil
+        gamePassCatalogCheckedAt = nil
         discoveryFailures = []
         discoveryCheckedAt = nil
         catalogCorpus = "observedPublicProducts"

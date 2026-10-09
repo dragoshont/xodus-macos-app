@@ -9,6 +9,22 @@ real Microsoft access or compatibility.
 
 ## Navigation and search
 
+**SDD-LIB correction (source only):** Your Games, its count, search, filters,
+sort, hero and Continue Playing share the qualified PC-collection join.
+Installed-only records are reachable below it in **Local installations · access
+not verified**, using existing native cards/actions, not a new navigation
+destination. Their warning explicitly preserves files/saves and does not grant
+ownership. A qualified cached collection remains navigable with source/age and
+stale copy, but new Download is disabled during failed/in-flight refresh.
+Revocation or account mismatch retires personal access without deleting local
+records. Game Pass catalog badges describe public PC membership only;
+Game-Pass-only current per-edition access remains a contract blocker.
+Loading/partial/failed discovery is not an empty personal library or evidence
+that missing titles are outside Game Pass. Package authorization failures ask
+for account/selected-edition resolution, separately from Mac package support.
+The approved Figma composition, toolbar and existing protected actions remain;
+no native walkthrough of this source correction has occurred.
+
 **Current shipping boundary:** the proposed artwork-led screens below are not
 synthetic production content. The live source uses native window-background
 setup/empty/loading/error/data views until rights-cleared real art exists.

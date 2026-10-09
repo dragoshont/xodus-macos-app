@@ -38,14 +38,15 @@ struct LiveProductView: View {
     @ObservedObject private var stats = LibraryXboxStats.shared
 
     private var installed: InstalledGame? { installedLibrary.games.first { $0.storeId == product.id } }
-    private var owned: PCGame? { library.snapshot?.games.first { $0.id == product.id } }
-    private var gamePass: Bool { operations.gamePassActive && session.gamePassProductIDs.contains(product.id) }
+    private var owned: PCGame? { library.representedGames.first { $0.id == product.id } }
+    private var gamePass: Bool {
+        product.pcCatalogCandidate && operations.gamePassActive && session.gamePassProductIDs.contains(product.id)
+    }
     private var art: LibraryCatalogArtwork.Images? { catalog.images[product.id] }
     private var details: CatalogDetailFacts? { art?.detail }
     private var access: LibraryAccess? { owned != nil ? .owned : gamePass ? .gamePass : nil }
     private var accessSummary: String {
-        if owned != nil, gamePass { return "Owned · In Game Pass" }
-        return access?.rawValue ?? "Not verified"
+        LibraryAccess.summary(owned: owned != nil, catalogMembership: gamePass, current: library.accessIsCurrent)
     }
     private var landscape: [CatalogArtworkReference] {
         art?.landscape ?? product.artwork.filter { $0.role == .hero }
@@ -126,6 +127,10 @@ struct LiveProductView: View {
                                      allowsLoading: allowsArtworkLoading)
                     LibraryGameInformation(access: access, gamePass: gamePass,
                                            facts: art?.facts, xbox: stats.cache?.games[product.id])
+                    if owned != nil && !library.accessIsCurrent {
+                        Label("Saved access · refresh required", systemImage: "clock")
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
                     LibraryGameSizeView(installed: installed, downloadBytes: art?.facts.downloadBytes,
                                         allowsMeasurement: allowsArtworkLoading)
                     if let date = installed?.lastPlayedAt {
@@ -145,15 +150,12 @@ struct LiveProductView: View {
                                 Label("Download", systemImage: "icloud.and.arrow.down")
                             }
                                 .modifier(LibraryActionStyle())
-                                .disabled(!allowsStartupTasks || !operations.canStartMutation)
+                                .disabled(!allowsStartupTasks || !operations.canStartMutation || !library.accessIsCurrent)
                                 .help("Download \(product.title)")
                                 .accessibilityLabel("Download \(product.title)")
                         } else if gamePass {
-                            Button("Install") { beginInstall(PCGame(product: product)) }
-                                .modifier(LibraryActionStyle())
-                                .disabled(!allowsStartupTasks || !operations.canStartMutation)
-                                .help("Install \(product.title) with PC Game Pass")
-                                .accessibilityLabel("Install \(product.title) with PC Game Pass")
+                            Text("Game Pass catalog membership doesn't verify this account's access to this edition.")
+                                .font(.callout).foregroundStyle(.secondary)
                         } else {
                             Text("Access hasn't been verified.").font(.callout).foregroundStyle(.secondary)
                         }

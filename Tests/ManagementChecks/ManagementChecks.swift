@@ -911,7 +911,7 @@ enum MockBackend {
             if scenario.hasPrefix("recent") { supported.formUnion([.libraryRecent, .query]) }
             if scenario == "verify" || scenario.hasPrefix("verify-") { supported.insert(.authVerify) }
             if scenario == "diagnostics" { supported.insert(.diagnostics) }
-            if ["discoveryfail", "discoveryrecover", "discoverypcflag"].contains(scenario) { supported.insert(.discover) }
+            if ["discoveryfail", "discoveryrecover", "discoverypcflag", "discoveryrefresh"].contains(scenario) { supported.insert(.discover) }
             if ["queryfail", "badqueryfail", "queryempty", "queryslow", "querynodetails",
                 "querynulldetails", "querycoalesce", "startupquery", "publiccapture", "uifailures", "discoverypcflag"].contains(scenario) { supported.insert(.query) }
             if scenario == "startupquery" { supported.insert(.search) }
@@ -1338,6 +1338,30 @@ enum MockBackend {
                                 do { try emit(.object(response)) }
                                 catch { exit(3) }
                             }
+                        }
+                        continue
+                    }
+                    if scenario == "discoveryrefresh", command == "catalog.discover" {
+                        discoveryReads += 1
+                        if discoveryReads == 1 {
+                            guard var page = frames.first(where: {
+                                $0["data"]?["corpus"]?.string == "pcGamePassDiscovery"
+                            })?["data"]?.object else { exit(3) }
+                            page["products"] = .array((page["products"]?.array ?? []).map { product in
+                                var value = product.object ?? [:]
+                                value["source"] = .string("syntheticPublicSource")
+                                value["pcCatalogCandidate"] = .bool(true)
+                                return .object(value)
+                            })
+                            page["failures"] = .array([])
+                            page["nextCursor"] = .null
+                            try emit(.object(result(request, data: .object(page))))
+                        } else {
+                            guard var response = frames.first(where: {
+                                $0["error"]?["details"]?["corpus"]?.string == "pcGamePassDiscovery"
+                            })?.object else { exit(3) }
+                            response["requestID"] = request["requestID"]
+                            try emit(.object(response))
                         }
                         continue
                     }

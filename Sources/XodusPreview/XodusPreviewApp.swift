@@ -14,7 +14,7 @@ enum DevelopmentArguments {
     static func accepts(_ arguments: [String]) -> Bool {
         guard let mode = arguments.first else { return true }
         switch mode {
-        case "--fixture", "--self-check", "--live-check", "--media-check", "--stats-check", "--game-operation-check":
+        case "--fixture", "--self-check", "--live-check", "--media-check", "--stats-check", "--game-operation-check", "--library-access-check":
             return arguments.count == 1
         case "--export-preview", "--export-live", "--export-live-data":
             return arguments.count == 2
@@ -103,6 +103,7 @@ struct XodusPreviewApp: App {
             }
         }
         if CommandLine.arguments.contains("--live-check") { NativeChecks.launch() }
+        if CommandLine.arguments.contains("--library-access-check") { NativeChecks.launch(libraryAccessOnly: true) }
         if CommandLine.arguments.contains("--media-check") { NativeChecks.launch(mediaOnly: true) }
         if CommandLine.arguments.contains("--stats-check") { NativeChecks.launch(statsOnly: true) }
         if CommandLine.arguments.contains("--game-operation-check") { NativeChecks.launch(gameOperationsOnly: true) }

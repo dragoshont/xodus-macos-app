@@ -223,6 +223,15 @@ struct PCGamesSnapshot: Sendable {
     let games: [PCGame]
     let excludedCount: Int
     let updatedAt: Date
+    // Memory-only identity: never persisted or logged. Bounds a retained complete snapshot.
+    let accountID: String?
+
+    init(games: [PCGame], excludedCount: Int, updatedAt: Date, accountID: String? = nil) {
+        self.games = games
+        self.excludedCount = excludedCount
+        self.updatedAt = updatedAt
+        self.accountID = accountID
+    }
 }
 
 struct PCGamesCollectionPage: Decodable, Sendable {
@@ -525,7 +534,8 @@ struct PCGamesClient: Sendable {
         return value
     }
 
-    func library(accessToken: String, market: String, language: String) async throws -> PCGamesSnapshot {
+    func library(accessToken: String, market: String, language: String,
+                 expectedAccountID: String? = nil) async throws -> PCGamesSnapshot {
         let market = Self.market(market), language = Self.language(language)
         let user = try await xbox(post("https://user.auth.xboxlive.com/user/authenticate", json: [
             "RelyingParty": "http://auth.xboxlive.com", "TokenType": "JWT",
@@ -544,6 +554,7 @@ struct PCGamesClient: Sendable {
               claim.uhs == user.DisplayClaims.xui.first?.uhs else { throw PCGamesError.identityMismatch }
         guard let xid = claim.xid, !xid.isEmpty, xid.utf8.count <= 32,
               xid.utf8.allSatisfy({ (48...57).contains($0) }) else { throw PCGamesError.invalidResponse }
+        guard expectedAccountID == nil || expectedAccountID == xid else { throw PCGamesError.identityMismatch }
         var candidates = Set<String>(), candidateIDs = Set<String>(), cursors = Set<String>()
         var cursor: String?
         for index in 0..<Self.maximumPages {
@@ -603,6 +614,6 @@ struct PCGamesClient: Sendable {
             catch { throw PCGamesError.incompleteCatalog(start) }
         }
         return PCGamesSnapshot(games: games.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending },
-                               excludedCount: candidateIDs.count - games.count, updatedAt: Date())
+                               excludedCount: candidateIDs.count - games.count, updatedAt: Date(), accountID: xid)
     }
 }

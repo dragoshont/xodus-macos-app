@@ -5,13 +5,16 @@ import XodusManagement
 
 @MainActor
 enum NativeChecks {
-    static func launch(gameOperationsOnly: Bool = false, mediaOnly: Bool = false, statsOnly: Bool = false) -> Never {
-        Task { exit(await run(gameOperationsOnly: gameOperationsOnly, mediaOnly: mediaOnly, statsOnly: statsOnly) ? 0 : 1) }
+    static func launch(gameOperationsOnly: Bool = false, mediaOnly: Bool = false, statsOnly: Bool = false,
+                       libraryAccessOnly: Bool = false) -> Never {
+        Task { exit(await run(gameOperationsOnly: gameOperationsOnly, mediaOnly: mediaOnly, statsOnly: statsOnly,
+                              libraryAccessOnly: libraryAccessOnly) ? 0 : 1) }
         CFRunLoopRun()
         fatalError("The native check run loop ended before completion.")
     }
 
-    static func run(gameOperationsOnly: Bool = false, mediaOnly: Bool = false, statsOnly: Bool = false) async -> Bool {
+    static func run(gameOperationsOnly: Bool = false, mediaOnly: Bool = false, statsOnly: Bool = false,
+                    libraryAccessOnly: Bool = false) async -> Bool {
         var count = 0, failures = 0
         func check(_ condition: Bool, _ name: String) {
             count += 1
@@ -47,6 +50,12 @@ enum NativeChecks {
             }
         }
         do {
+            try LibraryAccessChecks.run(check: check)
+            if libraryAccessOnly {
+                try await PCGamesChecks.run(check: check)
+                print("\(count) Library access checks, \(failures) failures. Synthetic data only.")
+                return failures == 0
+            }
             if statsOnly {
                 do { try await LibraryStatsChecks.run(check: check) }
                 catch { check(false, "Stats fixture failed: \(error.localizedDescription)") }
@@ -528,16 +537,34 @@ enum NativeChecks {
                   "Successful continuation retains earlier failures without ownership promotion")
             await discovery.disconnect()
 
+            let partialFeed = session("discoveryrefresh")
+            await partialFeed.connect()
+            await partialFeed.refreshCatalog("")
+            let retainedFeedIDs = partialFeed.gamePassProductIDs
+            check(!retainedFeedIDs.isEmpty && partialFeed.gamePassCatalogError == nil,
+                  "SDD-LIB-06: partial PC discovery records remain metadata, not a personal access grant")
+            await partialFeed.refreshCatalog("")
+            check(partialFeed.gamePassProductIDs == retainedFeedIDs
+                  && Set(partialFeed.gamePassProducts.map(\.id)) == retainedFeedIDs
+                  && partialFeed.gamePassCatalogError != nil
+                  && partialFeed.gamePassLibraryNotice.contains("retained")
+                  && !partialFeed.gamePassCatalogLoading,
+                  "SDD-LIB-06: all-failure partial refresh retains bounded catalog records with explicit stale/error state")
+            await partialFeed.disconnect()
+            check(partialFeed.gamePassProductIDs.isEmpty && partialFeed.gamePassProducts.isEmpty
+                  && partialFeed.gamePassCatalogError == nil && !partialFeed.gamePassCatalogLoading,
+                  "SDD-LIB-06: disconnect retires prior catalog scope and transient refresh state")
+
             let feed = session("discoverypcflag")
             await feed.connect()
             await feed.refreshCatalog("")
             let feedIDs = Set(feed.products.map(\.id))
             check(!feedIDs.isEmpty && feed.catalogError == nil
                   && feed.products.allSatisfy { !$0.pcCatalogCandidate }
-                  && feed.gamePassProductIDs == feedIDs && Set(feed.gamePassProducts.map(\.id)) == feedIDs,
-                  "B1/B2: A 16-result discovery request accepts false flags and records only validated feed products")
+                  && feed.gamePassProductIDs.isEmpty && feed.gamePassProducts.isEmpty,
+                  "SDD-LIB-03: public discovery may retain console candidates but the PC Game Pass shelf excludes them")
             await feed.refreshCatalog("neutral")
-            check(feed.gamePassProductIDs == feedIDs && Set(feed.gamePassProducts.map(\.id)) == feedIDs
+            check(feed.gamePassProductIDs.isEmpty && feed.gamePassProducts.isEmpty
                   && feed.catalogCorpus == "publicMicrosoftStoreSearch"
                   && feed.catalogError == nil,
                   "B2: Searching Store preserves loaded Game Pass IDs without promoting failures or ownership")

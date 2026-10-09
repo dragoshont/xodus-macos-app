@@ -577,6 +577,7 @@ final class GameOperationsController: ObservableObject {
                 ? "Your saves couldn't be preserved. The game wasn't uninstalled."
                 : outcome.code == 12 ? unsupportedReason
                     ?? GameScriptError.failed(outcome.code).localizedDescription
+                : outcome.code == 11 ? GameScriptError.failed(11).localizedDescription
                 : specificFailure ?? GameScriptError.failed(outcome.code).localizedDescription
         }
         try await journal.clear()

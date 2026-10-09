@@ -66,13 +66,17 @@ struct LibraryGame: Identifiable {
         var result: [Self] = []
         var seen = Set<String>()
         let catalog = Dictionary(products.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let pass = Dictionary(gamePass.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let purchases = Dictionary(owned.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        // Discovery is public, partial membership metadata, NOT an account grant.
+        // The global subscription probe has no account-bound per-product access field.
+        // Until that contract exists it cannot contribute Game-Pass-only Your Games.
+        let pass = Dictionary(gamePass.filter(\.pcCatalogCandidate).map { ($0.id, $0) },
+                              uniquingKeysWith: { first, _ in first })
+        let held = Dictionary(owned.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         for game in installed {
             let id = game.storeId.isEmpty ? game.id.uuidString : game.storeId
-            guard seen.insert(id).inserted else { continue }
-            result.append(Self(id: id, title: game.title, installed: game, pc: purchases[id],
-                               product: catalog[id] ?? pass[id], owned: purchases[id] != nil,
+            guard let entitlement = held[id], seen.insert(id).inserted else { continue }
+            result.append(Self(id: id, title: game.title, installed: game, pc: entitlement,
+                               product: catalog[id] ?? pass[id], owned: true,
                                gamePass: active && pass[id] != nil))
         }
         for game in owned where seen.insert(game.id).inserted {
@@ -80,13 +84,29 @@ struct LibraryGame: Identifiable {
                                product: catalog[game.id] ?? pass[game.id], owned: true,
                                gamePass: active && pass[game.id] != nil))
         }
-        if active {
-            for game in gamePass where seen.insert(game.id).inserted {
-                result.append(Self(id: game.id, title: game.title, installed: nil, pc: nil,
-                                   product: game, owned: false, gamePass: true))
-            }
-        }
         return result
+    }
+
+    static func localRecords(installed: [InstalledGame], qualified: [Self],
+                             query: String, sort: LibrarySort) -> [Self] {
+        let qualifiedInstallations = Set(qualified.compactMap { $0.installed?.id })
+        let records = installed.filter { !qualifiedInstallations.contains($0.id) }.map {
+            // UUID keeps separate imports reachable even if Store IDs overlap.
+            Self(id: $0.id.uuidString, title: $0.title, installed: $0, pc: nil, product: nil,
+                 owned: false, gamePass: false)
+        }
+        return visible(records, query: query, filter: .installed, sort: sort)
+    }
+
+    static func continuing(_ qualified: [Self], launchableIDs: Set<UUID>) -> [InstalledGame] {
+        qualified.compactMap(\.installed)
+            .filter { $0.lastPlayedAt != nil && launchableIDs.contains($0.id) }
+            .sorted {
+                if $0.lastPlayedAt != $1.lastPlayedAt {
+                    return ($0.lastPlayedAt ?? .distantPast) > ($1.lastPlayedAt ?? .distantPast)
+                }
+                return $0.id.uuidString < $1.id.uuidString
+            }
     }
 
     static func visible(_ games: [Self], query: String, filter: LibraryFilter, sort: LibrarySort) -> [Self] {
@@ -188,12 +208,12 @@ struct LibraryHero<Artwork: View, Poster: View, Information: View, Actions: View
 }
 
 enum LibraryAccess: String {
-    case owned = "Owned", gamePass = "Game Pass"
+    case owned = "Owned", gamePass = "Game Pass catalog"
     var symbol: String { self == .owned ? "checkmark.seal" : "ticket" }
     var help: String {
         self == .owned
             ? "Held by this Microsoft account. The service doesn't provide a purchase or acquisition type."
-            : "Included in the currently loaded PC Game Pass catalog."
+            : "Listed in the loaded public PC Game Pass catalog. This does not verify this account's access or the selected playable edition. The feed is partial."
     }
     init?(_ game: LibraryGame) {
         if game.owned { self = .owned }
@@ -202,6 +222,10 @@ enum LibraryAccess: String {
     }
     static func badges(_ game: LibraryGame) -> [Self] {
         (game.owned ? [.owned] : []) + (game.gamePass ? [.gamePass] : [])
+    }
+    static func summary(owned: Bool, catalogMembership: Bool, current: Bool) -> String {
+        let access = owned ? (current ? "Owned" : "Saved Owned · refresh required") : "Access not verified"
+        return catalogMembership ? access + " · Game Pass catalog" : access
     }
 }
 

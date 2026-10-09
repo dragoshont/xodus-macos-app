@@ -27,7 +27,7 @@ struct LiveLibraryView: View {
     }
 
     private var collection: [LibraryGame] {
-        LibraryGame.collection(installed: installed.games, owned: library.snapshot?.games ?? [],
+        LibraryGame.collection(installed: installed.games, owned: library.representedGames,
                                products: session.products, gamePass: session.gamePassProducts,
                                active: operations.gamePassActive)
     }
@@ -35,13 +35,15 @@ struct LiveLibraryView: View {
         LibraryGame.visible(collection, query: query, filter: filter, sort: sort)
     }
     private var continuing: [InstalledGame] {
-        installed.games.filter { $0.lastPlayedAt != nil && installed.launchableIDs.contains($0.id) }
-            .sorted { ($0.lastPlayedAt ?? .distantPast) > ($1.lastPlayedAt ?? .distantPast) }
+        LibraryGame.continuing(visible, launchableIDs: installed.launchableIDs)
+    }
+    private var localRecords: [LibraryGame] {
+        LibraryGame.localRecords(installed: installed.games, qualified: collection, query: query, sort: sort)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if query.isEmpty, let game = installed.continuingGame {
+            if query.isEmpty, let game = continuing.first {
                 LibraryHero(title: game.title,
                             logos: (xboxStats.cache?.games[game.storeId]?.logo.map { [$0] } ?? []) +
                                 (art.images[game.storeId]?.logos ?? []),
@@ -84,19 +86,19 @@ struct LiveLibraryView: View {
                 if visible.isEmpty {
                     if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         ContentUnavailableView.search(text: query)
-                    } else if filter == .gamePass, operations.gamePassActive, session.gamePassProducts.isEmpty {
+                    } else if filter == .gamePass {
                         ContentUnavailableView {
-                            Label("Game Pass catalog not loaded", systemImage: "ticket")
-                        } description: { Text("Your saved subscription status doesn't supply a game list. Refresh Library when Xodus is connected.") }
+                            Label("Game Pass access not verified", systemImage: "ticket")
+                        } description: { Text("Public catalog membership and subscription status don't confirm access to each PC edition. Loaded account-held games can show catalog membership; missing titles aren't proof they're outside Game Pass.") }
                     } else if !collection.isEmpty {
                         ContentUnavailableView {
                             Label("No \(filter.rawValue.lowercased()) games", systemImage: "gamecontroller")
-                        } description: { Text("Games appear here when their access or installation is known.") }
+                        } description: { Text("Only access-qualified PC games appear in Your Games. Preserved local installations are shown separately below.") }
                         actions: { Button("Show all games") { filter = .all } }
                     } else if library.hasSavedSignIn {
                         ContentUnavailableView {
                             Label("Your games are ready to load", systemImage: "gamecontroller")
-                        } description: { Text("Load your PC library, or import a game already installed with Xodus.") }
+                        } description: { Text("Load your account-held PC games. Local installations alone don't confirm account access.") }
                         actions: { Button("Load PC games") { library.refresh() }.disabled(library.busy || library.needsKeychainApproval) }
                     }
                 } else {
@@ -105,9 +107,29 @@ struct LiveLibraryView: View {
                         ForEach(visible) { game in card(game) }
                     }
                 }
-                if session.catalogCorpus == "pcGamePassDiscovery", operations.gamePassActive,
-                   let notice = session.catalogNotice {
-                    Label(notice, systemImage: "info.circle").font(.callout).foregroundStyle(.secondary)
+                if session.gamePassCatalogLoading {
+                    ProgressView("Loading public PC Game Pass catalog")
+                }
+                Label(session.gamePassLibraryNotice, systemImage: "info.circle")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                if let checked = operations.gamePassStatus?.checkedAt.flatMap(GameCompatibilityResult.parseDate) {
+                    Text("\(operations.gamePassFromCache ? "Saved scoped licence probe" : "Scoped licence probe") · checked \(Text(checked, style: .relative)) ago")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if let checked = session.gamePassCatalogCheckedAt.flatMap(GameCompatibilityResult.parseDate) {
+                    Text("Public PC Game Pass catalog · checked \(Text(checked, style: .relative)) ago")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if !localRecords.isEmpty {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Local installations · access not verified").font(.title2.weight(.semibold))
+                        Text("These records are outside Your Games. Files and saves are preserved. Installation doesn't prove current account access; Play still uses the existing game-service checks.")
+                            .font(.callout).foregroundStyle(.secondary)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 170, maximum: 220), spacing: 24)],
+                                  alignment: .leading, spacing: 30) {
+                            ForEach(localRecords) { game in card(game) }
+                        }
+                    }.accessibilityIdentifier("xodus.library.localRecords")
                 }
                 if let error = art.error {
                     Label(error, systemImage: "photo.badge.exclamationmark").font(.callout).foregroundStyle(.secondary)
@@ -116,9 +138,10 @@ struct LiveLibraryView: View {
                     Label(error, systemImage: "exclamationmark.circle").font(.callout).foregroundStyle(.secondary)
                 }
             }
-            .task(id: collection.map(\.id).sorted().joined(separator: ",")) {
+            .task(id: (collection.map(\.id) + localRecords.map(\.id)).sorted().joined(separator: ",")) {
                 guard artworkAllowed else { return }
-                await art.load(ids: collection.map(\.id), market: session.market, language: session.language)
+                await art.load(ids: collection.map(\.id) + localRecords.compactMap { $0.installed?.storeId }
+                    .filter(PCGamesClient.validProductID), market: session.market, language: session.language)
             }
             .padding(.horizontal, 56).padding(.vertical, 22)
         }
@@ -176,8 +199,13 @@ struct LiveLibraryView: View {
 
     private func open(_ game: LibraryGame) {
         do {
-            session.selectedProduct = try game.product ?? art.images[game.id]?.product ??
-                LibraryGame.details(id: game.id, title: game.title, market: session.market, language: session.language,
+            let productID = game.installed?.storeId ?? game.id
+            guard PCGamesClient.validProductID(productID) else {
+                session.errorMessage = "This local record has no verified Store identity. Its files and saves are preserved."
+                return
+            }
+            session.selectedProduct = try game.product ?? art.images[productID]?.product ??
+                LibraryGame.details(id: productID, title: game.title, market: session.market, language: session.language,
                                     source: game.owned ? "AccountPCLibrary:identityOnly" : "LocalInstalledRegistry:identityOnly",
                                     pcCandidate: false)
         } catch { session.errorMessage = "Game details couldn't be opened. Your games haven't changed." }
@@ -189,23 +217,33 @@ struct LiveLibraryView: View {
         let facts = metadata?.genres.isEmpty == false ? metadata :
             xbox.map { LibraryCatalogFacts(genres: $0.genres, capabilities: metadata?.capabilities ?? []) } ?? metadata
         let game = collection.first(where: { $0.id == id })
-        return LibraryGameInformation(access: game.flatMap(LibraryAccess.init),
-                                      gamePass: game?.gamePass == true,
-                                      facts: facts, xbox: xbox, compact: compact)
+        return VStack(alignment: .leading, spacing: 5) {
+            LibraryGameInformation(access: game.flatMap(LibraryAccess.init),
+                                   gamePass: game?.gamePass == true,
+                                   facts: facts, xbox: xbox, compact: compact)
+            if game != nil && !library.accessIsCurrent {
+                Label("Saved access · refresh required", systemImage: "clock")
+                    .font(compact ? .caption : .callout).foregroundStyle(.secondary)
+            }
+        }
     }
 
     private func card(_ game: LibraryGame) -> some View {
-        LibraryCover(title: game.title,
+        let artworkID = game.installed?.storeId ?? game.id
+        return LibraryCover(title: game.title,
                      openLabel: "View",
                      open: { open(game) }) {
-            CatalogArtworkView(reference: artworkAllowed ? art.images[game.id]?.cover ?? game.cover : nil,
-                               status: (art.images[game.id]?.cover ?? game.cover) == nil ? .absent : .available)
+            CatalogArtworkView(reference: artworkAllowed ? art.images[artworkID]?.cover ?? game.cover : nil,
+                               status: (art.images[artworkID]?.cover ?? game.cover) == nil ? .absent : .available)
         } status: {
             information(id: game.id, compact: true)
+            if !game.owned {
+                Label("Access not verified", systemImage: "exclamationmark.shield").font(.caption)
+            }
             if game.installed != nil { Label("Installed", systemImage: "internaldrive").font(.caption) }
-            LibraryGameSizeView(installed: game.installed, downloadBytes: art.images[game.id]?.facts.downloadBytes,
+            LibraryGameSizeView(installed: game.installed, downloadBytes: art.images[artworkID]?.facts.downloadBytes,
                                 allowsMeasurement: artworkAllowed)
-            GameCompatibilityBadge(operations: operations, productID: game.id, allowsLoading: allowsStartupTasks)
+            GameCompatibilityBadge(operations: operations, productID: artworkID, allowsLoading: allowsStartupTasks)
             if let match = game.installed { InstalledPlayError(library: installed, game: match) }
         } actions: {
             LibraryGlassCluster {
@@ -225,7 +263,7 @@ struct LiveLibraryView: View {
                     .labelStyle(.iconOnly)
                     .help("Download \(game.title)")
                     .modifier(LibraryActionStyle(primary: false))
-                    .disabled(!operations.canStartMutation)
+                    .disabled(!operations.canStartMutation || !library.accessIsCurrent)
                     .accessibilityLabel("Download \(game.title)")
                     .accessibilityIdentifier("xodus.pcGames.download")
                 } else {

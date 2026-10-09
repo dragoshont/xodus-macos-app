@@ -40,7 +40,7 @@ enum GameScriptError: Error, LocalizedError, Equatable {
         case .failed(let code):
             switch code {
             case 10: "There isn't enough free space. Free up storage and try again."
-            case 11: "Sign in for games before installing. Then try again."
+            case 11: "Package authorization or game sign-in couldn't be confirmed. Check that your PC Store and game-service accounts match, then verify the selected edition. This doesn't change your library ownership or Mac support."
             case 12: "This game's package isn't supported on Mac yet."
             case 13: "The download couldn't be verified. Try installing again."
             case 14: "Installation cancelled. Partial files are kept; installing again resumes the download."
