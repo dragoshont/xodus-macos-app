@@ -885,7 +885,7 @@ enum MockBackend {
             let lifecycleDirectory = URL(fileURLWithPath: CommandLine.arguments[index + 1])
             let lifecycleScenario = ["retireslow", "retirefailed", "retirehello", "retiresnapshot", "authgate",
                                      "savedpermission", "startupquery", "uifailures",
-                                     "statuspermission", "deadlinecompleted"].contains(scenario) || scenario.hasPrefix("recent")
+                                     "statuspermission", "deadlinecompleted", "discoverybounded"].contains(scenario) || scenario.hasPrefix("recent")
             func trace(_ entry: String) throws {
                 guard lifecycleScenario else { return }
                 try FileManager.default.createDirectory(at: lifecycleDirectory, withIntermediateDirectories: true,
@@ -912,7 +912,7 @@ enum MockBackend {
             if scenario == "verify" || scenario.hasPrefix("verify-") { supported.insert(.authVerify) }
             if scenario == "diagnostics" { supported.insert(.diagnostics) }
             if ["discoveryfail", "discoveryrecover", "discoverypcflag", "discoveryrefresh",
-                "discoveryhundreds", "discoveryrepeatedpage"].contains(scenario) { supported.insert(.discover) }
+                "discoveryhundreds", "discoveryrepeatedpage", "discoverybounded"].contains(scenario) { supported.insert(.discover) }
             if ["queryfail", "badqueryfail", "queryempty", "queryslow", "querynodetails",
                 "querynulldetails", "querycoalesce", "startupquery", "publiccapture", "uifailures", "discoverypcflag"].contains(scenario) { supported.insert(.query) }
             if scenario == "startupquery" { supported.insert(.search) }
@@ -1342,7 +1342,7 @@ enum MockBackend {
                         }
                         continue
                     }
-                    if ["discoveryhundreds", "discoveryrepeatedpage"].contains(scenario),
+                    if ["discoveryhundreds", "discoveryrepeatedpage", "discoverybounded"].contains(scenario),
                        command == "catalog.discover" {
                         guard request["params"]?["limit"]?.uint64 == 16,
                               var page = frames.first(where: {
@@ -1358,8 +1358,9 @@ enum MockBackend {
                                   let offset = Int(cursor.dropFirst(prefix.count)) else { exit(3) }
                             start = offset
                         } else { start = 0 }
-                        guard start >= 0 && start < 300 else { exit(3) }
-                        let end = min(start + 16, 300)
+                        let total = scenario == "discoverybounded" ? 528 : 300
+                        guard start >= 0 && start < total else { exit(3) }
+                        let end = min(start + 16, total)
                         page["products"] = .array((start..<end).map { index in
                             let id = String(format: "NEUTRAL%05d", index)
                             var item = template
@@ -1378,7 +1379,7 @@ enum MockBackend {
                         })
                         page["failures"] = .array([])
                         let next = scenario == "discoveryrepeatedpage" && start > 0 ? start : end
-                        page["nextCursor"] = next < 300 ? .string("\(prefix)\(next)") : .null
+                        page["nextCursor"] = next < total ? .string("\(prefix)\(next)") : .null
                         try emit(.object(result(request, data: .object(page))))
                         continue
                     }

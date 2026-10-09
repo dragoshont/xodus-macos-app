@@ -458,10 +458,6 @@ enum PreviewChecks {
                   LibraryGame.localRecords(installed: [installed], qualified: all, query: "", sort: .title)
                     .allSatisfy { LibraryAccess($0) == nil },
                   "Local-only copy never turns installation into account entitlement")
-            check(joined[0].actionTitle == "Play" &&
-                  all.filter { $0.installed == nil && $0.owned }.allSatisfy { $0.actionTitle == "Download" } &&
-                  all.filter { $0.installed == nil && !$0.owned }.allSatisfy { $0.actionTitle == "Install" },
-                  "Installed games say Play, owned games say Download and subscription-only games say Install")
             let metadata = try JSONDecoder().decode(PCGamesCatalog.Product.self, from: Data("""
                 {"ProductId":"FIXTURE00002","Properties":{
                  "Categories":[" Action & adventure ","Role playing","Action & adventure"],

@@ -126,6 +126,11 @@ struct LiveLibraryView: View {
                     }
                     Label(session.gamePassLibraryNotice, systemImage: "info.circle")
                         .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    if let error = session.gamePassCatalogError {
+                        Label(error, systemImage: "exclamationmark.circle")
+                            .font(.callout).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     HStack {
                         Button("Refresh Game Pass") {
                             Task { await session.loadGamePassCatalog(refresh: true) }

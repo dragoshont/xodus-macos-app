@@ -1250,6 +1250,7 @@ final class LiveSession: ObservableObject {
                   catalogError == nil, !catalogStopped, let cursor = nextCursor else { return }
             guard products.count + discoveryFailures.count < 512 else {
                 gamePassCatalogError = "The catalogue reached this build's limit. Some games remain unloaded."
+                gamePassCatalogHasMore = false
                 return
             }
             guard cursors.insert(cursor).inserted else {

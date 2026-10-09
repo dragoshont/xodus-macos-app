@@ -568,6 +568,21 @@ enum NativeChecks {
                   "Repeated catalogue cursors stop with explicit partial coverage instead of looping or duplicating games")
             await repeatedPage.disconnect()
 
+            let boundedConfiguration = configuration("discoverybounded")
+            let boundedCatalogue = LiveSession(configuration: boundedConfiguration)
+            await boundedCatalogue.connect()
+            await boundedCatalogue.loadGamePassCatalog()
+            check(boundedCatalogue.gamePassProducts.count == 512
+                  && boundedCatalogue.nextCursor != nil && !boundedCatalogue.gamePassCatalogHasMore
+                  && boundedCatalogue.gamePassCatalogError?.contains("limit") == true,
+                  "Catalogue limit preserves partial coverage and stops offering an impossible Load remaining action")
+            let readsAtLimit = try trace(boundedConfiguration).filter { $0 == "catalog.discover" }.count
+            await boundedCatalogue.loadGamePassCatalog()
+            check(try trace(boundedConfiguration).filter { $0 == "catalog.discover" }.count == readsAtLimit,
+                  "Repeated requests at the catalogue bound make no additional producer calls")
+            await boundedCatalogue.disconnect()
+            try cleanLifecycle(boundedConfiguration)
+
             let partialFeed = session("discoveryrefresh")
             await partialFeed.connect()
             await partialFeed.refreshCatalog("")
