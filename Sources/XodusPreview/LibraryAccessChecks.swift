@@ -95,6 +95,10 @@ enum LibraryAccessChecks {
         check(stale.isEmpty && LibraryGame.localRecords(installed: [installedHeld],
             qualified: stale, query: "", sort: .title).first?.eligibility == .installedUnknown,
               "M10: stale held evidence leaves Your Games and preserves the qualified local installation")
+        check(GameDetailFacetCopy.access(acquisition: .subscription, current: true) == "Subscription (plan unknown)"
+              && GameDetailFacetCopy.access(acquisition: .purchased, current: false).contains("refresh required")
+              && GameDetailFacetCopy.access(acquisition: nil, current: true) == "Access not verified",
+              "M10: detail facets never relabel subscription, stale or absent access as current Owned")
         let refusal = GameScriptError.failed(11).localizedDescription
         check(refusal.contains("account") && refusal.contains("sign-in")
               && refusal.contains("try again")

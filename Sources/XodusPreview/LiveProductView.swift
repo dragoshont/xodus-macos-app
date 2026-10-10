@@ -6,6 +6,12 @@ enum GameDetailFacetCopy {
     static func installation(installed: Bool) -> String {
         installed ? "Ready to play" : "Not installed"
     }
+
+    static func access(acquisition: PCGameAcquisitionKind?, current: Bool) -> String {
+        guard let acquisition else { return "Access not verified" }
+        let label = acquisition == .subscription ? "Subscription (plan unknown)" : "Owned"
+        return current ? label : "Saved \(label) - refresh required"
+    }
 }
 
 struct LiveProductView: View {
@@ -163,8 +169,9 @@ struct LiveProductView: View {
 
     private var evidence: some View {
         Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 14) {
-            if owned != nil { facet("Library", "Owned") }
-            if gamePass { facet("Game Pass", "Included with PC Game Pass") }
+            facet("Library", GameDetailFacetCopy.access(acquisition: owned?.acquisitionKind,
+                                                      current: library.accessIsCurrent))
+            if gamePass { facet("Game Pass catalog", "PC catalogue member - account access checked separately") }
             facet("Installation", GameDetailFacetCopy.installation(installed: installed != nil))
         }
         .font(.callout).frame(maxWidth: .infinity, alignment: .leading)
