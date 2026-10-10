@@ -370,14 +370,20 @@ struct LiveLibraryView: View {
             CatalogArtworkView(reference: artworkAllowed ? art.images[artworkID]?.cover ?? game.cover : nil,
                                status: (art.images[artworkID]?.cover ?? game.cover) == nil ? .absent : .available)
         } status: {
-            if game.installed != nil {
-                Label("Installed", systemImage: "internaldrive")
-            } else if let reason = unsupportedReason(game) {
-                Label("Not on Mac yet", systemImage: "laptopcomputer.slash").help(reason)
-            } else {
-                LibraryGameSizeView(installed: nil, downloadBytes: art.images[artworkID]?.facts.downloadBytes,
-                                    packageFormat: art.images[artworkID]?.facts.packageFormat,
-                                    allowsMeasurement: artworkAllowed)
+            HStack(spacing: 8) {
+                if let format = art.images[artworkID]?.facts.packageFormat,
+                   game.installed != nil || unsupportedReason(game) != nil {
+                    LibraryPackageFormatLabel(format: format)
+                }
+                if game.installed != nil {
+                    Label("Installed", systemImage: "internaldrive")
+                } else if let reason = unsupportedReason(game) {
+                    Label("Not on Mac yet", systemImage: "laptopcomputer.slash").help(reason)
+                } else {
+                    LibraryGameSizeView(installed: nil, downloadBytes: art.images[artworkID]?.facts.downloadBytes,
+                                        packageFormat: art.images[artworkID]?.facts.packageFormat,
+                                        allowsMeasurement: artworkAllowed)
+                }
             }
             if let match = game.installed { InstalledPlayError(library: installed, game: match) }
         } actions: {
