@@ -263,11 +263,12 @@ actor InstalledGameStore {
 
     /// Persist the detected package format. Returns the saved list, or the current
     /// list unchanged when the value already matches, so backfill is idempotent.
-    func recordPackageType(id: UUID, type: PackageType) throws -> [InstalledGame] {
+    func recordPackageType(id: UUID, type: PackageType, observedAtImport: Date? = nil) throws -> [InstalledGame] {
         var games = try load()
         guard let index = games.firstIndex(where: { $0.id == id }), games[index].packageType != type else {
             return games
         }
+        if let observedAtImport, games[index].importedAt != observedAtImport { return games }
         games[index].packageType = type
         try save(games)
         return games

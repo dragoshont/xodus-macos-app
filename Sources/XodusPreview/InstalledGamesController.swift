@@ -38,6 +38,7 @@ final class InstalledGamesController: ObservableObject {
     private var playingTask: Task<Void, Never>?
     private var runToken: UUID?
     private var stopToken: UUID?
+    private var inspectionGeneration = UUID()
     private var stopConfirmed = false
     private var process: Process?
     private var sessionPersistence: Task<Void, Never>?
@@ -124,6 +125,7 @@ final class InstalledGamesController: ObservableObject {
     func remove(_ game: InstalledGame) async {
         guard loaded, !editing, !choosing, !mutationActive, !applicationTerminating, runningGameID != game.id else { return }
         editing = true
+        inspectionGeneration = UUID()
         defer { editing = false }
         do {
             let updated = try await store.remove(id: game.id)
@@ -360,6 +362,7 @@ final class InstalledGamesController: ObservableObject {
         guard loaded, !editing, !choosing, !mutationActive, !applicationTerminating,
               runningGameID != game.id, games.contains(where: { $0.id == game.id }) else { return }
         editing = true
+        inspectionGeneration = UUID()
         defer { editing = false }
         do {
             applySavedGames(try await store.setEngineOverride(id: game.id, override: override))
@@ -377,6 +380,7 @@ final class InstalledGamesController: ObservableObject {
     func removeUninstalled(_ id: UUID) async throws {
         guard mutationActive, mutationGameID == id, runningGameID != id, !editing else { throw GameScriptError.busy }
         editing = true
+        inspectionGeneration = UUID()
         defer { editing = false }
         applySavedGames(try await store.remove(id: id))
         launchableIDs.remove(id)
@@ -386,6 +390,7 @@ final class InstalledGamesController: ObservableObject {
     }
 
     private func saveValidatedGame(folder: URL, launcher: URL, expectedStoreID: String?) async throws {
+        inspectionGeneration = UUID()
         let inspectPackage = inspectPackage
         let metadata = try await Task.detached(priority: .userInitiated) {
             let config = try MicrosoftGameConfig.read(folder: folder)
@@ -417,6 +422,8 @@ final class InstalledGamesController: ObservableObject {
     }
 
     private func refreshLaunchableGames() async {
+        let generation = UUID()
+        inspectionGeneration = generation
         let entries = games
         let inspectPackage = inspectPackage
         let result = await Task.detached(priority: .utility) {
@@ -441,13 +448,20 @@ final class InstalledGamesController: ObservableObject {
             }
             return (launchable, publishers, packageTypes, failures)
         }.value
+        guard inspectionGeneration == generation, !applicationTerminating else { return }
         launchableIDs = result.0.intersection(games.map(\.id))
         packageErrors = result.3
         var latestSaved: [InstalledGame]?
         for (id, detected) in result.2 where games.contains(where: { $0.id == id && $0.packageType != detected }) {
-            do { latestSaved = try await store.recordPackageType(id: id, type: detected) }
+            guard inspectionGeneration == generation else { return }
+            do {
+                guard let observed = entries.first(where: { $0.id == id }) else { continue }
+                latestSaved = try await store.recordPackageType(id: id, type: detected,
+                                                                observedAtImport: observed.importedAt)
+            }
             catch { packageErrors[id] = "The detected package format couldn't be saved. Check Application Support access." }
         }
+        guard inspectionGeneration == generation else { return }
         if let latestSaved { applySavedGames(latestSaved) }
         for index in games.indices where games[index].publisher == nil {
             games[index].publisher = result.1[games[index].id]

@@ -11,6 +11,7 @@ public struct AppxManifestFacts: Equatable, Sendable {
         let reader = AppxManifestReader()
         let parser = XMLParser(data: data)
         parser.shouldProcessNamespaces = true
+        parser.shouldReportNamespacePrefixes = true
         parser.shouldResolveExternalEntities = false
         parser.delegate = reader
         guard parser.parse(), !reader.invalid, reader.root == "Package", reader.applications > 0 else {
@@ -31,23 +32,58 @@ private final class AppxManifestReader: NSObject, XMLParserDelegate {
     var applications = 0
     var invalid = false
     private var path: [String] = []
+    private var namespaces: [String?] = []
+    private var prefixBindings: [String: [String]] = [:]
+    private let foundation = "http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+    private let uap10 = "http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+    private let restricted = "http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+
+    func parser(_ parser: XMLParser, didStartMappingPrefix prefix: String, toURI uri: String) {
+        prefixBindings[prefix, default: []].append(uri)
+    }
+
+    func parser(_ parser: XMLParser, didEndMappingPrefix prefix: String) {
+        prefixBindings[prefix]?.removeLast()
+    }
+
+    private func isFoundation(_ uri: String?) -> Bool {
+        uri == nil || uri == "" || uri == foundation
+            || uri == "http://schemas.microsoft.com/appx/2010/manifest"
+    }
+
+    private var foundationPath: Bool { namespaces.allSatisfy(isFoundation) }
 
     func parser(_ parser: XMLParser, didStartElement name: String, namespaceURI: String?,
                 qualifiedName: String?, attributes: [String: String]) {
         path.append(name)
-        if path.count == 1 { root = name }
+        namespaces.append(namespaceURI)
+        if path.count == 1 {
+            guard isFoundation(namespaceURI) else { invalid = true; parser.abortParsing(); return }
+            root = name
+        }
         guard path.count <= 64, families.count < 64, applications < 256 else {
             invalid = true; parser.abortParsing(); return
         }
-        if path == ["Package", "Dependencies", "TargetDeviceFamily"],
+        if foundationPath, path == ["Package", "Dependencies", "TargetDeviceFamily"],
            let family = attributes["Name"], !family.isEmpty, family.utf8.count <= 256 {
             families.append(family)
         }
-        if path == ["Package", "Applications", "Application"] {
+        if foundationPath, path == ["Package", "Applications", "Application"] {
             applications += 1
             let entryPoint = attributes["EntryPoint"]
-            let behavior = attribute("RuntimeBehavior", in: attributes)
-            let trust = attribute("TrustLevel", in: attributes)
+            let behavior = attribute("RuntimeBehavior", in: attributes, parser: parser)
+            let trust = attribute("TrustLevel", in: attributes, parser: parser)
+            guard !invalid else { return }
+            if let behavior, !["windowsApp", "win32App", "packagedClassicApp"].contains(behavior) {
+                invalid = true; parser.abortParsing(); return
+            }
+            if let trust, !["appContainer", "mediumIL"].contains(trust) {
+                invalid = true; parser.abortParsing(); return
+            }
+            if behavior == "windowsApp" && trust == "mediumIL"
+                || (behavior == "win32App" || behavior == "packagedClassicApp") && trust == "appContainer" {
+                invalid = true; parser.abortParsing(); return
+            }
             if entryPoint == "Windows.FullTrustApplication" || trust == "mediumIL"
                 || behavior == "win32App" || behavior == "packagedClassicApp" {
                 fullTrust = true
@@ -56,19 +92,31 @@ private final class AppxManifestReader: NSObject, XMLParserDelegate {
                 uwpApplication = true
             }
         }
-        if path == ["Package", "Capabilities", "Capability"], attributes["Name"] == "runFullTrust" {
+        if path == ["Package", "Capabilities", "Capability"],
+           namespaces.dropLast().allSatisfy(isFoundation),
+           namespaceURI == restricted, attributes["Name"] == "runFullTrust" {
             fullTrust = true
         }
-        if name == "Extension", attributes["Category"] == "windows.fullTrustProcess" { fullTrust = true }
+        if name == "Extension",
+           namespaceURI == "http://schemas.microsoft.com/appx/manifest/desktop/windows10",
+           Array(path.prefix(3)) == ["Package", "Applications", "Application"],
+           attributes["Category"] == "windows.fullTrustProcess" { fullTrust = true }
     }
 
-    private func attribute(_ name: String, in values: [String: String]) -> String? {
-        values.first { $0.key.split(separator: ":").last.map(String.init) == name }?.value
+    private func attribute(_ name: String, in values: [String: String], parser: XMLParser) -> String? {
+        let matches = values.filter {
+            let parts = $0.key.split(separator: ":", omittingEmptySubsequences: false)
+            return parts.count == 2 && parts[1] == name
+                && prefixBindings[String(parts[0])]?.last == uap10
+        }
+        guard matches.count <= 1 else { invalid = true; parser.abortParsing(); return nil }
+        return matches.first?.value
     }
 
     func parser(_ parser: XMLParser, didEndElement name: String, namespaceURI: String?,
                 qualifiedName: String?) {
         path.removeLast()
+        namespaces.removeLast()
     }
 
     func parser(_ parser: XMLParser, foundInternalEntityDeclarationWithName name: String, value: String?) {

@@ -30,7 +30,7 @@ public struct PackageTypeEvidence: Equatable, Codable, Sendable {
     public var hasMSIXVCHeader: Bool
     /// An `AppxManifest.xml` exists (packaged MSIX/APPX/UWP app).
     public var hasAppxManifest: Bool
-    /// The package layout shows an encrypted-APPX marker (`.eappx`/`.eappxbundle`).
+    /// A bounded encrypted-APPX header was observed; a filename is not evidence.
     public var encryptedPackageMarker: Bool
     /// Target device families declared by the manifest's `<Dependencies>`.
     public var targetDeviceFamilies: [String]
@@ -98,5 +98,12 @@ extension PackageType {
         let offset = (0..<4).reduce(0) { $0 | (Int(bytes[0x3c + $1]) << ($1 * 8)) }
         guard offset >= 64, offset <= bytes.count - 4 else { return false }
         return bytes.subdata(in: offset..<(offset + 4)) == Data([0x50, 0x45, 0, 0])
+    }
+
+    /// Signature recognition only, not decryption, signature or package-integrity verification.
+    public static func hasEncryptedAppxHeader(_ bytes: Data) -> Bool {
+        guard bytes.count >= 64, bytes.prefix(4) == Data("EXPH".utf8) else { return false }
+        let headerSize = Int(bytes[4]) | (Int(bytes[5]) << 8)
+        return headerSize >= 64 && headerSize <= bytes.count
     }
 }
