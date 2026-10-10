@@ -66,7 +66,6 @@ struct LibraryLogoTitle: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .help(presentation.unavailable ? "Logo couldn't be loaded. Showing the game title." : "")
         .task(id: references.map(\.url).joined(separator: "|")) {
             await presentation.load(references, allowed: allowsLoading)
         }
@@ -118,7 +117,6 @@ struct LibraryLandscapeView: View {
             .frame(width: geometry.size.width, height: geometry.size.height).clipped()
         }
         .accessibilityHidden(true)
-        .help(presentation.unavailable ? "Artwork unavailable. Game actions are unchanged." : "")
         .task(id: references.map(\.url).joined(separator: "|") + (installed?.id.uuidString ?? "")) {
             await presentation.load(references, installed: installed, allowed: allowsLoading)
         }

@@ -15,7 +15,8 @@ enum HeroMotionPolicy {
 private final class HeroMediaPresentation: ObservableObject {
     @Published var visible = false
     @Published var paused = false
-    @Published var hovered = false
+    /// Latched by the first hover so playback continues after the pointer leaves.
+    @Published var started = false
     @Published var lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
 }
 
@@ -43,8 +44,10 @@ private struct HeroAVPlayerView: NSViewRepresentable {
 struct LibraryHeroMedia<Poster: View>: View {
     let trailer: CatalogTrailer?
     var allowsPlayback = true
+    var playingChanged: (Bool) -> Void = { _ in }
     @ViewBuilder let poster: () -> Poster
     @AppStorage("Xodus.heroAnimationsEnabled") private var enabled = true
+    @AppStorage("Xodus.heroTrailerMuted") private var muted = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var presentation = HeroMediaPresentation()
@@ -60,7 +63,7 @@ struct LibraryHeroMedia<Poster: View>: View {
             reduceMotion: reduceMotion, lowPower: presentation.lowPower, active: scenePhase == .active,
             visible: presentation.visible, hasTrailer: trailer != nil,
             supportsViewportVisibility: supportsViewportVisibility)
-            && presentation.hovered
+            && presentation.started
     }
 
     var body: some View {
@@ -68,35 +71,54 @@ struct LibraryHeroMedia<Poster: View>: View {
             poster()
             if let player = playback.player, playback.error == nil {
                 HeroAVPlayerView(player: player)
+                    .opacity(playback.rendering ? 1 : 0)
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.6), value: playback.rendering)
                     .allowsHitTesting(false).accessibilityHidden(true)
             }
             if eligible {
-                Button {
-                    if playback.error != nil, let trailer {
-                        playback.play(trailer, muted: true, loops: true, preview: true)
-                    } else { presentation.paused.toggle() }
-                } label: {
-                    Image(systemName: playback.error != nil ? "arrow.clockwise"
-                          : presentation.paused ? "play.fill" : "pause.fill")
+                HStack(spacing: 10) {
+                    if playback.rendering, playback.error == nil {
+                        Button {
+                            muted.toggle()
+                        } label: {
+                            Image(systemName: muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                        }
+                        .modifier(LibraryActionStyle(primary: false)).buttonBorderShape(.circle)
+                        .accessibilityLabel(muted ? "Unmute trailer" : "Mute trailer")
+                        .help(muted ? "Unmute" : "Mute")
+                    }
+                    Button {
+                        if playback.error != nil, let trailer {
+                            playback.play(trailer, muted: muted, loops: true, preview: true)
+                        } else { presentation.paused.toggle() }
+                    } label: {
+                        Image(systemName: playback.error != nil ? "arrow.clockwise"
+                              : presentation.paused ? "play.fill" : "pause.fill")
+                    }
+                    .modifier(LibraryActionStyle(primary: false)).buttonBorderShape(.circle)
+                    .accessibilityLabel(playback.error != nil ? "Retry animated artwork"
+                                        : presentation.paused ? "Resume animated artwork" : "Pause animated artwork")
+                    .help(playback.error ?? (presentation.paused ? "Resume" : "Pause"))
                 }
-                .modifier(LibraryActionStyle(primary: false)).buttonBorderShape(.circle)
-                .accessibilityLabel(playback.error != nil ? "Retry animated artwork"
-                                    : presentation.paused ? "Resume animated artwork" : "Pause animated artwork")
-                .help(playback.error ?? "Muted animated artwork. Game playback is a separate action.")
                 .padding(.trailing, 24).padding(.top, 68)
             }
         }
         .onAppear { presentation.visible = true }
-        .onHover { presentation.hovered = $0 }
+        .onHover { if $0 { presentation.started = true } }
         .modifier(HeroScrollVisibility { presentation.visible = $0 })
         .task(id: "\(eligible):\(presentation.paused):\(trailer?.id ?? "")") {
             if eligible, let trailer {
                 if presentation.paused { playback.pause() }
                 else if playback.player != nil { playback.resume() }
-                else { playback.play(trailer, muted: true, loops: true, preview: true) }
+                else { playback.play(trailer, muted: muted, loops: true, preview: true) }
             } else { playback.stop() }
         }
-        .onChange(of: trailer?.id) { _, _ in playback.stop(); presentation.paused = false }
+        .onChange(of: muted) { _, value in playback.setMuted(value) }
+        .onChange(of: allowsPlayback) { _, allowed in if !allowed { presentation.started = false } }
+        .onChange(of: playback.rendering && !presentation.paused) { _, playing in playingChanged(playing) }
+        .onChange(of: trailer?.id) { _, _ in
+            playback.stop(); presentation.paused = false; presentation.started = false
+        }
         .onReceive(NotificationCenter.default.publisher(for: .NSProcessInfoPowerStateDidChange)) { _ in
             presentation.lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
         }

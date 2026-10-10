@@ -28,12 +28,18 @@ struct CatalogAVPlayerView: NSViewRepresentable {
 final class CatalogTrailerPlayback: ObservableObject {
     @Published private(set) var player: AVPlayer?
     @Published private(set) var error: String?
+    /// True once frames from the intended start point are on screen, so callers can keep the poster until then.
+    @Published private(set) var rendering = false
     private var observation: AnyCancellable?
     private var endObservation: AnyCancellable?
+    private var controlObservation: AnyCancellable?
+    private var reveal: Task<Void, Never>?
+    private var positioned = false
     private var wantsPlayback = false
 
     func pause() { wantsPlayback = false; player?.pause() }
     func resume() { wantsPlayback = true; player?.play() }
+    func setMuted(_ muted: Bool) { player?.isMuted = muted }
 
     static func previewStart(duration: Double) -> Double {
         guard duration.isFinite, duration > 10 else { return 0 }
@@ -43,7 +49,9 @@ final class CatalogTrailerPlayback: ObservableObject {
     func play(_ trailer: CatalogTrailer, muted: Bool = false, loops: Bool = false, preview: Bool = false) {
         stop()
         wantsPlayback = true
-        let asset = AVURLAsset(url: trailer.url, options: [AVURLAssetHTTPCookiesKey: []])
+        let cached = TrailerCache.shared.localURL(for: trailer.url)
+        let asset = AVURLAsset(url: cached ?? trailer.url, options: [AVURLAssetHTTPCookiesKey: []])
+        if cached == nil { TrailerCache.shared.store(trailer.url) }
         let item = AVPlayerItem(asset: asset)
         if muted {
             item.preferredPeakBitRate = 6_000_000
@@ -51,16 +59,34 @@ final class CatalogTrailerPlayback: ObservableObject {
         }
         let player = AVPlayer(playerItem: item)
         player.isMuted = muted
+        positioned = !preview
         observation = item.publisher(for: \.status).receive(on: DispatchQueue.main).sink { [weak self] status in
             if status == .failed {
                 self?.player?.pause()
                 self?.error = "The trailer couldn't be played. Try again or view the screenshots."
             } else if status == .readyToPlay, preview, self?.player === player {
                 let start = Self.previewStart(duration: item.duration.seconds)
-                player.seek(to: CMTime(seconds: start, preferredTimescale: 600))
-                if self?.wantsPlayback == true { player.play() }
+                player.seek(to: CMTime(seconds: start, preferredTimescale: 600),
+                            toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] done in
+                    Task { @MainActor in
+                        guard done, let self, self.player === player else { return }
+                        self.positioned = true
+                        if self.wantsPlayback { player.play() }
+                    }
+                }
             }
         }
+        controlObservation = player.publisher(for: \.timeControlStatus).receive(on: DispatchQueue.main)
+            .sink { [weak self] status in
+                guard let self, self.player === player, status == .playing, self.positioned, !self.rendering else { return }
+                self.reveal?.cancel()
+                self.reveal = Task { @MainActor [weak self] in
+                    // Let the first decoded frames settle before replacing the poster.
+                    try? await Task.sleep(for: .milliseconds(350))
+                    guard !Task.isCancelled, let self, self.player === player else { return }
+                    self.rendering = true
+                }
+            }
         if loops {
             endObservation = NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime, object: item)
                 .receive(on: DispatchQueue.main).sink { [weak self] _ in
@@ -78,6 +104,11 @@ final class CatalogTrailerPlayback: ObservableObject {
         wantsPlayback = false
         observation = nil
         endObservation = nil
+        controlObservation = nil
+        reveal?.cancel()
+        reveal = nil
+        rendering = false
+        positioned = false
         player?.pause()
         player?.replaceCurrentItem(with: nil)
         player = nil

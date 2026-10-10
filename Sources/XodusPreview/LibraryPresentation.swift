@@ -25,6 +25,7 @@ final class LibrarySelection: ObservableObject {
     @Published var recentGameID: UUID?
     @Published var heroID: String?
     @Published var heroHovered = false
+    @Published var heroPlaying = false
     var requestedGamePassScope: String?
 }
 
@@ -203,7 +204,11 @@ struct LibraryHero<Artwork: View, Poster: View, Information: View, Actions: View
             artwork()
             LinearGradient(colors: [.clear, .black.opacity(0.15), .black.opacity(0.8)],
                            startPoint: .top, endPoint: .bottom)
-                .frame(height: 210).allowsHitTesting(false)
+                .frame(height: height > 340 ? height * 0.7 : 210).allowsHitTesting(false)
+            if height > 340 {
+                LinearGradient(colors: [.black.opacity(0.55), .clear], startPoint: .leading, endPoint: .center)
+                    .allowsHitTesting(false)
+            }
             HStack(alignment: .bottom, spacing: 24) {
                 poster().frame(width: 100, height: 150).clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 10))

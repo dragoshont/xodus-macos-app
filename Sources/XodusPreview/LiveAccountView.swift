@@ -66,13 +66,14 @@ struct LiveAccountView: View {
                     GameServiceAccountView(operations: state.gameOperations, library: state.pcGames)
                     GroupBox("Downloaded artwork") {
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("Xodus keeps a bounded cache of public covers and screenshots. Trailers are streamed and aren't stored here.")
+                            Text("Xodus keeps a bounded cache of public covers, screenshots and the last \(TrailerCache.limit) trailers you've watched.")
                                 .font(.callout).foregroundStyle(.secondary)
                             HStack {
                                 Button("Clear artwork cache") {
                                     interaction.clearingArtwork = true
                                     interaction.artworkNotice = nil
                                     interaction.artworkError = nil
+                                    TrailerCache.shared.clear()
                                     Task {
                                         do {
                                             try await CatalogArtworkStore.shared.clearCache()
@@ -228,7 +229,7 @@ struct LiveSettingsView: View {
         Form {
             Section("Artwork") {
                 Toggle("Animate featured game artwork", isOn: $heroAnimationsEnabled)
-                Text("Muted trailers stream only while the featured artwork is visible. Reduce Motion and Low Power Mode use the poster instead.")
+                Text("Trailers start when you point at the featured artwork and keep playing while it's visible. Use the speaker button to unmute. Reduce Motion and Low Power Mode use the poster instead.")
                     .foregroundStyle(.secondary)
             }
             Section("Xodus engine") {

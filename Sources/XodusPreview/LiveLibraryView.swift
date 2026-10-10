@@ -195,7 +195,7 @@ struct LiveLibraryView: View {
                     }
                     .scrollTargetLayout()
                 }
-                .scrollIndicators(.hidden).scrollTargetBehavior(.paging)
+                .scrollIndicators(.never).scrollTargetBehavior(.paging)
                 .scrollPosition(id: $selection.heroID)
                 if heroGames.count > 1 {
                     HStack(spacing: 4) {
@@ -225,7 +225,7 @@ struct LiveLibraryView: View {
             guard allowsStartupTasks, allowsHeroAnimation, !reduceMotion else { return }
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(9))
-                guard !Task.isCancelled, !selection.heroHovered, heroGames.count > 1 else { continue }
+                guard !Task.isCancelled, !selection.heroHovered, !selection.heroPlaying, heroGames.count > 1 else { continue }
                 let ids = heroGames.map(\.id)
                 let next = ids.firstIndex(of: selection.heroID ?? "").map { ids[($0 + 1) % ids.count] } ?? ids[0]
                 withAnimation(.smooth(duration: 0.6)) { selection.heroID = next }
@@ -239,7 +239,8 @@ struct LiveLibraryView: View {
                     logos: (xboxStats.cache?.games[id]?.logo.map { [$0] } ?? []) + (art.images[id]?.logos ?? []),
                     allowsArtworkLoading: artworkAllowed, height: 460) {
             LibraryHeroMedia(trailer: art.images[id]?.detail?.trailers.first,
-                             allowsPlayback: allowsStartupTasks && allowsHeroAnimation && selected) {
+                             allowsPlayback: allowsStartupTasks && allowsHeroAnimation && selected,
+                             playingChanged: { playing in selection.heroPlaying = playing && selected }) {
                 LibraryLandscapeView(references: art.images[id]?.landscape ?? [],
                                      installed: game.installed, allowsLoading: artworkAllowed)
             }
@@ -289,11 +290,9 @@ struct LiveLibraryView: View {
                                         .padding(12)
                                 }
                             Text(game.title).font(.headline).lineLimit(1)
-                            information(id: game.storeId, compact: true)
-                            LibraryGameSizeView(installed: game, downloadBytes: nil, allowsMeasurement: artworkAllowed)
                             if let date = game.lastPlayedAt {
                                 Text("Last played \(Text(date, style: .relative)) ago")
-                                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                    .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                             }
                             InstalledPlayError(library: installed, game: game)
                         }.frame(width: 260, alignment: .leading).id(game.id)

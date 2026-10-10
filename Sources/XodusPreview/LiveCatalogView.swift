@@ -214,7 +214,7 @@ struct LiveCatalogView: View {
                     }
                     .scrollTargetLayout()
                 }
-                .scrollIndicators(.hidden).scrollTargetBehavior(.paging)
+                .scrollIndicators(.never).scrollTargetBehavior(.paging)
                 .scrollPosition(id: $selection.featuredID)
                 if featuredGames.count > 1 {
                     HStack(spacing: 10) {
