@@ -75,6 +75,10 @@ enum NativeUIChecks {
             context.clear(CGRect(x: 0, y: 0, width: 32, height: 16))
             check(context.makeImage().map(LibraryLogoPolicy.isTransparent) == false,
                   "An empty transparent asset falls back to the accessible text title")
+            context.setFillColor(CGColor(gray: 0.08, alpha: 1))
+            context.fill(CGRect(x: 8, y: 4, width: 16, height: 8))
+            check(context.makeImage().map(LibraryLogoPolicy.isTransparent) == false,
+                  "A dark transparent logo falls back to the readable text title over dark hero art")
         } else { check(false, "Synthetic logo pixel context allocates without a window") }
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             for width in [CGFloat(820), CGFloat(1440)] {

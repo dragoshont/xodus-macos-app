@@ -216,7 +216,8 @@ struct LibraryHero<Artwork: View, Poster: View, Information: View, Actions: View
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 10) {
                     LibraryLogoTitle(title: title, references: logos, allowsLoading: allowsArtworkLoading)
-                    information()
+                        .shadow(color: .black.opacity(0.5), radius: 6)
+                    information().environment(\.libraryOnHeroMedia, true)
                     LibraryGlassCluster { actions() }.modifier(LibraryHeroControlSize()).padding(.top, 4)
                 }
                 .foregroundStyle(.white)
@@ -256,10 +257,19 @@ struct LibraryAccessBadge: View {
     let access: LibraryAccess
     var compact = false
     var body: some View {
-        Label(access.rawValue, systemImage: access.symbol)
-            .font(compact ? .caption : .callout)
-            .padding(.horizontal, compact ? 8 : 10).padding(.vertical, 4)
-            .modifier(LibraryBadgeMaterial())
+        if access == .gamePass {
+            Label("Game Pass", systemImage: "xbox.logo")
+                .font((compact ? Font.caption : .callout).weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, compact ? 8 : 10).padding(.vertical, 4)
+                .background(Color(red: 16 / 255, green: 124 / 255, blue: 16 / 255), in: Capsule())
+                .accessibilityLabel(access.rawValue)
+        } else {
+            Label(access.rawValue, systemImage: access.symbol)
+                .font(compact ? .caption : .callout)
+                .padding(.horizontal, compact ? 8 : 10).padding(.vertical, 4)
+                .modifier(LibraryBadgeMaterial())
+        }
     }
 }
 
@@ -273,6 +283,29 @@ private struct LibraryBadgeMaterial: ViewModifier {
     }
 }
 
+private struct LibraryOnHeroMediaKey: EnvironmentKey { static let defaultValue = false }
+
+extension EnvironmentValues {
+    var libraryOnHeroMedia: Bool {
+        get { self[LibraryOnHeroMediaKey.self] }
+        set { self[LibraryOnHeroMediaKey.self] = newValue }
+    }
+}
+
+/// Secondary grey disappears over bright art and video frames, so hero facts stay near-white with a soft shadow.
+private struct LibraryInformationStyle: ViewModifier {
+    let onHeroMedia: Bool
+    func body(content: Content) -> some View {
+        if onHeroMedia {
+            content.foregroundStyle(.white.opacity(0.92))
+                .shadow(color: .black.opacity(0.75), radius: 2, x: 0, y: 1)
+                .shadow(color: .black.opacity(0.45), radius: 8)
+        } else {
+            content.foregroundStyle(.secondary)
+        }
+    }
+}
+
 struct LibraryGameInformation: View {
     var access: LibraryAccess?
     var gamePass = false
@@ -280,6 +313,7 @@ struct LibraryGameInformation: View {
     var xbox: LibraryXboxStatsCache.Game?
     var localPlaySeconds: Double? = nil
     var compact = false
+    @Environment(\.libraryOnHeroMedia) private var onHeroMedia
 
     var body: some View {
         VStack(alignment: .leading, spacing: compact ? 5 : 8) {
@@ -315,7 +349,8 @@ struct LibraryGameInformation: View {
                 Label(label, systemImage: "clock")
             }
         }
-        .font(compact ? .caption : .callout).foregroundStyle(.secondary)
+        .font(compact ? .caption : .callout)
+        .modifier(LibraryInformationStyle(onHeroMedia: onHeroMedia))
     }
 
     private func capabilityRow(_ values: [LibraryCapability]) -> some View {

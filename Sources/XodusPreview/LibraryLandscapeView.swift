@@ -17,11 +17,20 @@ enum LibraryLogoPolicy {
             }
             context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
             var transparent = 0, visible = 0
+            var luminance = 0.0
             for offset in stride(from: 3, to: bytes.count, by: 4) {
-                if bytes[offset] < 250 { transparent += 1 }
-                if bytes[offset] > 20 { visible += 1 }
+                let alpha = bytes[offset]
+                if alpha < 250 { transparent += 1 }
+                if alpha > 20 {
+                    visible += 1
+                    let scale = 255.0 / Double(alpha)
+                    luminance += (0.2126 * Double(bytes[offset - 3]) + 0.7152 * Double(bytes[offset - 2])
+                        + 0.0722 * Double(bytes[offset - 1])) * scale / 255.0
+                }
             }
+            // Heroes sit on dark scrims and video; a mostly dark logo would be invisible there.
             return transparent >= max(1, width * height / 20) && visible > 0
+                && luminance / Double(visible) >= 0.4
         }
     }
 }
