@@ -256,11 +256,13 @@ struct LiveLibraryView: View {
                                  installed: game.installed, allowsLoading: artworkAllowed)
         } information: {
             information(id: id)
+            if let match = game.installed { InstalledPackageTypeLabel(game: match) }
             LibraryGameSizeView(installed: game.installed, downloadBytes: art.images[id]?.facts.downloadBytes,
                                 packageFormat: art.images[id]?.facts.packageFormat,
                                 allowsMeasurement: artworkAllowed)
         } actions: {
             if let match = game.installed {
+                InstalledEngineOverride(library: installed, game: match)
                 InstalledPlayButton(library: installed, operations: operations, game: match,
                                     usesGlass: true, heroStyle: true)
                 InstalledGameActions(library: installed, operations: operations, game: match,
@@ -315,6 +317,11 @@ struct LiveLibraryView: View {
                                         .padding(12)
                                 }
                             Text(game.title).font(.headline).lineLimit(1)
+                            HStack {
+                                InstalledPackageTypeLabel(game: game)
+                                Spacer()
+                                InstalledEngineOverride(library: installed, game: game)
+                            }
                             if let date = game.lastPlayedAt {
                                 Text("Last played \(Text(date, style: .relative)) ago")
                                     .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
@@ -372,8 +379,10 @@ struct LiveLibraryView: View {
                                status: (art.images[artworkID]?.cover ?? game.cover) == nil ? .absent : .available)
         } status: {
             HStack(spacing: 8) {
-                if let format = art.images[artworkID]?.facts.packageFormat,
-                   game.installed != nil || unsupportedReason(game) != nil {
+                if let match = game.installed {
+                    InstalledPackageTypeLabel(game: match)
+                } else if let format = art.images[artworkID]?.facts.packageFormat,
+                   unsupportedReason(game) != nil {
                     LibraryPackageFormatLabel(format: format)
                 }
                 if game.installed != nil {
@@ -393,6 +402,7 @@ struct LiveLibraryView: View {
         } actions: {
             LibraryGlassCluster {
                 if let match = game.installed {
+                    InstalledEngineOverride(library: installed, game: match)
                     InstalledPlayButton(library: installed, operations: operations, game: match,
                                         usesGlass: true, prominent: false)
                     InstalledGameActions(library: installed, operations: operations, game: match, usesGlass: true)
@@ -434,6 +444,7 @@ struct LiveLibraryView: View {
         }
         .contextMenu {
             if let match = game.installed {
+                InstalledEngineOverride(library: installed, game: match)
                 InstalledGameManagement(library: installed, operations: operations, game: match)
                 Button("Show in Finder") { NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: match.folder) }
             } else { Button("View game") { open(game) } }

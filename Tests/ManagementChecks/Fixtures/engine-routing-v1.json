@@ -23,22 +23,22 @@
     {
       "name": "fallback prefers CrossOver",
       "request": {"packageType": "uwp", "override": null, "defaultEngine": null, "availability": {"installed": ["crossover", "gptk4", "gptk3", "standaloneWine"]}},
-      "expected": {"outcome": "routed", "runner": "crossover", "reason": "packageTypeFallback"}
+      "expected": {"outcome": "routed", "runner": "crossover", "reason": "installedFallback"}
     },
     {
       "name": "fallback skips absent CrossOver to GPTK4",
       "request": {"packageType": "appx", "override": null, "defaultEngine": null, "availability": {"installed": ["gptk3", "gptk4", "standaloneWine"]}},
-      "expected": {"outcome": "routed", "runner": "gptk4", "reason": "packageTypeFallback"}
+      "expected": {"outcome": "routed", "runner": "gptk4", "reason": "installedFallback"}
     },
     {
       "name": "fallback to GPTK3 when only older toolkit and Wine present",
       "request": {"packageType": "win32", "override": null, "defaultEngine": null, "availability": {"installed": ["gptk3", "standaloneWine"]}},
-      "expected": {"outcome": "routed", "runner": "gptk3", "reason": "packageTypeFallback"}
+      "expected": {"outcome": "routed", "runner": "gptk3", "reason": "installedFallback"}
     },
     {
       "name": "fallback to standalone Wine as last resort",
       "request": {"packageType": "win32", "override": null, "defaultEngine": null, "availability": {"installed": ["standaloneWine"]}},
-      "expected": {"outcome": "routed", "runner": "standaloneWine", "reason": "packageTypeFallback"}
+      "expected": {"outcome": "routed", "runner": "standaloneWine", "reason": "installedFallback"}
     },
     {
       "name": "nothing installed refuses launch",

@@ -19,6 +19,7 @@ final class InstalledGamesController: ObservableObject {
     @Published private(set) var playState: InstalledGamePlayState?
     @Published private(set) var playErrors: [UUID: String] = [:]
     @Published private(set) var historyError: String?
+    @Published private(set) var packageErrors: [UUID: String] = [:]
     @Published private(set) var playLogs: [UUID: URL] = [:]
     @Published private(set) var playNotices: [UUID: String] = [:]
     @Published private(set) var stoppingGameID: UUID?
@@ -33,7 +34,7 @@ final class InstalledGamesController: ObservableObject {
     private let launchingDuration: Duration
     private let defaultEngine: @Sendable () -> RuntimeProviderKind?
     private let detectAvailability: @Sendable () async -> RunnerAvailability
-    private let inspectPackage: @Sendable (URL) -> PackageType
+    private let inspectPackage: @Sendable (URL) throws -> PackageType
     private var playingTask: Task<Void, Never>?
     private var runToken: UUID?
     private var stopToken: UUID?
@@ -57,7 +58,7 @@ final class InstalledGamesController: ObservableObject {
          detectAvailability: @escaping @Sendable () async -> RunnerAvailability = {
              await Task.detached(priority: .utility) { RunnerAvailabilityDetector.detect() }.value
          },
-         inspectPackage: @escaping @Sendable (URL) -> PackageType = { PackageInspector.detect(folder: $0) }) {
+         inspectPackage: @escaping @Sendable (URL) throws -> PackageType = { try PackageInspector.detect(folder: $0) }) {
         self.store = store
         self.launchingDuration = launchingDuration
         self.logDirectory = logDirectory
@@ -157,9 +158,9 @@ final class InstalledGamesController: ObservableObject {
     static func engineUnavailableMessage(_ reason: EngineRoutingUnavailable) -> String {
         switch reason {
         case .overrideNotInstalled(let kind):
-            "This game's selected engine (\(kind.label)) isn't installed. Install it, or clear the per-game engine override."
+            "This game's selected engine (\(kind.label)) isn't installed or its runner isn't configured. Check its executable path in Engines, or clear the per-game override."
         case .defaultNotInstalled(let kind):
-            "The default engine (\(kind.label)) isn't installed. Install it, or choose a different default engine in Engines."
+            "The default engine (\(kind.label)) isn't installed or its runner isn't configured. Check its executable path in Engines, or choose a different default."
         case .noRunnerInstalled:
             "No supported engine is installed. Set up CrossOver in Engines before launching."
         }
@@ -385,18 +386,19 @@ final class InstalledGamesController: ObservableObject {
     }
 
     private func saveValidatedGame(folder: URL, launcher: URL, expectedStoreID: String?) async throws {
+        let inspectPackage = inspectPackage
         let metadata = try await Task.detached(priority: .userInitiated) {
             let config = try MicrosoftGameConfig.read(folder: folder)
             try InstalledGameFiles.checkLauncher(launcher)
             if let expectedStoreID, config.storeId != expectedStoreID { throw GameScriptError.invalidReceipt }
-            return config
+            return (config, try inspectPackage(folder))
         }.value
         let previous = games.first(where: { $0.folder == folder.path })
         guard previous?.id != runningGameID || runningGameID == nil else { throw GameScriptError.busy }
         let game = InstalledGame(id: previous?.id ?? UUID(),
-            title: metadata.title, identityName: metadata.identityName, version: metadata.version,
-            storeId: metadata.storeId, folder: folder.path, launcher: launcher.path, importedAt: Date(),
-            publisher: metadata.publisher)
+            title: metadata.0.title, identityName: metadata.0.identityName, version: metadata.0.version,
+            storeId: metadata.0.storeId, folder: folder.path, launcher: launcher.path, importedAt: Date(),
+            publisher: metadata.0.publisher, packageType: metadata.1)
         applySavedGames(try await store.upsert(game))
         await refreshLaunchableGames()
     }
@@ -421,24 +423,30 @@ final class InstalledGamesController: ObservableObject {
             var launchable: Set<UUID> = []
             var publishers: [UUID: String] = [:]
             var packageTypes: [UUID: PackageType] = [:]
+            var failures: [UUID: String] = [:]
             for game in entries {
                 let folder = URL(fileURLWithPath: game.folder)
                 if game.publisher == nil, let publisher = (try? MicrosoftGameConfig.read(folder: folder))?.publisher {
                     publishers[game.id] = publisher
                 }
-                if game.packageType == nil { packageTypes[game.id] = inspectPackage(folder) }
+                do { packageTypes[game.id] = try inspectPackage(folder) }
+                catch {
+                    failures[game.id] = "Package format couldn't be inspected. Reconnect the game drive or reimport the game."
+                }
                 do {
                     try InstalledGameFiles.checkFolder(folder)
                     try InstalledGameFiles.checkLauncher(URL(fileURLWithPath: game.launcher))
                     launchable.insert(game.id)
                 } catch { continue }
             }
-            return (launchable, publishers, packageTypes)
+            return (launchable, publishers, packageTypes, failures)
         }.value
         launchableIDs = result.0.intersection(games.map(\.id))
+        packageErrors = result.3
         var latestSaved: [InstalledGame]?
-        for (id, detected) in result.2 where games.contains(where: { $0.id == id && $0.packageType == nil }) {
-            if let saved = try? await store.recordPackageType(id: id, type: detected) { latestSaved = saved }
+        for (id, detected) in result.2 where games.contains(where: { $0.id == id && $0.packageType != detected }) {
+            do { latestSaved = try await store.recordPackageType(id: id, type: detected) }
+            catch { packageErrors[id] = "The detected package format couldn't be saved. Check Application Support access." }
         }
         if let latestSaved { applySavedGames(latestSaved) }
         for index in games.indices where games[index].publisher == nil {

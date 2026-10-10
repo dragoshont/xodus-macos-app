@@ -389,7 +389,54 @@ enum InstalledGameChecks {
         let routingFolder = routingRoot.appendingPathComponent("routed game")
         try FileManager.default.createDirectory(at: routingFolder, withIntermediateDirectories: false)
         try Data(config.utf8).write(to: routingFolder.appendingPathComponent("MicrosoftGame.config"))
+        check(try PackageInspector.detect(folder: routingFolder) == .unknown,
+              "M1: GDK config alone never claims MSIXVC container evidence")
+        var containerHeader = Data(repeating: 0, count: 4096)
+        containerHeader.replaceSubrange(0x200..<0x208, with: Data("msft-xvd".utf8))
+        let container = routingFolder.appendingPathComponent(".xodus-streaming.msixvc")
+        try containerHeader.write(to: container)
+        let misleadingFolder = routingRoot.appendingPathComponent("nonfiles")
+        try FileManager.default.createDirectory(at: misleadingFolder, withIntermediateDirectories: false)
+        for name in ["game.exe", "game.eappx", "MicrosoftGame.config", "AppxManifest.xml", "game.msixvc"] {
+            try FileManager.default.createDirectory(at: misleadingFolder.appendingPathComponent(name),
+                                                    withIntermediateDirectories: false)
+        }
+        check(try PackageInspector.detect(folder: misleadingFolder) == .unknown,
+              "M1: Directories named after evidence files do not establish a format")
+        try FileManager.default.createSymbolicLink(at: misleadingFolder.appendingPathComponent("linked.msixvc"),
+                                                  withDestinationURL: container)
+        check(try PackageInspector.detect(folder: misleadingFolder) == .unknown,
+              "M1: Symlinked external evidence is ignored")
+        let malformed = misleadingFolder.appendingPathComponent("broken.exe")
+        try Data("not a PE file".utf8).write(to: malformed)
+        check(try PackageInspector.detect(folder: misleadingFolder) == .unknown,
+              "M1: An executable extension without PE bytes is not Win32 evidence")
         let routingLauncher = try script("routing launch.sh", "exit 0")
+        let registeredRunner = try script("registered-gptk4-runner", "exit 0")
+        let declaredPaths: [RuntimeProviderKind: String] = [.gptk4: registeredRunner.path]
+        let observed = RunnerAvailabilityDetector.detect(crossOver: .absent, runnerPaths: declaredPaths)
+        check(observed == RunnerAvailability([.gptk4]),
+              "M3: An independently registered executable is observed without a global default")
+        let suiteName = "Xodus.EngineChecks.\(UUID().uuidString)"
+        guard let preferences = UserDefaults(suiteName: suiteName) else { throw InstalledGameError.storage }
+        defer { preferences.removePersistentDomain(forName: suiteName) }
+        preferences.set(registeredRunner.path, forKey: "Xodus.developerBackendPath")
+        EngineDefaults.setDefaultEngine(.gptk3, preferences)
+        check(RunnerAvailabilityDetector.detect(crossOver: .absent,
+                    runnerPaths: EngineDefaults.runnerPaths(preferences)).installed.isEmpty,
+              "M3: An executable management backend never fabricates a GPTK installation")
+        EngineDefaults.setRunnerPath(registeredRunner.path, for: .gptk4, defaults: preferences)
+        check(EngineDefaults.defaultEngine(preferences) == .gptk3
+              && EngineDefaults.runnerPaths(preferences)[.gptk4] == registeredRunner.path
+              && RunnerAvailabilityDetector.detect(crossOver: .absent,
+                    runnerPaths: EngineDefaults.runnerPaths(preferences)) == observed,
+              "M3: Per-provider paths persist independently of a different global default")
+        check(RunnerAvailabilityDetector.detect(crossOver: .absent,
+                    runnerPaths: [.gptk3: routingFolder.path, .standaloneWine: "relative/wine"]).installed.isEmpty,
+              "M3: Directories and relative runner paths are not observed as available")
+        check(EngineRouting.decide(.init(packageType: .win32, override: .gptk4, defaultEngine: .crossover,
+                    availability: observed)) == .routed(.gptk4, .perGameOverride),
+              "M3: A non-default Experimental override routes when its own executable is present")
         let routingFile = routingRoot.appendingPathComponent("private/routing-list.json")
         let routingStore = InstalledGameStore(file: routingFile)
         let routing = InstalledGamesController(store: routingStore, launchingDuration: .milliseconds(100),
@@ -399,7 +446,7 @@ enum InstalledGameChecks {
         await routing.importGame(folder: routingFolder, launcher: routingLauncher)
         guard let routed = routing.games.first else { throw InstalledGameError.invalidRegistry }
         check(routed.packageType == .msixvc,
-              "M1: A folder with only MicrosoftGame.config is detected as MSIXVC from file evidence")
+              "M1: MSIXVC classification requires actual container-header evidence")
         check(try await InstalledGameStore(file: routingFile).load().first?.packageType == .msixvc,
               "M1: Detected package type is persisted to the private registry, not recomputed as a label")
         await routing.setEngineOverride(.gptk4, for: routed)
@@ -417,5 +464,45 @@ enum InstalledGameChecks {
         try await wait { routing.runningGameID == nil }
         check(routing.playErrors[cleared.id] == nil,
               "M3: Clearing the override falls back to an installed runner and launches")
+        await routing.waitForSessionPersistence()
+        await routing.setEngineOverride(.gptk4, for: cleared)
+        try FileManager.default.removeItem(at: container)
+        var peHeader = Data(repeating: 0, count: 128)
+        peHeader.replaceSubrange(0..<2, with: Data([0x4d, 0x5a]))
+        peHeader[0x3c] = 64
+        peHeader.replaceSubrange(64..<68, with: Data([0x50, 0x45, 0, 0]))
+        try peHeader.write(to: routingFolder.appendingPathComponent("game.exe"))
+        await routing.importGame(folder: routingFolder, launcher: routingLauncher)
+        check(routing.games.first?.packageType == .win32 && routing.games.first?.engineOverride == .gptk4,
+              "M1/M3: Reimport refreshes changed package facts without dropping the user's override")
+        let disconnected = routingRoot.appendingPathComponent("disconnected")
+        try FileManager.default.moveItem(at: routingFolder, to: disconnected)
+        let offline = InstalledGamesController(store: routingStore, defaultEngine: { nil },
+            detectAvailability: { RunnerAvailability([.crossover]) })
+        await offline.load()
+        check(offline.packageErrors[routed.id] != nil && offline.games.first?.packageType == .win32,
+              "M1: An unavailable folder exposes an observation error without overwriting saved evidence")
+        try FileManager.default.moveItem(at: disconnected, to: routingFolder)
+        try containerHeader.write(to: container)
+        await offline.importGame(folder: routingFolder, launcher: routingLauncher)
+        check(offline.packageErrors[routed.id] == nil && offline.games.first?.packageType == .msixvc
+              && offline.games.first?.engineOverride == .gptk4,
+              "M1/M3: Reconnecting and reimporting refreshes evidence and retains the override")
+        let selectorRecord = routingRoot.appendingPathComponent("selected-engine.txt")
+        let selectorLauncher = try script("selector-launch.sh", "printf '%s\\n' \"$2\" > '\(selectorRecord.path)'")
+        let nonDefault = InstalledGamesController(store: routingStore, defaultEngine: { .crossover },
+            detectAvailability: {
+                RunnerAvailabilityDetector.detect(crossOver: .absent, runnerPaths: declaredPaths)
+            })
+        await nonDefault.load()
+        await nonDefault.importGame(folder: routingFolder, launcher: selectorLauncher)
+        guard let selected = nonDefault.games.first else { throw InstalledGameError.invalidRegistry }
+        await nonDefault.play(selected)
+        try await wait { nonDefault.runningGameID == nil }
+        await nonDefault.waitForSessionPersistence()
+        let recordedSelector = try String(contentsOf: selectorRecord, encoding: .utf8)
+        check(nonDefault.playErrors[selected.id] == nil
+              && recordedSelector == "gptk4\n",
+              "M3: Observed non-default override reaches the launch script, not only the pure decision")
     }
 }

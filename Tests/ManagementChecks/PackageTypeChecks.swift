@@ -33,7 +33,37 @@ extension Checks {
             targetDeviceFamilies: ["Windows.Universal"], declaresFullTrustEntryPoint: true)) == .appx,
               "A universal manifest declaring full trust is packaged Win32 (Appx), not UWP")
         check(PackageType.classify(PackageTypeEvidence(hasAppxManifest: true,
-            targetDeviceFamilies: ["Windows.Universal"])) == .uwp,
-              "A universal manifest without full trust is UWP")
+            targetDeviceFamilies: ["Windows.Universal"])) == .appx,
+              "Device targeting alone never invents a UWP application model")
+        for value in try fixture("package-types-v1")["manifests"]?.array ?? [] {
+            guard let name = value["name"]?.string, let xml = value["xml"]?.string,
+                  let expected = value["expected"]?.string.flatMap(PackageType.init(rawValue:)) else {
+                check(false, "Manifest fixture is well formed"); continue
+            }
+            let facts = try AppxManifestFacts.parse(Data(xml.utf8))
+            let evidence = PackageTypeEvidence(hasAppxManifest: true,
+                targetDeviceFamilies: facts.targetDeviceFamilies,
+                declaresFullTrustEntryPoint: facts.fullTrust, declaresUWPApplication: facts.uwpApplication)
+            check(PackageType.classify(evidence) == expected, "Actual manifest XML: \(name)")
+        }
+        for xml in ["", "<Other/>", "<Package/>", "<Package><Applications>",
+                    "<!DOCTYPE Package [<!ENTITY e 'expanded'>]><Package><Applications><Application EntryPoint='Fixture.App'/></Applications>&e;</Package>"] {
+            do { _ = try AppxManifestFacts.parse(Data(xml.utf8)); check(false, "Invalid manifest refused") }
+            catch { check(error is AppxManifestError, "Invalid manifest refused") }
+        }
+        var container = Data(repeating: 0, count: 4096)
+        container.replaceSubrange(0x200..<0x208, with: Data("msft-xvd".utf8))
+        check(PackageType.hasMSIXVCHeader(container), "MSIXVC requires an observed MSFT-XVD header")
+        check(!PackageType.hasMSIXVCHeader(Data(container.prefix(1024))),
+              "Truncated container header is not MSIXVC evidence")
+        container[0x200] = 0
+        check(!PackageType.hasMSIXVCHeader(container), "Incorrect container magic is refused")
+        var pe = Data(repeating: 0, count: 128)
+        pe.replaceSubrange(0..<2, with: Data([0x4d, 0x5a]))
+        pe[0x3c] = 64
+        pe.replaceSubrange(64..<68, with: Data([0x50, 0x45, 0, 0]))
+        check(PackageType.hasPEHeader(pe), "Win32 file evidence requires DOS and PE headers")
+        pe[0x3f] = 0xff
+        check(!PackageType.hasPEHeader(pe), "Out-of-bounds PE header offset is refused")
     }
 }

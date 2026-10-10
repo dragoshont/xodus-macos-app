@@ -17,15 +17,14 @@ extension Checks {
                 check(false, "Engine-routing case is well formed")
                 continue
             }
-            let packageType = request["packageType"]?.string
-                .flatMap(PackageType.init(rawValue:)) ?? .unknown
-            let override = request["override"]?.string.flatMap(RuntimeProviderKind.init(rawValue:))
-            let defaultEngine = request["defaultEngine"]?.string.flatMap(RuntimeProviderKind.init(rawValue:))
-            let availability = try (request["availability"].map { try $0.decode(RunnerAvailability.self) })
-                ?? RunnerAvailability()
+            guard let packageType = request["packageType"]?.string.flatMap(PackageType.init(rawValue:)),
+                  let available = request["availability"] else { throw ManagementError.invalidPayload }
+            let override = try fixtureKind(request["override"])
+            let defaultEngine = try fixtureKind(request["defaultEngine"])
+            let availability = try available.decode(RunnerAvailability.self)
             let outcome = EngineRouting.decide(.init(packageType: packageType, override: override,
                 defaultEngine: defaultEngine, availability: availability))
-            check(outcome == expectedOutcome(expected),
+            check(try outcome == expectedOutcome(expected),
                   "Engine routing: \(name)")
         }
         // Explicit invariant: an override wins over an installed default.
@@ -37,19 +36,57 @@ extension Checks {
             defaultEngine: .crossover, availability: RunnerAvailability([.crossover]))) ==
             .unavailable(.overrideNotInstalled(.standaloneWine)),
               "An uninstalled override refuses launch instead of substituting the installed default")
+        let kinds: [RuntimeProviderKind] = [.crossover, .gptk4, .gptk3, .standaloneWine]
+        let choices: [RuntimeProviderKind?] = [nil] + kinds.map { Optional($0) }
+        for type in PackageType.allCases {
+            for mask in 0..<16 {
+                let installed = kinds.enumerated().compactMap { (mask & (1 << $0.offset)) != 0 ? $0.element : nil }
+                for override in choices {
+                    for preferred in choices {
+                        let expected: EngineRoutingOutcome
+                        if let override {
+                            expected = installed.contains(override) ? .routed(override, .perGameOverride)
+                                : .unavailable(.overrideNotInstalled(override))
+                        } else if let preferred {
+                            expected = installed.contains(preferred) ? .routed(preferred, .configuredDefault)
+                                : .unavailable(.defaultNotInstalled(preferred))
+                        } else if let first = installed.first {
+                            expected = .routed(first, .installedFallback)
+                        } else { expected = .unavailable(.noRunnerInstalled) }
+                        check(EngineRouting.decide(.init(packageType: type, override: override,
+                            defaultEngine: preferred, availability: RunnerAvailability(installed))) == expected,
+                            "Routing matrix \(type.rawValue)/\(mask)/\(String(describing: override))/\(String(describing: preferred))")
+                    }
+                }
+            }
+        }
     }
 
-    private func expectedOutcome(_ value: JSONValue) -> EngineRoutingOutcome {
+    private func fixtureKind(_ value: JSONValue?) throws -> RuntimeProviderKind? {
+        if value == .null { return nil }
+        guard let kind = value?.string.flatMap(RuntimeProviderKind.init(rawValue:)) else {
+            throw ManagementError.invalidPayload
+        }
+        return kind
+    }
+
+    private func expectedOutcome(_ value: JSONValue) throws -> EngineRoutingOutcome {
         if value["outcome"]?.string == "routed",
            let runner = value["runner"]?.string.flatMap(RuntimeProviderKind.init(rawValue:)),
            let reason = value["reason"]?.string.flatMap(EngineRoutingReason.init(rawValue:)) {
             return .routed(runner, reason)
         }
+        guard value["outcome"]?.string == "unavailable" else { throw ManagementError.invalidPayload }
         let kind = value["kind"]?.string.flatMap(RuntimeProviderKind.init(rawValue:))
         switch value["unavailable"]?.string {
-        case "overrideNotInstalled": return .unavailable(.overrideNotInstalled(kind ?? .crossover))
-        case "defaultNotInstalled": return .unavailable(.defaultNotInstalled(kind ?? .crossover))
-        default: return .unavailable(.noRunnerInstalled)
+        case "overrideNotInstalled":
+            guard let kind else { throw ManagementError.invalidPayload }
+            return .unavailable(.overrideNotInstalled(kind))
+        case "defaultNotInstalled":
+            guard let kind else { throw ManagementError.invalidPayload }
+            return .unavailable(.defaultNotInstalled(kind))
+        case "noRunnerInstalled": return .unavailable(.noRunnerInstalled)
+        default: throw ManagementError.invalidPayload
         }
     }
 }

@@ -43,7 +43,7 @@ public struct EngineRoutingRequest: Equatable, Sendable {
 
 /// Why a runner was chosen, for honest surfacing and evidence.
 public enum EngineRoutingReason: String, Equatable, Codable, Sendable {
-    case perGameOverride, configuredDefault, packageTypeFallback
+    case perGameOverride, configuredDefault, installedFallback
 }
 
 /// Why no runner could be chosen. A chosen-but-missing engine never silently
@@ -75,6 +75,8 @@ public enum EngineRouting {
     ///    (never substituted by another runner).
     /// 2. Otherwise a configured default engine must be installed, else fail explicitly.
     /// 3. Otherwise the first installed runner in `fallbackOrder`, else no runner.
+    /// Format is retained as request context, not an invented compatibility policy:
+    /// no package-specific runner certification exists in this contract.
     public static func decide(_ request: EngineRoutingRequest) -> EngineRoutingOutcome {
         if let override = request.override {
             return request.availability.contains(override)
@@ -87,7 +89,7 @@ public enum EngineRouting {
                 : .unavailable(.defaultNotInstalled(preferred))
         }
         for candidate in fallbackOrder where request.availability.contains(candidate) {
-            return .routed(candidate, .packageTypeFallback)
+            return .routed(candidate, .installedFallback)
         }
         return .unavailable(.noRunnerInstalled)
     }

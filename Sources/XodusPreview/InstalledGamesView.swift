@@ -105,6 +105,11 @@ struct InstalledPlayError: View {
     let game: InstalledGame
 
     var body: some View {
+        if let error = library.packageErrors[game.id] {
+            Text(error).font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("xodus.installed.packageError")
+        }
         if let error = library.playErrors[game.id] {
             Text(error).font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -143,10 +148,26 @@ struct InstalledEngineOverride: View {
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
-        .disabled(library.runningGameID == game.id || library.editing || library.choosing)
+        .disabled(library.runningGameID == game.id || library.editing || library.choosing
+                  || library.mutationActive || library.applicationTerminating)
+        .accessibilityLabel("Engine for \(game.title)")
+        .accessibilityValue(game.engineOverride.map(RuntimeProviderSettings.providerLabel) ?? "Use default engine")
         .help(game.engineOverride.map { "Engine override: \(RuntimeProviderSettings.providerLabel($0))" }
               ?? "Launch with the default engine")
         .accessibilityIdentifier("xodus.installed.engineOverride")
+    }
+
+    struct InstalledPackageTypeLabel: View {
+        let game: InstalledGame
+
+        var body: some View {
+            if let type = game.packageType, type != .unknown {
+                Text("Detected: \(type.label)")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .help("Format detected from installed files, not a compatibility verdict.")
+                    .accessibilityIdentifier("xodus.installed.packageType")
+            }
+        }
     }
 }
 

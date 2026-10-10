@@ -2,11 +2,9 @@
 import Foundation
 import XodusCore
 
-/// The configurable default engine (M3). Persisted in `UserDefaults` alongside the
-/// existing developer backend key, so a chosen default survives relaunch.
+/// Launch preferences are independent of the management backend selection.
 enum EngineDefaults {
     static let defaultEngineKey = "Xodus.defaultEngine"
-    static let backendPathKey = "Xodus.developerBackendPath"
 
     static func defaultEngine(_ defaults: UserDefaults = .standard) -> RuntimeProviderKind? {
         defaults.string(forKey: defaultEngineKey).flatMap(RuntimeProviderKind.init(rawValue:))
@@ -17,27 +15,42 @@ enum EngineDefaults {
         else { defaults.removeObject(forKey: defaultEngineKey) }
     }
 
-    static func backendPath(_ defaults: UserDefaults = .standard) -> String? {
-        defaults.string(forKey: backendPathKey)
+    static func runnerPathKey(_ kind: RuntimeProviderKind) -> String {
+        "Xodus.runner.\(kind.rawValue).executable"
+    }
+
+    static func runnerPaths(_ defaults: UserDefaults = .standard) -> [RuntimeProviderKind: String] {
+        var paths: [RuntimeProviderKind: String] = [:]
+        for kind in RuntimeProviderKind.allCases where kind != .crossover {
+            if let path = defaults.string(forKey: runnerPathKey(kind)), !path.isEmpty { paths[kind] = path }
+        }
+        return paths
+    }
+
+    static func setRunnerPath(_ path: String, for kind: RuntimeProviderKind,
+                              defaults: UserDefaults = .standard) {
+        if path.isEmpty { defaults.removeObject(forKey: runnerPathKey(kind)) }
+        else { defaults.set(path, forKey: runnerPathKey(kind)) }
     }
 }
 
-/// Observes which runners are actually installed. CrossOver is verified by its
-/// signed bundle (the app's existing release dependency); a non-CrossOver engine
-/// counts as installed only when the user's selected engine binary is a real
-/// executable on disk. Nothing here is hardcoded — absence means not installed.
+/// CrossOver is signature-verified. Experimental providers use their own explicit
+/// runner registrations, never the management binary or the default preference.
+/// The executable's presence is observed; toolkit provenance/version remain the
+/// user's declarations, not a verified compatibility or gameplay claim.
 enum RunnerAvailabilityDetector {
     static func detect(
         crossOver: CrossOverDependencyState = CrossOverDetector.detect(),
-        defaultEngine: RuntimeProviderKind? = EngineDefaults.defaultEngine(),
-        backendPath: String? = EngineDefaults.backendPath(),
+        runnerPaths: [RuntimeProviderKind: String] = EngineDefaults.runnerPaths(),
         probe: (URL) -> Bool = RunnerAvailabilityDetector.isExecutable
     ) -> RunnerAvailability {
         var installed: Set<RuntimeProviderKind> = []
         if crossOver.isVerified { installed.insert(.crossover) }
-        if let defaultEngine, defaultEngine != .crossover,
-           let backendPath, !backendPath.isEmpty, probe(URL(fileURLWithPath: backendPath)) {
-            installed.insert(defaultEngine)
+        for kind in RuntimeProviderKind.allCases where kind != .crossover {
+            if let path = runnerPaths[kind], path.hasPrefix("/"),
+               probe(URL(fileURLWithPath: path)) {
+                installed.insert(kind)
+            }
         }
         return RunnerAvailability(installed)
     }
