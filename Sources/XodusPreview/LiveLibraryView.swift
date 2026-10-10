@@ -51,29 +51,11 @@ struct LiveLibraryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if query.isEmpty, let game = continuing.first {
-                LibraryHero(title: game.title,
-                            logos: (xboxStats.cache?.games[game.storeId]?.logo.map { [$0] } ?? []) +
-                                (art.images[game.storeId]?.logos ?? []),
-                            allowsArtworkLoading: artworkAllowed) {
-                    LibraryHeroMedia(trailer: art.images[game.storeId]?.detail?.trailers.first,
-                                     allowsPlayback: allowsStartupTasks && allowsHeroAnimation) {
-                        LibraryLandscapeView(references: art.images[game.storeId]?.landscape ?? [],
-                                             installed: game, allowsLoading: artworkAllowed)
-                    }
-                } poster: {
-                    LibraryLandscapeView(references: art.images[game.storeId]?.cover.map { [$0] } ?? [],
-                                         installed: game, allowsLoading: artworkAllowed)
-                } information: {
-                    information(id: game.storeId)
-                    LibraryGameSizeView(installed: game, downloadBytes: nil, allowsMeasurement: artworkAllowed)
-                } actions: {
-                    InstalledPlayButton(library: installed, operations: operations, game: game,
-                                        usesGlass: true, heroStyle: true)
-                    InstalledGameActions(library: installed, operations: operations, game: game,
-                                         usesGlass: true, heroStyle: true)
+            if query.isEmpty, !heroGames.isEmpty {
+                heroCarousel
+                if let game = heroGames.first(where: { $0.id == selection.heroID })?.installed {
+                    InstalledPlayError(library: installed, game: game).padding(.horizontal, 56)
                 }
-                InstalledPlayError(library: installed, game: game).padding(.horizontal, 56)
             }
             VStack(alignment: .leading, spacing: 22) {
                 if query.isEmpty, !continuing.isEmpty { continuePlaying }
@@ -190,6 +172,101 @@ struct LiveLibraryView: View {
         }
     }
 
+    // Apple TV pattern: recently played first, then the rest of the installed and owned collection.
+    private var heroGames: [LibraryGame] {
+        let order = Dictionary(continuing.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let ranked = collection.sorted {
+            let left = $0.installed.flatMap { order[$0.id] } ?? ($0.installed == nil ? 2_000 : 1_000)
+            let right = $1.installed.flatMap { order[$0.id] } ?? ($1.installed == nil ? 2_000 : 1_000)
+            return left == right ? $0.title.localizedStandardCompare($1.title) == .orderedAscending : left < right
+        }
+        return Array(ranked.prefix(6))
+    }
+
+    private var heroCarousel: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .bottom) {
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: 0) {
+                        ForEach(heroGames) { game in
+                            hero(game, selected: selection.heroID == game.id)
+                                .frame(width: geometry.size.width).id(game.id)
+                        }
+                    }
+                    .scrollTargetLayout()
+                }
+                .scrollIndicators(.hidden).scrollTargetBehavior(.paging)
+                .scrollPosition(id: $selection.heroID)
+                if heroGames.count > 1 {
+                    HStack(spacing: 4) {
+                        ForEach(heroGames) { game in
+                            Button {
+                                withAnimation(reduceMotion ? nil : .smooth(duration: 0.35)) { selection.heroID = game.id }
+                            } label: {
+                                Circle().fill(selection.heroID == game.id ? Color.white : Color.white.opacity(0.45))
+                                    .frame(width: 8, height: 8).frame(width: 22, height: 22)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Show \(game.title)")
+                            .accessibilityAddTraits(selection.heroID == game.id ? .isSelected : [])
+                        }
+                    }
+                    .padding(.bottom, 18)
+                }
+            }
+        }
+        .frame(height: 460)
+        .onHover { selection.heroHovered = $0 }
+        .onChange(of: heroGames.map(\.id), initial: true) { _, ids in
+            if selection.heroID.map({ !ids.contains($0) }) ?? true { selection.heroID = ids.first }
+        }
+        .task(id: heroGames.map(\.id).joined(separator: ",")) {
+            guard allowsStartupTasks, allowsHeroAnimation, !reduceMotion else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(9))
+                guard !Task.isCancelled, !selection.heroHovered, heroGames.count > 1 else { continue }
+                let ids = heroGames.map(\.id)
+                let next = ids.firstIndex(of: selection.heroID ?? "").map { ids[($0 + 1) % ids.count] } ?? ids[0]
+                withAnimation(.smooth(duration: 0.6)) { selection.heroID = next }
+            }
+        }
+    }
+
+    private func hero(_ game: LibraryGame, selected: Bool) -> some View {
+        let id = game.installed?.storeId ?? game.id
+        return LibraryHero(title: game.title,
+                    logos: (xboxStats.cache?.games[id]?.logo.map { [$0] } ?? []) + (art.images[id]?.logos ?? []),
+                    allowsArtworkLoading: artworkAllowed, height: 460) {
+            LibraryHeroMedia(trailer: art.images[id]?.detail?.trailers.first,
+                             allowsPlayback: allowsStartupTasks && allowsHeroAnimation && selected) {
+                LibraryLandscapeView(references: art.images[id]?.landscape ?? [],
+                                     installed: game.installed, allowsLoading: artworkAllowed)
+            }
+        } poster: {
+            LibraryLandscapeView(references: art.images[id]?.cover.map { [$0] } ?? (game.cover.map { [$0] } ?? []),
+                                 installed: game.installed, allowsLoading: artworkAllowed)
+        } information: {
+            information(id: id)
+            LibraryGameSizeView(installed: game.installed, downloadBytes: art.images[id]?.facts.downloadBytes,
+                                allowsMeasurement: artworkAllowed)
+        } actions: {
+            if let match = game.installed {
+                InstalledPlayButton(library: installed, operations: operations, game: match,
+                                    usesGlass: true, heroStyle: true)
+                InstalledGameActions(library: installed, operations: operations, game: match,
+                                     usesGlass: true, heroStyle: true)
+            } else {
+                Button {
+                    if let pc = game.pc { Task { await operations.install(pc) } }
+                } label: { Label("Install", systemImage: "icloud.and.arrow.down") }
+                .modifier(LibraryActionStyle(primary: true))
+                .disabled(game.pc == nil || !allowsStartupTasks || !operations.canStartMutation)
+                Button("View game") { open(game) }.modifier(LibraryActionStyle(primary: false))
+            }
+        }
+    }
+
     private var continuePlaying: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -270,10 +347,12 @@ struct LiveLibraryView: View {
             CatalogArtworkView(reference: artworkAllowed ? art.images[artworkID]?.cover ?? game.cover : nil,
                                status: (art.images[artworkID]?.cover ?? game.cover) == nil ? .absent : .available)
         } status: {
-            information(id: game.id, compact: true)
-            if game.installed != nil { Label("Installed", systemImage: "internaldrive").font(.caption) }
-            LibraryGameSizeView(installed: game.installed, downloadBytes: art.images[artworkID]?.facts.downloadBytes,
-                                allowsMeasurement: artworkAllowed)
+            if game.installed != nil {
+                Label("Installed", systemImage: "internaldrive")
+            } else {
+                LibraryGameSizeView(installed: nil, downloadBytes: art.images[artworkID]?.facts.downloadBytes,
+                                    allowsMeasurement: artworkAllowed)
+            }
             if let match = game.installed { InstalledPlayError(library: installed, game: match) }
         } actions: {
             LibraryGlassCluster {

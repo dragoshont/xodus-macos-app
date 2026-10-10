@@ -158,6 +158,17 @@ enum LibraryPreviewExporter {
                 ]
                 let data = try JSONSerialization.data(withJSONObject: record, options: [.sortedKeys])
                 try data.write(to: output.appendingPathComponent("ready.json"), options: .withoutOverwriting)
+                // Own-view render: draws only this window's view hierarchy; no desktop capture permission needed.
+                for (name, target) in [("own-view", window), ("own-sheet", window.attachedSheet)] {
+                    guard let view = target?.contentView?.superview else { continue }
+                    view.displayIfNeeded()
+                    if let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+                        view.cacheDisplay(in: view.bounds, to: bitmap)
+                        if let png = bitmap.representation(using: .png, properties: [:]) {
+                            try png.write(to: output.appendingPathComponent("\(name).png"), options: .withoutOverwriting)
+                        }
+                    }
+                }
             } catch {
                 FileHandle.standardError.write(Data("Library review stopped: \(error.localizedDescription)\n".utf8))
                 NSApp.terminate(nil)

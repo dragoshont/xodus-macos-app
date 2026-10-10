@@ -23,6 +23,8 @@ final class LibrarySelection: ObservableObject {
     @Published var filter: LibraryFilter = .all
     @Published var sort: LibrarySort = .title
     @Published var recentGameID: UUID?
+    @Published var heroID: String?
+    @Published var heroHovered = false
     var requestedGamePassScope: String?
 }
 
@@ -190,6 +192,7 @@ struct LibraryHero<Artwork: View, Poster: View, Information: View, Actions: View
     let title: String
     var logos: [CatalogArtworkReference] = []
     var allowsArtworkLoading = true
+    var height: CGFloat = 340
     @ViewBuilder let artwork: () -> Artwork
     @ViewBuilder let poster: () -> Poster
     @ViewBuilder let information: () -> Information
@@ -214,9 +217,9 @@ struct LibraryHero<Artwork: View, Poster: View, Information: View, Actions: View
                 .foregroundStyle(.white)
             }
             .frame(maxWidth: 900, alignment: .leading)
-            .padding(.horizontal, 56).padding(.bottom, 24)
+            .padding(.horizontal, 56).padding(.bottom, height > 340 ? 56 : 24)
         }
-        .frame(height: 340).clipped()
+        .frame(height: height).clipped()
         .accessibilityElement(children: .contain)
         .modifier(LibraryBackgroundExtension())
     }
