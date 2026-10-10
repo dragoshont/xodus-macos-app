@@ -126,6 +126,16 @@ struct LibraryGame: Identifiable {
             }
     }
 
+    /// First-class per-title eligibility: (a) owned entitlement, (b) active Game Pass access,
+    /// (c) installed-only / unknown-access. This is the audited distinction behind the
+    /// `Your Games` gate — installation alone only ever yields `.installedUnknown`.
+    var eligibility: LibraryEligibility? {
+        if owned { return .owned }
+        if gamePass { return .gamePass }
+        if installed != nil { return .installedUnknown }
+        return nil
+    }
+
     static func visible(_ games: [Self], query: String, filter: LibraryFilter, sort: LibrarySort) -> [Self] {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
         return games.filter {
@@ -231,6 +241,15 @@ struct LibraryHero<Artwork: View, Poster: View, Information: View, Actions: View
     }
 }
 
+enum LibraryEligibility: String, Sendable {
+    /// Account-held, non-trial entitlement (owned outright or a Game Pass library grant).
+    case owned
+    /// Active Game Pass catalog access proven for this title.
+    case gamePass
+    /// Installed locally with no verified account access — qualified, never counted as owned.
+    case installedUnknown
+}
+
 enum LibraryAccess: String {
     case owned = "Owned", gamePass = "Game Pass catalog", subscription = "Game Pass"
     var symbol: String { self == .owned ? "checkmark.seal" : "ticket" }
@@ -242,9 +261,11 @@ enum LibraryAccess: String {
         }
     }
     init?(_ game: LibraryGame) {
-        if game.owned { self = game.pc?.acquisitionKind == .subscription ? .subscription : .owned }
-        else if game.gamePass { self = .gamePass }
-        else { return nil }
+        switch game.eligibility {
+        case .owned: self = game.pc?.acquisitionKind == .subscription ? .subscription : .owned
+        case .gamePass: self = .gamePass
+        case .installedUnknown, nil: return nil
+        }
     }
     static func badges(_ game: LibraryGame) -> [Self] {
         if game.owned, game.pc?.acquisitionKind == .subscription { return [.subscription] }

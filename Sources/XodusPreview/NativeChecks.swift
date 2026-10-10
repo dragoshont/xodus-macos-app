@@ -71,6 +71,7 @@ enum NativeChecks {
                       "Hero playback respects lifecycle fence \(fence)")
             }
             try LibraryAccessChecks.run(check: check)
+            AccountTierChecks.run(check: check)
             if libraryAccessOnly {
                 try await PCGamesChecks.run(check: check)
                 print("\(count) Library access checks, \(failures) failures. Synthetic data only.")

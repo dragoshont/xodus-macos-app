@@ -107,6 +107,15 @@ final class GameOperationsController: ObservableObject {
             : serviceStatus == nil ? "Game sign-in hasn't been checked" : "Sign in for games"
     }
     var gamePassActive: Bool { gamePassStatus?.active == true }
+
+    // Single source for the account tier surface: owned entitlement (from the held PC
+    // library) and Game Pass access (from the PC probe) are derived by the pure model.
+    func accountEntitlements(library: PCGamesController) -> AccountEntitlements {
+        AccountEntitlements.derive(
+            signedIn: serviceStatus?.signedIn == true || library.hasSavedSignIn,
+            held: library.representedGames.map(\.acquisitionKind),
+            gamePassActive: gamePassActive)
+    }
     var setupNeedsAttention: Bool { setupResult?.ready == false || setupError != nil }
     var canRepairSetup: Bool {
         canStartMutation && !serviceBusy && installed.runningGameID == nil

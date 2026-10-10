@@ -226,6 +226,103 @@ struct PCGame: Identifiable, Sendable {
     }
 }
 
+// The Game Pass plan taxonomy. PC/Console/Ultimate are representable, but only PC is
+// auto-detected today: the account-bound probe is PC-specific and no Console/Ultimate
+// discriminator exists. `undetermined` means an active grant is proven but the exact plan
+// is not — it is never silently upgraded to a specific plan.
+enum GamePassPlan: String, Sendable, CaseIterable {
+    case pc, console, ultimate, undetermined
+
+    var label: String {
+        switch self {
+        case .pc: "PC Game Pass"
+        case .console: "Console Game Pass"
+        case .ultimate: "Game Pass Ultimate"
+        case .undetermined: "Game Pass"
+        }
+    }
+}
+
+// Account-bound Game Pass access. `.active(.pc)` comes from the PC probe; `.active(.undetermined)`
+// comes from subscription-grant collection entries that prove an active grant without a plan.
+enum GamePassAccess: Equatable, Sendable {
+    case inactive
+    case active(GamePassPlan)
+
+    var isActive: Bool { if case .active = self { return true } else { return false } }
+    var plan: GamePassPlan? { if case let .active(plan) = self { return plan } else { return nil } }
+}
+
+// A display tier derived from the account's entitlement state. Owned and Game Pass are
+// independent facts that can both hold, so a single account surfaces an ordered list of these.
+enum AccountTier: Equatable, Sendable {
+    case free
+    case owned
+    case gamePass(GamePassPlan)
+
+    var label: String {
+        switch self {
+        case .free: "Free"
+        case .owned: "Owned library"
+        case let .gamePass(plan): plan.label
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .free: "person.crop.circle"
+        case .owned: "checkmark.seal"
+        case .gamePass: "xbox.logo"
+        }
+    }
+}
+
+// The account's entitlement state across two independent axes: outright ownership and
+// Game Pass access. `derive` is the single, pure source of truth, computed from primitive
+// signals so it is trivially fixture-testable without any UI dependency.
+struct AccountEntitlements: Equatable, Sendable {
+    var signedIn: Bool
+    var ownsGames: Bool
+    var gamePass: GamePassAccess
+
+    static let signedOut = Self(signedIn: false, ownsGames: false, gamePass: .inactive)
+
+    // Owned = any held entry that is not a subscription grant (purchased or unknown held
+    // entitlement). A `.subscription` held entry is a Game Pass grant, not ownership.
+    // Game Pass access prefers the account-bound PC probe; a subscription grant without a
+    // positive probe proves an active grant but not the specific plan (`.undetermined`).
+    static func derive(signedIn: Bool, held: [PCGameAcquisitionKind], gamePassActive: Bool) -> Self {
+        guard signedIn else { return .signedOut }
+        let owns = held.contains { $0 != .subscription }
+        let grantEvidence = held.contains { $0 == .subscription }
+        let access: GamePassAccess
+        if gamePassActive { access = .active(.pc) }
+        else if grantEvidence { access = .active(.undetermined) }
+        else { access = .inactive }
+        return Self(signedIn: signedIn, ownsGames: owns, gamePass: access)
+    }
+
+    // Ordered display tiers. Owned and Game Pass can coexist; `.free` only when signed in
+    // with neither entitlement. Signed-out makes no entitlement claim.
+    var tiers: [AccountTier] {
+        guard signedIn else { return [] }
+        var result: [AccountTier] = []
+        if ownsGames { result.append(.owned) }
+        if case let .active(plan) = gamePass { result.append(.gamePass(plan)) }
+        if result.isEmpty { result.append(.free) }
+        return result
+    }
+
+    var summary: String {
+        guard signedIn else { return "Not signed in" }
+        return tiers.map(\.label).joined(separator: " + ")
+    }
+
+    // True when Game Pass is active but the exact plan cannot be determined from available
+    // signals, so the UI can show an honest "plan not determined" affordance.
+    var gamePassPlanUndetermined: Bool { gamePass.plan == .undetermined }
+}
+
 struct PCGamesSnapshot: Sendable {
     let games: [PCGame]
     let excludedCount: Int

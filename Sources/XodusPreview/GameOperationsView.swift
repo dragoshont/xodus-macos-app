@@ -7,6 +7,7 @@ struct GameServiceAccountView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            AccountTierView(entitlements: operations.accountEntitlements(library: library))
             GroupBox("Microsoft PC games") {
                 VStack(alignment: .leading, spacing: 10) {
                     if library.hasSavedSignIn {
@@ -119,6 +120,39 @@ struct GamePassAccountView: View {
                         .accessibilityIdentifier("xodus.gamePass.showLog")
                 }
             }
+        }
+    }
+}
+
+struct AccountTierView: View {
+    let entitlements: AccountEntitlements
+
+    var body: some View {
+        GroupBox("Account tier") {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Text(entitlements.summary).font(.headline)
+                        .accessibilityIdentifier("xodus.account.tier")
+                    Spacer()
+                }
+                if entitlements.signedIn {
+                    HStack(spacing: 8) {
+                        ForEach(entitlements.tiers, id: \.label) { tier in
+                            Label(tier.label, systemImage: tier.symbol)
+                                .font(.callout).padding(.horizontal, 10).padding(.vertical, 4)
+                                .background(.quaternary, in: Capsule())
+                                .accessibilityIdentifier("xodus.account.tier.badge")
+                        }
+                    }
+                }
+                if entitlements.gamePassPlanUndetermined {
+                    Text("Game Pass is active, but the exact plan (PC, Console or Ultimate) can't be determined on this Mac.")
+                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                Text("Owned games stay in your library. Game Pass access requires an active subscription and is checked separately.")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.top, 2).frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }

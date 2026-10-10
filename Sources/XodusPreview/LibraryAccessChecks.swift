@@ -51,6 +51,8 @@ enum LibraryAccessChecks {
         let locals = LibraryGame.localRecords(installed: [local], qualified: collection, query: "", sort: .title)
         check(locals.count == 1 && locals[0].installed == local && !locals[0].owned && !locals[0].gamePass,
               "SDD-LIB-04: live local-record seam preserves exact registry data without access badges")
+        check(collection.first?.eligibility == .owned && locals[0].eligibility == .installedUnknown,
+              "M10: eligibility classifies held access as owned and installed-only as installedUnknown")
         check(LibraryGame.continuing(collection, launchableIDs: [local.id]).isEmpty,
               "SDD-LIB-05: local unknown access cannot become hero or Continue Playing")
         let installedHeld = InstalledGame(id: local.id, title: local.title, identityName: local.identityName,
@@ -63,6 +65,8 @@ enum LibraryAccessChecks {
         check(both.count == 1 && both[0].owned && both[0].gamePass
               && LibraryAccess.badges(both[0]) == [.owned, .gamePass],
               "SDD-LIB-02: held access and explicitly public Game Pass membership remain independent overlapping facts")
+        check(both[0].eligibility == .owned,
+              "M10: eligibility prefers owned entitlement when a title is both owned and Game Pass")
         check(LibraryGame.visible(both, query: "", filter: .owned, sort: .title).count == 1
               && LibraryGame.visible(both, query: "", filter: .gamePass, sort: .title).count == 1,
               "SDD-LIB-05: Owned and Game Pass catalog filters overlap without double counting")
@@ -72,6 +76,8 @@ enum LibraryAccessChecks {
               && LibraryAccess.badges(catalogue[0]) == [.owned, .gamePass]
               && catalogue.last?.owned == false,
               "Game Pass catalogue includes unowned PC members and independently marks overlapping held access")
+        check(catalogue.last?.eligibility == .gamePass,
+              "M10: an unowned Game Pass catalogue member classifies as gamePass eligibility")
         check(LibraryGame.visible(catalogue, query: "Public PC", filter: .gamePass, sort: .title).count == 1,
               "Game Pass filter searches the catalogue instead of only the owned-library overlap")
         check(LibraryGame.continuing(both, launchableIDs: [local.id]).map(\.id) == [local.id]
