@@ -81,6 +81,7 @@ struct InstalledGamesView: View {
                         InstalledGameActions(library: library, operations: operations, game: game)
                         InstalledPlayButton(library: library, operations: operations, game: game)
                     }
+                    InstalledUpdateBadge(library: library, operations: operations, game: game)
                     playError(game)
                 }
                 .accessibilityElement(children: .contain)
@@ -97,6 +98,35 @@ struct InstalledGamesView: View {
 
     @ViewBuilder private func playError(_ game: InstalledGame) -> some View {
         InstalledPlayError(library: library, game: game)
+    }
+}
+
+struct InstalledUpdateBadge: View {
+    @ObservedObject var library: InstalledGamesController
+    @ObservedObject var operations: GameOperationsController
+    let game: InstalledGame
+
+    var body: some View {
+        if library.updateStatus(for: game).hasUpdate {
+            HStack(spacing: 10) {
+                Label("Update available", systemImage: "arrow.down.circle")
+                    .font(.callout.weight(.medium)).foregroundStyle(.tint)
+                    .accessibilityIdentifier("xodus.installed.updateAvailable")
+                if let version = library.availableVersions[game.storeId] {
+                    Text("Version \(version)").font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Update") {
+                    Task {
+                        await operations.prepareInstall(
+                            PCGame(id: game.storeId, title: game.title, artwork: nil), repairing: game)
+                    }
+                }
+                .disabled(!operations.canStartMutation || library.runningGameID == game.id)
+                .accessibilityIdentifier("xodus.installed.update")
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 
