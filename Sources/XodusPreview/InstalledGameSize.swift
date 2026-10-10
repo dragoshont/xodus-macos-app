@@ -103,10 +103,20 @@ final class InstalledGameSizeStore: ObservableObject {
 struct LibraryGameSizeView: View {
     let installed: InstalledGame?
     let downloadBytes: Int64?
+    var packageFormat: String? = nil
     var allowsMeasurement = true
     @ObservedObject private var sizes = InstalledGameSizeStore.shared
 
     var body: some View {
+        HStack(spacing: 8) {
+            if let packageFormat {
+                LibraryPackageFormatLabel(format: packageFormat)
+            }
+            sizeLabel
+        }
+    }
+
+    private var sizeLabel: some View {
         Group {
             if let installed, let size = sizes.value(for: installed) {
                 Label("\(GameOperationProgressView.bytes(size.allocatedBytes)) installed", systemImage: "internaldrive")
@@ -120,5 +130,19 @@ struct LibraryGameSizeView: View {
         .task(id: installed.map { "\($0.id):\($0.version):\($0.importedAt)" }) {
             if allowsMeasurement, let installed { await sizes.load(installed) }
         }
+    }
+}
+
+struct LibraryPackageFormatLabel: View {
+    let format: String
+
+    var body: some View {
+        Text(format)
+            .font(.caption2.weight(.semibold).monospaced())
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 6).padding(.vertical, 2)
+            .background(.quaternary, in: Capsule())
+            .help("PC package format from the public Microsoft catalog. MSIXVC is the GDK format Xodus installs today; EAppx/Appx are Store app packages.")
+            .accessibilityLabel("Package format \(format)")
     }
 }

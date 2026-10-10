@@ -303,10 +303,12 @@ struct PCGamesCatalog: Decodable {
                         struct Platform: Decodable { let PlatformName: String? }
                         let PlatformDependencies: [Platform]?
                         let MaxDownloadSizeInBytes: Int64?
-                        private enum CodingKeys: String, CodingKey { case PlatformDependencies, MaxDownloadSizeInBytes }
+                        let PackageFormat: String?
+                        private enum CodingKeys: String, CodingKey { case PlatformDependencies, MaxDownloadSizeInBytes, PackageFormat }
                         init(from decoder: Decoder) throws {
                             let values = try decoder.container(keyedBy: CodingKeys.self)
                             PlatformDependencies = try values.decodeIfPresent([Platform].self, forKey: .PlatformDependencies)
+                            PackageFormat = try? values.decode(String.self, forKey: .PackageFormat)
                             MaxDownloadSizeInBytes = (try? values.decode(Int64.self, forKey: .MaxDownloadSizeInBytes))
                                 ?? (try? values.decode(String.self, forKey: .MaxDownloadSizeInBytes)).flatMap(Int64.init)
                         }
@@ -362,6 +364,26 @@ struct PCGamesCatalog: Decodable {
             (DisplaySkuAvailabilities ?? []).flatMap { $0.Sku?.Properties?.Packages ?? [] }
                 .filter { ($0.PlatformDependencies ?? []).contains { $0.PlatformName == "Windows.Desktop" } }
                 .compactMap(\.MaxDownloadSizeInBytes).filter { $0 > 0 }.max()
+        }
+
+        // Public PC package format family (e.g. "MSIXVC", "EAppx"); a catalog fact, not a Mac verdict.
+        var pcPackageFormat: String? {
+            let families = (DisplaySkuAvailabilities ?? []).flatMap { $0.Sku?.Properties?.Packages ?? [] }
+                .filter { ($0.PlatformDependencies ?? []).contains { $0.PlatformName == "Windows.Desktop" } }
+                .compactMap { Self.packageFamily($0.PackageFormat) }
+            var unique: [String] = []
+            for family in families where !unique.contains(family) { unique.append(family) }
+            return unique.isEmpty ? nil : unique.joined(separator: " / ")
+        }
+
+        static func packageFamily(_ format: String?) -> String? {
+            switch format?.lowercased() {
+            case "msixvc", "xvc": "MSIXVC"
+            case "eappx", "eappxbundle": "EAppx"
+            case "appx", "appxbundle": "Appx"
+            case "msix", "msixbundle": "MSIX"
+            default: nil
+            }
         }
 
         var game: PCGame? {

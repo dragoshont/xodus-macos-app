@@ -114,6 +114,7 @@ struct LiveProductView: View {
                     LibraryGameInformation(access: access, gamePass: gamePass,
                                            facts: art?.facts, xbox: stats.cache?.games[product.id])
                     LibraryGameSizeView(installed: installed, downloadBytes: art?.facts.downloadBytes,
+                                        packageFormat: art?.facts.packageFormat,
                                         allowsMeasurement: allowsArtworkLoading)
                     if let date = installed?.lastPlayedAt {
                         Text("Last played \(date.formatted(.relative(presentation: .named))) on this Mac")

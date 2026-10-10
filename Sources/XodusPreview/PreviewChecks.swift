@@ -495,6 +495,17 @@ enum PreviewChecks {
                   "Public size uses positive PC package maxima, not console sizes or malformed metadata")
             check(metadata.pcDownloadBytes == nil && malformed.pcDownloadBytes == nil,
                   "Missing public size stays unknown and never becomes a zero-byte download")
+            let formats = try JSONDecoder().decode(PCGamesCatalog.Product.self, from: Data("""
+                {"ProductId":"FIXTURE00003","DisplaySkuAvailabilities":[{"Sku":{"Properties":{"Packages":[
+                 {"PlatformDependencies":[{"PlatformName":"Windows.Xbox"}],"PackageFormat":"XVC"},
+                 {"PlatformDependencies":[{"PlatformName":"Windows.Desktop"}],"PackageFormat":"EAppxBundle"},
+                 {"PlatformDependencies":[{"PlatformName":"Windows.Desktop"}],"PackageFormat":"EAppx"},
+                 {"PlatformDependencies":[{"PlatformName":"Windows.Desktop"}],"PackageFormat":"Unrecognized"}
+                ]}}}]}
+                """.utf8))
+            check(formats.pcPackageFormat == "EAppx" && packages.pcPackageFormat == nil &&
+                  PCGamesCatalog.Product.packageFamily("MSIXVC") == "MSIXVC",
+                  "Package format label uses PC package families only, ignores console and unknown formats")
             check(LibraryGameInformation.playTimeLabel(seconds: 43_200)?.hasPrefix("12 h") == true &&
                   LibraryGameInformation.playTimeLabel(seconds: 120)?.hasPrefix("2 min") == true &&
                   LibraryGameInformation.playTimeLabel(seconds: nil) == nil &&

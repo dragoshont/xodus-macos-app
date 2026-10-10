@@ -127,7 +127,8 @@ final class LibraryCatalogArtwork: ObservableObject {
                         images[product.ProductId] = Images(cover: cover, hero: heroes.first,
                             landscape: unique, logos: Self.logoReferences(in: art),
                             facts: LibraryCatalogFacts(properties: product.Properties,
-                                                       downloadBytes: product.pcDownloadBytes),
+                                                       downloadBytes: product.pcDownloadBytes,
+                                                       packageFormat: product.pcPackageFormat),
                             detail: detailFacts, product: detail)
                     }
                     requested.formUnion(batch)
@@ -188,15 +189,20 @@ struct LibraryCatalogFacts {
     let genres: [String]
     let capabilities: [LibraryCapability]
     let downloadBytes: Int64?
+    let packageFormat: String?
 
-    init(genres: [String], capabilities: [LibraryCapability] = [], downloadBytes: Int64? = nil) {
+    init(genres: [String], capabilities: [LibraryCapability] = [], downloadBytes: Int64? = nil,
+         packageFormat: String? = nil) {
         self.genres = Array(genres.prefix(2))
         self.capabilities = capabilities
         self.downloadBytes = downloadBytes
+        self.packageFormat = packageFormat
     }
 
-    init(properties: PCGamesCatalog.Product.PropertiesDTO?, downloadBytes: Int64? = nil) {
+    init(properties: PCGamesCatalog.Product.PropertiesDTO?, downloadBytes: Int64? = nil,
+         packageFormat: String? = nil) {
         self.downloadBytes = downloadBytes
+        self.packageFormat = packageFormat
         var seen = Set<String>()
         genres = Array((properties?.Categories ?? properties?.Category.map { [$0] } ?? [])
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }

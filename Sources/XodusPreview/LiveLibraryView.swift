@@ -256,6 +256,7 @@ struct LiveLibraryView: View {
         } information: {
             information(id: id)
             LibraryGameSizeView(installed: game.installed, downloadBytes: art.images[id]?.facts.downloadBytes,
+                                packageFormat: art.images[id]?.facts.packageFormat,
                                 allowsMeasurement: artworkAllowed)
         } actions: {
             if let match = game.installed {
@@ -375,6 +376,7 @@ struct LiveLibraryView: View {
                 Label("Not on Mac yet", systemImage: "laptopcomputer.slash").help(reason)
             } else {
                 LibraryGameSizeView(installed: nil, downloadBytes: art.images[artworkID]?.facts.downloadBytes,
+                                    packageFormat: art.images[artworkID]?.facts.packageFormat,
                                     allowsMeasurement: artworkAllowed)
             }
             if let match = game.installed { InstalledPlayError(library: installed, game: match) }
