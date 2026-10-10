@@ -68,6 +68,8 @@ actor Checks {
         try registryDevelopmentChecks()
         try installPlanDevelopmentChecks()
         try await runtimePlanChecks()
+        try packageTypeChecks()
+        try engineRoutingChecks()
         try await hostBindingChecks()
         try await artworkChecks()
         let validator = try ContractValidator()

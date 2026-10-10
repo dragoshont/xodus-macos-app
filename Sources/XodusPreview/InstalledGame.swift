@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import Darwin
 import Foundation
+import XodusCore
 
 struct InstalledGame: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
@@ -14,6 +15,13 @@ struct InstalledGame: Codable, Equatable, Identifiable, Sendable {
     var publisher: String? = nil
     var lastPlayedAt: Date? = nil
     var lastSessionSeconds: Double? = nil
+    /// Detected on-disk package format (M1). Optional so pre-M1 registries decode
+    /// unchanged; it is backfilled from file evidence after load, never invented.
+    var packageType: PackageType? = nil
+    /// A persisted per-game engine choice (M3). When set it takes precedence over
+    /// the configured default; a missing selected engine refuses launch, never
+    /// silently substitutes another runner.
+    var engineOverride: RuntimeProviderKind? = nil
 }
 
 enum InstalledGameError: Error, LocalizedError {
@@ -228,6 +236,8 @@ actor InstalledGameStore {
         if let previous = games.first(where: { $0.id == game.id }) {
             updated.lastPlayedAt = previous.lastPlayedAt
             updated.lastSessionSeconds = previous.lastSessionSeconds
+            updated.packageType = game.packageType ?? previous.packageType
+            updated.engineOverride = game.engineOverride ?? previous.engineOverride
         }
         games.removeAll { $0.folder == game.folder }
         games.append(updated)
@@ -249,5 +259,26 @@ actor InstalledGameStore {
         games[index].lastPlayedAt = startedAt
         games[index].lastSessionSeconds = seconds
         try save(games)
+    }
+
+    /// Persist the detected package format. Returns the saved list, or the current
+    /// list unchanged when the value already matches, so backfill is idempotent.
+    func recordPackageType(id: UUID, type: PackageType) throws -> [InstalledGame] {
+        var games = try load()
+        guard let index = games.firstIndex(where: { $0.id == id }), games[index].packageType != type else {
+            return games
+        }
+        games[index].packageType = type
+        try save(games)
+        return games
+    }
+
+    /// Persist a per-game engine override (or clear it with `nil`).
+    func setEngineOverride(id: UUID, override: RuntimeProviderKind?) throws -> [InstalledGame] {
+        var games = try load()
+        guard let index = games.firstIndex(where: { $0.id == id }) else { return games }
+        games[index].engineOverride = override
+        try save(games)
+        return games
     }
 }

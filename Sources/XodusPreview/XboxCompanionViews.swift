@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import SwiftUI
+import XodusCore
 
 enum XboxCompanionCopy {
     static let accountScope =
@@ -373,6 +374,7 @@ struct XboxConsolesView: View {
 struct EnginesView: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var session: LiveSession
+    @State private var defaultEngine: RuntimeProviderKind? = EngineDefaults.defaultEngine()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -381,6 +383,21 @@ struct EnginesView: View {
                 .font(.callout).foregroundStyle(.secondary)
             Form {
                 RuntimeProviderSection(settings: state.runtimeSettings, backendPath: session.backendPath)
+                Section("Launch routing") {
+                    Picker("Default engine", selection: Binding(
+                        get: { defaultEngine },
+                        set: { value in
+                            defaultEngine = value
+                            EngineDefaults.setDefaultEngine(value)
+                        })) {
+                        Text("Automatic (first installed runner)").tag(Optional<RuntimeProviderKind>.none)
+                        ForEach(RuntimeProviderSettings.providerChoices, id: \.self) { provider in
+                            Text(RuntimeProviderSettings.providerLabel(provider)).tag(Optional(provider))
+                        }
+                    }
+                    Text("Chooses which installed runner launches a game by default. A per-game override takes precedence. A selected engine that is not installed refuses launch rather than substituting another runner.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             .formStyle(.grouped)
             .frame(minHeight: 440)

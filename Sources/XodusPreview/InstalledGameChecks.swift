@@ -4,6 +4,7 @@ import Darwin
 import Foundation
 import ImageIO
 import SwiftUI
+import XodusCore
 
 @MainActor
 enum InstalledGameChecks {
@@ -175,11 +176,13 @@ enum InstalledGameChecks {
         let failure = try script("exit three.sh", "exit 3")
         let record = root.appendingPathComponent("arguments.txt")
         let slow = try script("sleep two.sh",
-            "printf '%s\\n' \"$#\" \"$1\" \"$PATH\" \"${XODUS_NEUTRAL_SECRET-unset}\" > '\(record.path)'\nsleep 2\nexit 0")
+            "printf '%s\\n' \"$#\" \"$1\" \"$2\" \"$PATH\" \"${XODUS_ENGINE-unset}\" \"${XODUS_NEUTRAL_SECRET-unset}\" > '\(record.path)'\nsleep 2\nexit 0")
         let file = root.appendingPathComponent("private/installed-games.json")
         let store = InstalledGameStore(file: file)
         let library = InstalledGamesController(store: store, launchingDuration: .milliseconds(100),
-                                               logDirectory: root.appendingPathComponent("logs"))
+                                               logDirectory: root.appendingPathComponent("logs"),
+                                               defaultEngine: { nil },
+                                               detectAvailability: { RunnerAvailability([.crossover]) })
         await library.load()
         check(library.loaded && library.games.isEmpty && library.error == nil,
               "Absent private list loads as empty without importing or scanning games")
@@ -260,13 +263,15 @@ enum InstalledGameChecks {
         check(library.runningGameID == slowGame.id,
               "A still-alive fake session transitions to Playing and duplicate Play is guarded")
         let lines = try String(contentsOf: record, encoding: .utf8).split(separator: "\n").map(String.init)
-        check(lines.count == 4 && lines[0] == "1" && lines[1].range(
+        check(lines.count == 6 && lines[0] == "2" && lines[1].range(
             of: #"^xodus-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$"#, options: .regularExpression) != nil
-              && lines[2] == "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin" && lines[3] == "unset",
-              "Actual bash invocation passes one safe runID and minimal environment, not shell interpolation")
+              && lines[2] == "crossover" && lines[3] == "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+              && lines[4] == "crossover" && lines[5] == "unset",
+              "Actual bash invocation passes the safe runID, the routed engine arg and XODUS_ENGINE, not shell interpolation")
         check(InstalledGamesController.launchEnvironment(["HOME": "/home", "USER": "fixture", "LANG": "en",
-                    "PATH": "/wrong", "TOKEN": "secret"]).keys.sorted() == ["HOME", "LANG", "PATH", "USER"],
-              "Launch environment excludes unrelated secrets and overrides PATH exactly")
+                    "PATH": "/wrong", "TOKEN": "secret"], engine: .crossover).keys.sorted()
+                == ["HOME", "LANG", "PATH", "USER", "XODUS_ENGINE"],
+              "Launch environment excludes unrelated secrets, overrides PATH and adds only the routed engine")
         let fixedID = InstalledGamesController.runID(date: Date(timeIntervalSince1970: 0),
             nonce: UUID(uuidString: "abcdef01-2345-6789-abcd-ef0123456789")!)
         check(fixedID == "xodus-19700101T000000Z-abcdef01", "runID uses fixed UTC/POSIX date and lowercase eight-hex nonce")
@@ -339,7 +344,9 @@ enum InstalledGameChecks {
               "AC1.4: An unavailable launcher is excluded even when its recorded play is newest")
         try await store.save([older])
         let resilient = InstalledGamesController(store: store, launchingDuration: .milliseconds(100),
-                                                logDirectory: root.appendingPathComponent("logs"))
+                                                logDirectory: root.appendingPathComponent("logs"),
+                                                defaultEngine: { nil },
+                                                detectAvailability: { RunnerAvailability([.crossover]) })
         await resilient.load()
         await resilient.importGame(folder: folder, launcher: slow)
         guard let resilientGame = resilient.games.first else { throw InstalledGameError.invalidRegistry }
@@ -374,5 +381,41 @@ enum InstalledGameChecks {
         let aliased = InstalledGamesController(store: InstalledGameStore(file: alias))
         await aliased.load()
         check(!aliased.loaded && aliased.error != nil, "Saved-list symlinks are refused without following or replacing their target")
+
+        // M1 + M3 integration: detection is backfilled and persisted, a per-game
+        // override survives relaunch, and a selected-but-missing engine refuses launch.
+        let routingRoot = root.appendingPathComponent("routing")
+        try FileManager.default.createDirectory(at: routingRoot, withIntermediateDirectories: false)
+        let routingFolder = routingRoot.appendingPathComponent("routed game")
+        try FileManager.default.createDirectory(at: routingFolder, withIntermediateDirectories: false)
+        try Data(config.utf8).write(to: routingFolder.appendingPathComponent("MicrosoftGame.config"))
+        let routingLauncher = try script("routing launch.sh", "exit 0")
+        let routingFile = routingRoot.appendingPathComponent("private/routing-list.json")
+        let routingStore = InstalledGameStore(file: routingFile)
+        let routing = InstalledGamesController(store: routingStore, launchingDuration: .milliseconds(100),
+            logDirectory: routingRoot, defaultEngine: { nil },
+            detectAvailability: { RunnerAvailability([.crossover]) })
+        await routing.load()
+        await routing.importGame(folder: routingFolder, launcher: routingLauncher)
+        guard let routed = routing.games.first else { throw InstalledGameError.invalidRegistry }
+        check(routed.packageType == .msixvc,
+              "M1: A folder with only MicrosoftGame.config is detected as MSIXVC from file evidence")
+        check(try await InstalledGameStore(file: routingFile).load().first?.packageType == .msixvc,
+              "M1: Detected package type is persisted to the private registry, not recomputed as a label")
+        await routing.setEngineOverride(.gptk4, for: routed)
+        check(routing.games.first?.engineOverride == .gptk4, "M3: A per-game engine override is applied")
+        check(try await InstalledGameStore(file: routingFile).load().first?.engineOverride == .gptk4,
+              "M3: A per-game engine override persists across relaunch")
+        guard let overridden = routing.games.first else { throw InstalledGameError.invalidRegistry }
+        await routing.play(overridden)
+        try await wait { routing.runningGameID == nil }
+        check(routing.playErrors[overridden.id]?.contains("isn't installed") == true,
+              "M3: An override whose engine is not installed refuses launch, never substituting another runner")
+        await routing.setEngineOverride(nil, for: overridden)
+        guard let cleared = routing.games.first else { throw InstalledGameError.invalidRegistry }
+        await routing.play(cleared)
+        try await wait { routing.runningGameID == nil }
+        check(routing.playErrors[cleared.id] == nil,
+              "M3: Clearing the override falls back to an installed runner and launches")
     }
 }

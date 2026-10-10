@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import AppKit
 import Foundation
+import XodusCore
 
 enum InstalledGamePlayState: Equatable {
     case launching, playing
@@ -30,6 +31,9 @@ final class InstalledGamesController: ObservableObject {
     var applicationTerminating = false
     private let store: InstalledGameStore
     private let launchingDuration: Duration
+    private let defaultEngine: @Sendable () -> RuntimeProviderKind?
+    private let detectAvailability: @Sendable () async -> RunnerAvailability
+    private let inspectPackage: @Sendable (URL) -> PackageType
     private var playingTask: Task<Void, Never>?
     private var runToken: UUID?
     private var stopToken: UUID?
@@ -48,10 +52,18 @@ final class InstalledGamesController: ObservableObject {
     }
 
     init(store: InstalledGameStore = InstalledGameStore(), launchingDuration: Duration = .seconds(5),
-         logDirectory: URL = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Logs/XodusRemote")) {
+         logDirectory: URL = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Logs/XodusRemote"),
+         defaultEngine: @escaping @Sendable () -> RuntimeProviderKind? = { EngineDefaults.defaultEngine() },
+         detectAvailability: @escaping @Sendable () async -> RunnerAvailability = {
+             await Task.detached(priority: .utility) { RunnerAvailabilityDetector.detect() }.value
+         },
+         inspectPackage: @escaping @Sendable (URL) -> PackageType = { PackageInspector.detect(folder: $0) }) {
         self.store = store
         self.launchingDuration = launchingDuration
         self.logDirectory = logDirectory
+        self.defaultEngine = defaultEngine
+        self.detectAvailability = detectAvailability
+        self.inspectPackage = inspectPackage
     }
 
     func load() async {
@@ -132,10 +144,25 @@ final class InstalledGamesController: ObservableObject {
         return "xodus-\(formatter.string(from: date))-\(suffix)"
     }
 
-    nonisolated static func launchEnvironment(_ inherited: [String: String]) -> [String: String] {
+    nonisolated static func launchEnvironment(_ inherited: [String: String],
+                                              engine: RuntimeProviderKind? = nil) -> [String: String] {
         var environment = inherited.filter { ["HOME", "USER", "LANG"].contains($0.key) }
         environment["PATH"] = "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        // The resolved runner is passed to the launch script as an explicit, neutral
+        // selector so the launch path consumes the routing decision, not config only.
+        if let engine { environment["XODUS_ENGINE"] = engine.rawValue }
         return environment
+    }
+
+    static func engineUnavailableMessage(_ reason: EngineRoutingUnavailable) -> String {
+        switch reason {
+        case .overrideNotInstalled(let kind):
+            "This game's selected engine (\(kind.label)) isn't installed. Install it, or clear the per-game engine override."
+        case .defaultNotInstalled(let kind):
+            "The default engine (\(kind.label)) isn't installed. Install it, or choose a different default engine in Engines."
+        case .noRunnerInstalled:
+            "No supported engine is installed. Set up CrossOver in Engines before launching."
+        }
     }
 
     nonisolated static func sessionLog(runID: String, directory: URL) -> URL? {
@@ -159,16 +186,29 @@ final class InstalledGamesController: ObservableObject {
         playErrors[game.id] = nil
         playLogs[game.id] = nil
         playNotices[game.id] = nil
+        let availability = await detectAvailability()
+        guard runToken == token else { return }
+        let outcome = EngineRouting.decide(.init(packageType: game.packageType ?? .unknown,
+            override: game.engineOverride, defaultEngine: defaultEngine(), availability: availability))
+        guard case .routed(let runner, _) = outcome else {
+            finished(token: token, gameID: game.id, status: 0)
+            if case .unavailable(let reason) = outcome {
+                playErrors[game.id] = Self.engineUnavailableMessage(reason)
+            }
+            return
+        }
         do {
-            let environment = Self.launchEnvironment(ProcessInfo.processInfo.environment)
+            let environment = Self.launchEnvironment(ProcessInfo.processInfo.environment, engine: runner)
             let runID = Self.runID()
             runIDs[game.id] = runID
+            let launcher = game.launcher
+            let folder = game.folder
             let child = try await Task.detached(priority: .userInitiated) { [weak self] in
-                try InstalledGameFiles.checkFolder(URL(fileURLWithPath: game.folder))
-                try InstalledGameFiles.checkLauncher(URL(fileURLWithPath: game.launcher))
+                try InstalledGameFiles.checkFolder(URL(fileURLWithPath: folder))
+                try InstalledGameFiles.checkLauncher(URL(fileURLWithPath: launcher))
                 let child = Process()
                 child.executableURL = URL(fileURLWithPath: "/bin/bash")
-                child.arguments = [game.launcher, runID]
+                child.arguments = [launcher, runID, runner.rawValue]
                 child.environment = environment
                 child.standardInput = FileHandle.nullDevice
                 child.standardOutput = FileHandle.nullDevice
@@ -313,6 +353,19 @@ final class InstalledGamesController: ObservableObject {
         mutationGameID = nil
     }
 
+    /// Persist (or clear with `nil`) a per-game engine override. Routing consumes
+    /// this on the next launch; a selected-but-missing engine refuses launch.
+    func setEngineOverride(_ override: RuntimeProviderKind?, for game: InstalledGame) async {
+        guard loaded, !editing, !choosing, !mutationActive, !applicationTerminating,
+              runningGameID != game.id, games.contains(where: { $0.id == game.id }) else { return }
+        editing = true
+        defer { editing = false }
+        do {
+            applySavedGames(try await store.setEngineOverride(id: game.id, override: override))
+            error = nil
+        } catch { self.error = InstalledGameError.storage.localizedDescription }
+    }
+
     func registerInstallation(folder: URL, launcher: URL, expectedStoreID: String) async throws {
         guard loaded, mutationActive, !editing, !applicationTerminating else { throw GameScriptError.busy }
         editing = true
@@ -363,23 +416,31 @@ final class InstalledGamesController: ObservableObject {
 
     private func refreshLaunchableGames() async {
         let entries = games
+        let inspectPackage = inspectPackage
         let result = await Task.detached(priority: .utility) {
             var launchable: Set<UUID> = []
             var publishers: [UUID: String] = [:]
+            var packageTypes: [UUID: PackageType] = [:]
             for game in entries {
                 let folder = URL(fileURLWithPath: game.folder)
                 if game.publisher == nil, let publisher = (try? MicrosoftGameConfig.read(folder: folder))?.publisher {
                     publishers[game.id] = publisher
                 }
+                if game.packageType == nil { packageTypes[game.id] = inspectPackage(folder) }
                 do {
                     try InstalledGameFiles.checkFolder(folder)
                     try InstalledGameFiles.checkLauncher(URL(fileURLWithPath: game.launcher))
                     launchable.insert(game.id)
                 } catch { continue }
             }
-            return (launchable, publishers)
+            return (launchable, publishers, packageTypes)
         }.value
         launchableIDs = result.0.intersection(games.map(\.id))
+        var latestSaved: [InstalledGame]?
+        for (id, detected) in result.2 where games.contains(where: { $0.id == id && $0.packageType == nil }) {
+            if let saved = try? await store.recordPackageType(id: id, type: detected) { latestSaved = saved }
+        }
+        if let latestSaved { applySavedGames(latestSaved) }
         for index in games.indices where games[index].publisher == nil {
             games[index].publisher = result.1[games[index].id]
         }

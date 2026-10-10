@@ -1,0 +1,59 @@
+{
+  "cases": [
+    {
+      "name": "MicrosoftGame.config only",
+      "expected": "msixvc",
+      "evidence": {"hasMicrosoftGameConfig": true, "hasAppxManifest": false, "encryptedPackageMarker": false, "targetDeviceFamilies": [], "declaresFullTrustEntryPoint": false, "hasWin32Executable": false}
+    },
+    {
+      "name": "bare Win32 executable",
+      "expected": "win32",
+      "evidence": {"hasMicrosoftGameConfig": false, "hasAppxManifest": false, "encryptedPackageMarker": false, "targetDeviceFamilies": [], "declaresFullTrustEntryPoint": false, "hasWin32Executable": true}
+    },
+    {
+      "name": "universal manifest without full trust",
+      "expected": "uwp",
+      "evidence": {"hasMicrosoftGameConfig": false, "hasAppxManifest": true, "encryptedPackageMarker": false, "targetDeviceFamilies": ["Windows.Universal"], "declaresFullTrustEntryPoint": false, "hasWin32Executable": false}
+    },
+    {
+      "name": "universal manifest declaring full trust",
+      "expected": "appx",
+      "evidence": {"hasMicrosoftGameConfig": false, "hasAppxManifest": true, "encryptedPackageMarker": false, "targetDeviceFamilies": ["Windows.Universal"], "declaresFullTrustEntryPoint": true, "hasWin32Executable": true}
+    },
+    {
+      "name": "non-universal manifest",
+      "expected": "appx",
+      "evidence": {"hasMicrosoftGameConfig": false, "hasAppxManifest": true, "encryptedPackageMarker": false, "targetDeviceFamilies": ["Windows.Desktop"], "declaresFullTrustEntryPoint": false, "hasWin32Executable": false}
+    },
+    {
+      "name": "encrypted package marker",
+      "expected": "eappx",
+      "evidence": {"hasMicrosoftGameConfig": false, "hasAppxManifest": true, "encryptedPackageMarker": true, "targetDeviceFamilies": ["Windows.Universal"], "declaresFullTrustEntryPoint": false, "hasWin32Executable": false}
+    },
+    {
+      "name": "no evidence at all",
+      "expected": "unknown",
+      "evidence": {"hasMicrosoftGameConfig": false, "hasAppxManifest": false, "encryptedPackageMarker": false, "targetDeviceFamilies": [], "declaresFullTrustEntryPoint": false, "hasWin32Executable": false}
+    },
+    {
+      "name": "encrypted marker outranks manifest and config",
+      "expected": "eappx",
+      "evidence": {"hasMicrosoftGameConfig": true, "hasAppxManifest": true, "encryptedPackageMarker": true, "targetDeviceFamilies": ["Windows.Universal"], "declaresFullTrustEntryPoint": false, "hasWin32Executable": true}
+    },
+    {
+      "name": "MicrosoftGame.config outranks a bare executable",
+      "expected": "msixvc",
+      "evidence": {"hasMicrosoftGameConfig": true, "hasAppxManifest": false, "encryptedPackageMarker": false, "targetDeviceFamilies": [], "declaresFullTrustEntryPoint": false, "hasWin32Executable": true}
+    },
+    {
+      "name": "manifest outranks a co-present game config",
+      "expected": "uwp",
+      "evidence": {"hasMicrosoftGameConfig": true, "hasAppxManifest": true, "encryptedPackageMarker": false, "targetDeviceFamilies": ["Windows.Universal"], "declaresFullTrustEntryPoint": false, "hasWin32Executable": false}
+    },
+    {
+      "name": "case-insensitive universal family",
+      "expected": "uwp",
+      "evidence": {"hasMicrosoftGameConfig": false, "hasAppxManifest": true, "encryptedPackageMarker": false, "targetDeviceFamilies": ["WINDOWS.UNIVERSAL"], "declaresFullTrustEntryPoint": false, "hasWin32Executable": false}
+    }
+  ]
+}
