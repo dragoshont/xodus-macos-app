@@ -67,6 +67,7 @@ actor Checks {
         try accountTierChecks()
         try registryDevelopmentChecks()
         try installPlanDevelopmentChecks()
+        try installLifecycleChecks()
         try await runtimePlanChecks()
         try packageTypeChecks()
         try engineRoutingChecks()
