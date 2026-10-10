@@ -106,15 +106,17 @@ final class GameOperationsController: ObservableObject {
         serviceStatus?.signedIn == true ? "Signed in for games"
             : serviceStatus == nil ? "Game sign-in hasn't been checked" : "Sign in for games"
     }
-    var gamePassActive: Bool { gamePassStatus?.active == true }
+    var gamePassActive: Bool {
+        gamePassStatus?.active == true && !gamePassFromCache && !gamePassBusy && gamePassError == nil
+    }
 
-    // Single source for the account tier surface: owned entitlement (from the held PC
-    // library) and Game Pass access (from the PC probe) are derived by the pure model.
+    // Only current PC-library evidence belongs to this account's tier.
     func accountEntitlements(library: PCGamesController) -> AccountEntitlements {
         AccountEntitlements.derive(
-            signedIn: serviceStatus?.signedIn == true || library.hasSavedSignIn,
+            signedIn: library.hasSavedSignIn,
             held: library.representedGames.map(\.acquisitionKind),
-            gamePassActive: gamePassActive)
+            // The service receipt has no identity to bind it to the PC-library account.
+            gamePassActive: nil, accessIsCurrent: library.accessIsCurrent)
     }
     var setupNeedsAttention: Bool { setupResult?.ready == false || setupError != nil }
     var canRepairSetup: Bool {
@@ -122,7 +124,9 @@ final class GameOperationsController: ObservableObject {
             && installConsent == nil && uninstallConsent == nil
     }
     var gamePassLabel: String {
-        gamePassStatus?.active == true ? "PC Game Pass: Active"
+        if gamePassFromCache { return "PC Game Pass: Saved status - check required" }
+        if gamePassBusy || gamePassError != nil { return "PC Game Pass: Unknown" }
+        return gamePassStatus?.active == true ? "PC Game Pass: Active"
             : gamePassStatus?.active == false ? "PC Game Pass: Not active" : "PC Game Pass: Unknown"
     }
 
@@ -158,8 +162,11 @@ final class GameOperationsController: ObservableObject {
     }
 
     func refreshService() {
-        guard !serviceBusy, !setupRepairing, !terminating else { return }
+        guard !serviceBusy, !gamePassBusy, !setupRepairing, !terminating else { return }
         serviceBusy = true
+        gamePassStatus = nil
+        gamePassFromCache = false
+        gamePassGeneration += 1
         serviceError = nil
         let runID = InstalledGamesController.runID()
         serviceTask = Task {
@@ -259,7 +266,7 @@ final class GameOperationsController: ObservableObject {
     }
 
     func checkGamePass(discoveryProducts: [CatalogProduct], ownedGames: [PCGame]?) {
-        guard canStartMutation, installConsent == nil, uninstallConsent == nil else { return }
+        guard canStartMutation, !serviceBusy, installConsent == nil, uninstallConsent == nil else { return }
         let candidates = Self.gamePassProbes(discoveryProducts: discoveryProducts, ownedGames: ownedGames,
                                             compatibility: [:])
         guard !candidates.isEmpty else {

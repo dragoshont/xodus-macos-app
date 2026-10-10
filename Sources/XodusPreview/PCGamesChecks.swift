@@ -335,7 +335,10 @@ enum PCGamesChecks {
         let controllerTransport = PCGamesMockTransport([tokenResponse] + (try authResponses()) + [
             try page([item(first)]), try response(["Products": [catalogProduct(first)]])])
         let controller = PCGamesController(store: saved, client: PCGamesClient(transport: controllerTransport))
+        let tierOperations = GameOperationsController(installed: InstalledGamesController())
         await controller.restorePresence()
+        check(tierOperations.accountEntitlements(library: controller).tiers == [.unknown],
+              "M10: saved credential presence without a current snapshot cannot claim Free or Owned")
         let readsBeforeRefresh = await saved.reads
         let requestsBeforeRefresh = await controllerTransport.requests
         check(controller.hasSavedSignIn && readsBeforeRefresh == 0 && requestsBeforeRefresh.isEmpty,
@@ -453,14 +456,22 @@ enum PCGamesChecks {
         check(controller.snapshot?.games.map(\.id) == [first] && controller.error == nil
               && savedRotations == ["neutral-refresh-rotated"],
               "S4: Only refresh tokens rotate into the mocked Keychain; access/XSTS remain memory-only")
+        check(tierOperations.accountEntitlements(library: controller).tiers == [.owned],
+              "M10: current held PC snapshot supplies the account's Owned tier")
         controller.refresh()
+        check(tierOperations.accountEntitlements(library: controller).tiers == [.unknown],
+              "M10: in-flight refresh cannot extend current account access")
         await controller.waitForOperation()
         check(controller.snapshot?.games.map(\.id) == [first] && controller.error != nil,
               "S4: Refresh failure retains the last complete snapshot with an explicit stale notice")
+        check(tierOperations.accountEntitlements(library: controller).tiers == [.unknown],
+              "M10: failed refresh preserves metadata but withdraws the current tier claim")
         await controller.signOut()
         let signedOutToken = await saved.token
         check(!controller.hasSavedSignIn && controller.snapshot == nil && signedOutToken == nil,
               "S4: Sign out removes the one app-owned refresh item and clears the account shelf")
+        check(tierOperations.accountEntitlements(library: controller) == .signedOut,
+              "M10: sign-out clears all account entitlement tiers")
         let deletionStore = PCGamesMockStore("neutral-retained-refresh")
         await deletionStore.refuseDeletion()
         let deletionController = PCGamesController(store: deletionStore, client: PCGamesClient(transport: PCGamesMockTransport([])))

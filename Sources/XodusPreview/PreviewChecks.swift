@@ -401,7 +401,10 @@ enum PreviewChecks {
                   "An active subscription cannot enable arbitrary public-product review")
             check(DiscoverBrowse.canReviewInstall(owned: true, accessIsCurrent: false,
                       gamePass: true, subscriptionActive: true, pcCandidate: true),
-                  "Saved owned titles keep Install available; the backend validates actual download rights")
+                  "Current Game Pass review remains independent of stale held metadata")
+            check(!DiscoverBrowse.canReviewInstall(owned: true, accessIsCurrent: false,
+                      gamePass: false, subscriptionActive: false, pcCandidate: true),
+                  "M10: stale held evidence alone cannot enable a new install review")
             check(!DiscoverBrowse.canReviewInstall(owned: false, accessIsCurrent: false,
                       gamePass: true, subscriptionActive: true, pcCandidate: false),
                   "Console-only catalog membership cannot enable PC package review")

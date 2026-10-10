@@ -268,8 +268,9 @@ enum GameOperationChecks {
             try privateFile(paths.gamePassStatus, text)
             await operations.loadGamePassCache()
             check(operations.gamePassStatus?.active == expected && operations.gamePassFromCache
-                  && operations.gamePassError == nil && operations.gamePassActive == (expected == true),
-                  "B5 minimal private cache distinguishes Active, Not active and Unknown without a script")
+                  && operations.gamePassError == nil && !operations.gamePassActive
+                  && operations.gamePassLabel.contains("check required"),
+                  "M10: cached Game Pass status is historical, never current access or install authority")
         }
         for text in ["{}", #"{"active":1}"#, #"{"active":true,"checkedAt":"invalid"}"#,
                      #"{"active":true,"probeProductId":"../escape"}"#] {

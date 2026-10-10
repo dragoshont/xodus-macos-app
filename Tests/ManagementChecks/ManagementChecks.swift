@@ -64,6 +64,7 @@ actor Checks {
     }
 
     func run() async throws {
+        try accountTierChecks()
         try registryDevelopmentChecks()
         try installPlanDevelopmentChecks()
         try await runtimePlanChecks()

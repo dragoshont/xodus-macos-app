@@ -29,8 +29,23 @@ access-qualified from the last complete account-held PC collection, never from
 installation or public discovery alone. Unverified local installations remain
 reachable in a separate native group; their files and saves are not changed.
 Personal counts, filters, search, hero and Continue Playing use the same join.
-Failed refresh preserves a visibly stale complete snapshot and disables new
-downloads; confirmed revocation or account mismatch retires its access.
+Failed refresh preserves a visibly stale complete snapshot but removes it from
+the current Your Games set and disables new downloads. Installed records remain
+reachable with Access not verified; confirmed revocation or account mismatch
+retires its access.
+
+**M10 account tiers:** the shared model distinguishes current held ownership,
+current subscription grants and unverified access. Owned and subscription access
+are independent; subscription-held entries never enter the Owned filter.
+Saved credentials or a failed/in-flight refresh cannot establish a Free or
+Owned tier. Recurring collection entries show Subscription (plan unknown), not
+a fabricated PC/Console/Ultimate plan. The game-service licence probe lacks an
+identity binding to the PC-library account, so its result is shown separately
+and is not merged into that account's tier. Saved probe results are historical
+and must be checked again before opening subscription install review.
+Fixture coverage lives in `Tests/ManagementChecks/Fixtures/account-tiers.json`,
+with controller transition checks in the preview harness. Perks, leaving-soon
+dates and subscription expiry remain unavailable without a real source.
 
 The current `gamepass-status` contract is a scoped licence probe, not a complete
 subscription/expiry API or an account-bound per-edition access grant. Therefore

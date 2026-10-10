@@ -183,7 +183,7 @@ struct PCGameTile: View {
                 } label: {
                     Label("Install", systemImage: "icloud.and.arrow.down")
                 }
-                    .disabled(!operations.canStartMutation)
+                    .disabled(!accessIsCurrent || !operations.canStartMutation)
                     .help("Install \(game.title)")
                     .accessibilityLabel("Install \(game.title)")
                     .accessibilityIdentifier("xodus.pcGames.download")

@@ -24,9 +24,11 @@ enum LibraryAccessChecks {
             artwork: nil, acquisitionKind: .subscription)], products: [], gamePass: [], active: false)
         check(granted.first.flatMap(LibraryAccess.init) == .subscription
               && granted.first.map(LibraryAccess.badges) == [.subscription]
+              && granted.first?.owned == false && granted.first?.eligibility == .gamePass
+              && LibraryGame.visible(granted, query: "", filter: .owned, sort: .title).isEmpty
               && PCGameAcquisitionKind.merged(.subscription, .purchased) == .purchased
               && PCGameAcquisitionKind.merged(nil, .subscription) == .subscription,
-              "Game Pass-granted library games show the Game Pass mark instead of Owned; a purchase wins")
+              "M10: current subscription-held titles qualify without entering Owned or inventing a plan")
         let page = try JSONDecoder().decode(PCGamesCollectionPage.self, from: Data("""
             {"items":[{"productId":"FIXTURE00005","productKind":"Game","status":"Active","acquisitionType":"Recurring"},
             {"productId":"FIXTURE00006","productKind":"Game","status":"Active","acquisitionType":"Single"},
@@ -76,8 +78,8 @@ enum LibraryAccessChecks {
               && LibraryAccess.badges(catalogue[0]) == [.owned, .gamePass]
               && catalogue.last?.owned == false,
               "Game Pass catalogue includes unowned PC members and independently marks overlapping held access")
-        check(catalogue.last?.eligibility == .gamePass,
-              "M10: an unowned Game Pass catalogue member classifies as gamePass eligibility")
+        check(catalogue.last?.eligibility == nil,
+              "M10: public Game Pass catalogue membership is not account eligibility")
         check(LibraryGame.visible(catalogue, query: "Public PC", filter: .gamePass, sort: .title).count == 1,
               "Game Pass filter searches the catalogue instead of only the owned-library overlap")
         check(LibraryGame.continuing(both, launchableIDs: [local.id]).map(\.id) == [local.id]
@@ -88,6 +90,11 @@ enum LibraryAccessChecks {
         check(LibraryGame.collection(installed: [], owned: [held], products: [],
             gamePass: [consoleOverlap], active: true).first?.gamePass == false,
               "SDD-LIB-03: console catalogue flag cannot become PC Game Pass membership")
+        let stale = LibraryGame.collection(installed: [installedHeld], owned: [held],
+            products: [], gamePass: [overlap], active: true, accessIsCurrent: false)
+        check(stale.isEmpty && LibraryGame.localRecords(installed: [installedHeld],
+            qualified: stale, query: "", sort: .title).first?.eligibility == .installedUnknown,
+              "M10: stale held evidence leaves Your Games and preserves the qualified local installation")
         let refusal = GameScriptError.failed(11).localizedDescription
         check(refusal.contains("account") && refusal.contains("sign-in")
               && refusal.contains("try again")

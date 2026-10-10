@@ -28,7 +28,8 @@ struct LiveProductView: View {
     private var art: LibraryCatalogArtwork.Images? { catalog.images[product.id] }
     private var details: CatalogDetailFacts? { art?.detail }
     private var access: LibraryAccess? {
-        owned.map { $0.acquisitionKind == .subscription ? .subscription : .owned } ?? (gamePass ? .gamePass : nil)
+        (library.accessIsCurrent ? owned : nil)
+            .map { $0.acquisitionKind == .subscription ? .subscription : .owned } ?? (gamePass ? .gamePass : nil)
     }
     private var canReviewGamePass: Bool {
         DiscoverBrowse.canReviewInstall(owned: owned != nil, accessIsCurrent: library.accessIsCurrent,
@@ -133,7 +134,7 @@ struct LiveProductView: View {
                                 Label("Install", systemImage: "icloud.and.arrow.down")
                             }
                                 .modifier(LibraryActionStyle())
-                                .disabled(!allowsStartupTasks || !operations.canStartMutation)
+                                .disabled(!allowsStartupTasks || !library.accessIsCurrent || !operations.canStartMutation)
                                 .help("Install \(product.title)")
                                 .accessibilityLabel("Install \(product.title)")
                         } else if canReviewGamePass {
