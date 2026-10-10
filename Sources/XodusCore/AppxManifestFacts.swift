@@ -97,9 +97,10 @@ private final class AppxManifestReader: NSObject, XMLParserDelegate {
            namespaceURI == restricted, attributes["Name"] == "runFullTrust" {
             fullTrust = true
         }
-        if name == "Extension",
+        if path == ["Package", "Applications", "Application", "Extensions", "Extension"],
+           namespaces.prefix(3).allSatisfy(isFoundation),
+           isFoundation(namespaces[3]),
            namespaceURI == "http://schemas.microsoft.com/appx/manifest/desktop/windows10",
-           Array(path.prefix(3)) == ["Package", "Applications", "Application"],
            attributes["Category"] == "windows.fullTrustProcess" { fullTrust = true }
     }
 
