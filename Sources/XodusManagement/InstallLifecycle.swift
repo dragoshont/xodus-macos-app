@@ -110,9 +110,11 @@ public enum InstallLifecycle {
         case .queued:
             switch event {
             case .start: return .preparing
-            case .report(let activity, _): return activity.phase
             case .cancel: return .cancelled
-            case .pause, .resume, .complete, .fail: return nil
+            // A queued job has no engine slot yet, so it cannot report progress or terminate;
+            // it must be promoted (`.start`) first. This mirrors `.paused`, which also rejects
+            // `.report`, and keeps the slot accounting the single source of truth.
+            case .report, .pause, .resume, .complete, .fail: return nil
             }
         case .preparing, .downloading, .verifying, .configuring:
             switch event {

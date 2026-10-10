@@ -7,22 +7,22 @@
   {
     "from": "queued",
     "event": "report:preparing",
-    "to": "preparing"
+    "to": null
   },
   {
     "from": "queued",
     "event": "report:downloading",
-    "to": "downloading"
+    "to": null
   },
   {
     "from": "queued",
     "event": "report:verifying",
-    "to": "verifying"
+    "to": null
   },
   {
     "from": "queued",
     "event": "report:configuring",
-    "to": "configuring"
+    "to": null
   },
   {
     "from": "queued",

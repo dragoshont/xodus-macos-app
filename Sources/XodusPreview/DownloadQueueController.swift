@@ -118,7 +118,10 @@ final class DownloadQueueController: ObservableObject {
 
     private func finish(_ id: UUID, runID: String, terminal: InstallEvent) {
         // A newer run (resume) or a user interruption (pause/cancel) takes precedence over a
-        // run's natural terminal: only apply it when this run is still the active, slot-holding one.
+        // run's natural terminal: only apply it when this run is still the active, slot-holding
+        // one. If a pause/cancel lands in the narrow window after the engine already finished,
+        // the user's intent (paused/cancelled) deliberately wins here and the stale terminal is
+        // dropped — the job is re-driven from its kept partial files on the next resume.
         guard activeRunID[id] == runID else { return }
         activeRunID[id] = nil
         runTasks[id] = nil
