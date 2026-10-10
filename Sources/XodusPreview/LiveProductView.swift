@@ -3,22 +3,6 @@ import SwiftUI
 import XodusManagement
 
 enum GameDetailFacetCopy {
-    static func pcPackage(installed: Bool, compatibility: GameCompatibilityResult?) -> String {
-        if installed { return "Installed" }
-        if let bytes = compatibility?.packageBytes, bytes > 0 {
-            return bytes.formatted(.byteCount(style: .file))
-        }
-        return "Check before install"
-    }
-
-    static func macSupport(installed: Bool, compatibility: GameCompatibilityResult?) -> String {
-        guard let compatibility else { return "Check before install" }
-        if compatibility.supported {
-            return installed ? "Plays on this Mac" : "Supported on this Mac"
-        }
-        return "Not supported on this Mac"
-    }
-
     static func installation(installed: Bool) -> String {
         installed ? "Ready to play" : "Not installed"
     }
@@ -31,7 +15,6 @@ struct LiveProductView: View {
     @ObservedObject var operations: GameOperationsController
     var allowsStartupTasks = true
     var allowsArtworkLoading = true
-    let beginInstall: (PCGame) -> Void
     @EnvironmentObject private var session: LiveSession
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var catalog = LibraryCatalogArtwork.shared
@@ -40,7 +23,7 @@ struct LiveProductView: View {
     private var installed: InstalledGame? { installedLibrary.games.first { $0.storeId == product.id } }
     private var owned: PCGame? { library.representedGames.first { $0.id == product.id } }
     private var gamePass: Bool {
-        product.pcCatalogCandidate && operations.gamePassActive && session.gamePassProductIDs.contains(product.id)
+        session.gamePassProductIDs.contains(product.id)
     }
     private var art: LibraryCatalogArtwork.Images? { catalog.images[product.id] }
     private var details: CatalogDetailFacts? { art?.detail }
@@ -49,9 +32,6 @@ struct LiveProductView: View {
         DiscoverBrowse.canReviewInstall(owned: owned != nil, accessIsCurrent: library.accessIsCurrent,
             gamePass: gamePass, subscriptionActive: operations.gamePassActive,
             pcCandidate: owned != nil || product.pcCatalogCandidate)
-    }
-    private var accessSummary: String {
-        LibraryAccess.summary(owned: owned != nil, catalogMembership: gamePass, current: library.accessIsCurrent)
     }
     private var landscape: [CatalogArtworkReference] {
         art?.landscape ?? product.artwork.filter { $0.role == .hero }
@@ -64,6 +44,7 @@ struct LiveProductView: View {
                 VStack(alignment: .leading, spacing: 28) {
                     header
                     VStack(alignment: .leading, spacing: 28) {
+                        GameOperationProgressView(operations: operations)
                         evidence
                         if let error = catalog.detailErrors[product.id] ?? catalog.error {
                             HStack {
@@ -88,7 +69,6 @@ struct LiveProductView: View {
                             gameInfo(details)
                             requirements(details)
                         }
-                        technicalDetails
                     }.padding(.horizontal, 40).padding(.bottom, 72)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -108,9 +88,8 @@ struct LiveProductView: View {
         .frame(minWidth: 820, idealWidth: 1040, maxWidth: 1200,
                minHeight: 600, idealHeight: 780, maxHeight: 850)
         .task(id: "\(product.id):\(product.market):\(product.language)") {
-            await operations.loadCompatibility(productID: product.id)
             if allowsArtworkLoading {
-                await catalog.load(ids: [product.id], market: product.market, language: product.language)
+                await catalog.loadDetail(id: product.id, market: product.market, language: product.language)
             }
         }
     }
@@ -132,10 +111,6 @@ struct LiveProductView: View {
                                      allowsLoading: allowsArtworkLoading)
                     LibraryGameInformation(access: access, gamePass: gamePass,
                                            facts: art?.facts, xbox: stats.cache?.games[product.id])
-                    if owned != nil && !library.accessIsCurrent {
-                        Label("Saved access · refresh required", systemImage: "clock")
-                            .font(.callout).foregroundStyle(.secondary)
-                    }
                     LibraryGameSizeView(installed: installed, downloadBytes: art?.facts.downloadBytes,
                                         allowsMeasurement: allowsArtworkLoading)
                     if let date = installed?.lastPlayedAt {
@@ -150,24 +125,28 @@ struct LiveProductView: View {
                                                  game: installed, usesGlass: true)
                         } else if let owned {
                             Button {
-                                beginInstall(owned)
+                                Task { await operations.install(owned) }
                             } label: {
-                                Label("Download", systemImage: "icloud.and.arrow.down")
+                                Label("Install", systemImage: "icloud.and.arrow.down")
                             }
                                 .modifier(LibraryActionStyle())
-                                .disabled(!allowsStartupTasks || !operations.canStartMutation || !library.accessIsCurrent)
-                                .help("Download \(product.title)")
-                                .accessibilityLabel("Download \(product.title)")
-                        } else if gamePass {
-                            Button("Check Game Pass access") {
-                                beginInstall(PCGame(product: product))
+                                .disabled(!allowsStartupTasks || !operations.canStartMutation)
+                                .help("Install \(product.title)")
+                                .accessibilityLabel("Install \(product.title)")
+                        } else if canReviewGamePass {
+                            Button {
+                                Task { await operations.install(PCGame(product: product)) }
+                            } label: {
+                                Label("Install", systemImage: "icloud.and.arrow.down")
                             }
                             .modifier(LibraryActionStyle())
                             .disabled(!allowsStartupTasks || !operations.canStartMutation || !canReviewGamePass)
-                            .help("Check package access and Mac support. No download starts before confirmation.")
-                            .accessibilityLabel("Check Game Pass access for \(product.title)")
+                            .help("Install \(product.title)")
+                            .accessibilityLabel("Install \(product.title)")
                         } else {
-                            Text("Access hasn't been verified.").font(.callout).foregroundStyle(.secondary)
+                            Link("View in Microsoft Store",
+                                 destination: URL(string: "https://apps.microsoft.com/detail/\(product.id)")!)
+                                .modifier(LibraryActionStyle())
                         }
                     }.controlSize(.large)
                     if let installed { InstalledPlayError(library: installedLibrary, game: installed) }
@@ -179,13 +158,9 @@ struct LiveProductView: View {
     }
 
     private var evidence: some View {
-        let compatibility = operations.compatibility[product.id]
-        return Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 14) {
-            facet("Access", accessSummary)
-            facet("PC package", GameDetailFacetCopy.pcPackage(installed: installed != nil,
-                                                               compatibility: compatibility))
-            facet("Mac support", GameDetailFacetCopy.macSupport(installed: installed != nil,
-                                                                compatibility: compatibility))
+        Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 14) {
+            if owned != nil { facet("Library", "Owned") }
+            if gamePass { facet("Game Pass", "Included with PC Game Pass") }
             facet("Installation", GameDetailFacetCopy.installation(installed: installed != nil))
         }
         .font(.callout).frame(maxWidth: .infinity, alignment: .leading)
@@ -255,22 +230,6 @@ struct LiveProductView: View {
         } else if details.requirementsVaryByEdition {
             Text("PC requirements vary by edition. Check the publisher's requirements for your edition.")
                 .font(.callout).foregroundStyle(.secondary)
-        }
-    }
-
-    private var technicalDetails: some View {
-        DisclosureGroup("Technical details") {
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(product.editions) { edition in
-                    Text("Edition \(edition.editionID)")
-                    Text("Access: \(edition.entitlement.kind.label)")
-                    Text("PC package: \(edition.installability.kind.label)")
-                    Text("Mac support: \(edition.compatibility.kind.label)")
-                }
-                Text("Product ID: \(product.productID)")
-                Text("Package availability and Mac support are confirmed before installation.")
-            }
-            .font(.caption).foregroundStyle(.secondary).textSelection(.enabled).padding(.top, 12)
         }
     }
 

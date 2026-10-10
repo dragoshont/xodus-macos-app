@@ -15,6 +15,7 @@ enum HeroMotionPolicy {
 private final class HeroMediaPresentation: ObservableObject {
     @Published var visible = false
     @Published var paused = false
+    @Published var hovered = false
     @Published var lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
 }
 
@@ -59,6 +60,7 @@ struct LibraryHeroMedia<Poster: View>: View {
             reduceMotion: reduceMotion, lowPower: presentation.lowPower, active: scenePhase == .active,
             visible: presentation.visible, hasTrailer: trailer != nil,
             supportsViewportVisibility: supportsViewportVisibility)
+            && presentation.hovered
     }
 
     var body: some View {
@@ -71,7 +73,7 @@ struct LibraryHeroMedia<Poster: View>: View {
             if eligible {
                 Button {
                     if playback.error != nil, let trailer {
-                        playback.play(trailer, muted: true, loops: true)
+                        playback.play(trailer, muted: true, loops: true, preview: true)
                     } else { presentation.paused.toggle() }
                 } label: {
                     Image(systemName: playback.error != nil ? "arrow.clockwise"
@@ -85,12 +87,13 @@ struct LibraryHeroMedia<Poster: View>: View {
             }
         }
         .onAppear { presentation.visible = true }
+        .onHover { presentation.hovered = $0 }
         .modifier(HeroScrollVisibility { presentation.visible = $0 })
         .task(id: "\(eligible):\(presentation.paused):\(trailer?.id ?? "")") {
             if eligible, let trailer {
                 if presentation.paused { playback.pause() }
                 else if playback.player != nil { playback.resume() }
-                else { playback.play(trailer, muted: true, loops: true) }
+                else { playback.play(trailer, muted: true, loops: true, preview: true) }
             } else { playback.stop() }
         }
         .onChange(of: trailer?.id) { _, _ in playback.stop(); presentation.paused = false }

@@ -173,20 +173,19 @@ struct PCGameTile: View {
             if let badge {
                 Text(badge.rawValue).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             }
-            GameCompatibilityBadge(operations: operations, productID: game.id, allowsLoading: allowsArtworkLoading)
             if let match = PCGamesController.installedMatch(game, in: installed.games) {
                 InstalledPlayButton(library: installed, operations: operations, game: match)
                 InstalledPlayError(library: installed, game: match)
             } else {
                 Text("Not installed").font(.callout).foregroundStyle(.secondary)
                 Button {
-                    Task { await operations.prepareInstall(game) }
+                    Task { await operations.install(game) }
                 } label: {
-                    Label("Download", systemImage: "icloud.and.arrow.down")
+                    Label("Install", systemImage: "icloud.and.arrow.down")
                 }
-                    .disabled(!operations.canStartMutation || !accessIsCurrent)
-                    .help("Download \(game.title)")
-                    .accessibilityLabel("Download \(game.title)")
+                    .disabled(!operations.canStartMutation)
+                    .help("Install \(game.title)")
+                    .accessibilityLabel("Install \(game.title)")
                     .accessibilityIdentifier("xodus.pcGames.download")
             }
             if let viewDetails { Button("View game", action: viewDetails) }

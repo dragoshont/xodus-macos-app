@@ -327,16 +327,16 @@ enum PreviewChecks {
             check(malformedOptional.developer == nil &&
                   malformedOptional.description == "An original synthetic adventure.",
                   "Malformed optional text is omitted without discarding valid About metadata")
-            let supported = GameCompatibilityResult(storeId: "FIXTURE00002", packageBytes: 3_200_000_000,
-                supported: true, reason: nil, checkedAt: "2026-10-07T00:00:00Z")
-            check(GameDetailFacetCopy.pcPackage(installed: true, compatibility: nil) == "Installed" &&
-                  GameDetailFacetCopy.macSupport(installed: true, compatibility: supported) == "Plays on this Mac" &&
-                  GameDetailFacetCopy.installation(installed: true) == "Ready to play",
-                  "Installed detail facets use compatible consumer package, support and readiness copy")
-            check(GameDetailFacetCopy.pcPackage(installed: false, compatibility: nil) == "Check before install" &&
-                  GameDetailFacetCopy.macSupport(installed: false, compatibility: nil) == "Check before install",
-                  "Unknown package and Mac support use an install-time check instead of evidence terminology")
+            check(GameDetailFacetCopy.installation(installed: true) == "Ready to play",
+                  "Installed details show readiness without a Mac compatibility claim")
+            check(GameDetailFacetCopy.installation(installed: false) == "Not installed",
+                  "Uninstalled details show installation state without requesting internal checks")
             let playback = CatalogTrailerPlayback()
+            check(CatalogTrailerPlayback.previewStart(duration: 120) == 42 &&
+                  CatalogTrailerPlayback.previewStart(duration: 600) == 60 &&
+                  CatalogTrailerPlayback.previewStart(duration: .infinity) == 0 &&
+                  CatalogTrailerPlayback.previewStart(duration: 5) == 0,
+                  "Hero previews skip intros only with a usable duration and a bounded offset")
             check(playback.player == nil && playback.error == nil,
                   "Constructing trailer state never creates an AVPlayer, starts autoplay or fetches a video")
             playback.stop()
@@ -399,9 +399,9 @@ enum PreviewChecks {
             check(!DiscoverBrowse.canReviewInstall(owned: false, accessIsCurrent: false,
                       gamePass: false, subscriptionActive: true, pcCandidate: true),
                   "An active subscription cannot enable arbitrary public-product review")
-            check(!DiscoverBrowse.canReviewInstall(owned: true, accessIsCurrent: false,
+            check(DiscoverBrowse.canReviewInstall(owned: true, accessIsCurrent: false,
                       gamePass: true, subscriptionActive: true, pcCandidate: true),
-                  "Stale held-account access cannot silently broaden into a current Download")
+                  "Saved owned titles keep Install available; the backend validates actual download rights")
             check(!DiscoverBrowse.canReviewInstall(owned: false, accessIsCurrent: false,
                       gamePass: true, subscriptionActive: true, pcCandidate: false),
                   "Console-only catalog membership cannot enable PC package review")

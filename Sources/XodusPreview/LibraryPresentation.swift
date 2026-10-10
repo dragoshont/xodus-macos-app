@@ -198,9 +198,9 @@ struct LibraryHero<Artwork: View, Poster: View, Information: View, Actions: View
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             artwork()
-            LinearGradient(colors: [.clear, Color(nsColor: .windowBackgroundColor).opacity(0.45),
-                                    Color(nsColor: .windowBackgroundColor)],
+            LinearGradient(colors: [.clear, .black.opacity(0.15), .black.opacity(0.8)],
                            startPoint: .top, endPoint: .bottom)
+                .frame(height: 210).allowsHitTesting(false)
             HStack(alignment: .bottom, spacing: 24) {
                 poster().frame(width: 100, height: 150).clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 10))
@@ -211,6 +211,7 @@ struct LibraryHero<Artwork: View, Poster: View, Information: View, Actions: View
                     information()
                     LibraryGlassCluster { actions() }.modifier(LibraryHeroControlSize()).padding(.top, 4)
                 }
+                .foregroundStyle(.white)
             }
             .frame(maxWidth: 900, alignment: .leading)
             .padding(.horizontal, 56).padding(.bottom, 24)
@@ -226,8 +227,8 @@ enum LibraryAccess: String {
     var symbol: String { self == .owned ? "checkmark.seal" : "ticket" }
     var help: String {
         self == .owned
-            ? "Held by this Microsoft account. The service doesn't provide a purchase or acquisition type."
-            : "Listed in the loaded public PC Game Pass catalog. This does not verify this account's access or the selected playable edition. The feed is partial."
+            ? "In your Microsoft PC game library."
+            : "Included in the PC Game Pass catalogue. A subscription is required to install."
     }
     init?(_ game: LibraryGame) {
         if game.owned { self = .owned }

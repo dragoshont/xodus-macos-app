@@ -150,9 +150,7 @@ struct LiveLibraryView: View {
                 }
                 if filter != .gamePass, !localRecords.isEmpty {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("Local installations · access not verified").font(.title2.weight(.semibold))
-                        Text("These records are outside Your Games. Files and saves are preserved. Installation doesn't prove current account access; Play still uses the existing game-service checks.")
-                            .font(.callout).foregroundStyle(.secondary)
+                        Text("Installed on this Mac").font(.title2.weight(.semibold))
                         LazyVGrid(columns: LibraryGridLayout.columns,
                                   alignment: .leading, spacing: 30) {
                             ForEach(localRecords) { game in card(game) }
@@ -197,12 +195,6 @@ struct LiveLibraryView: View {
             HStack {
                 Text("Continue Playing").font(.title2.weight(.semibold))
                 Spacer()
-                Button("Previous game", systemImage: "chevron.left") { moveRecent(by: -1) }
-                    .labelStyle(.iconOnly).buttonBorderShape(.circle)
-                    .disabled(recentIndex == 0)
-                Button("Next game", systemImage: "chevron.right") { moveRecent(by: 1) }
-                    .labelStyle(.iconOnly).buttonBorderShape(.circle)
-                    .disabled(recentIndex >= continuing.count - 1)
                 Button("See All") { filter = .installed; sort = .recentlyPlayed }
                     .accessibilityLabel("Show installed games by last played")
             }
@@ -242,18 +234,6 @@ struct LiveLibraryView: View {
         }
     }
 
-    private var recentIndex: Int {
-        continuing.firstIndex { $0.id == selection.recentGameID } ?? 0
-    }
-
-    private func moveRecent(by offset: Int) {
-        let index = min(max(recentIndex + offset, 0), continuing.count - 1)
-        guard continuing.indices.contains(index) else { return }
-        withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) {
-            selection.recentGameID = continuing[index].id
-        }
-    }
-
     private func open(_ game: LibraryGame) {
         do {
             let productID = game.installed?.storeId ?? game.id
@@ -278,10 +258,6 @@ struct LiveLibraryView: View {
             LibraryGameInformation(access: game.flatMap(LibraryAccess.init),
                                    gamePass: game?.gamePass == true,
                                    facts: facts, xbox: xbox, compact: compact)
-            if game?.owned == true && !library.accessIsCurrent {
-                Label("Saved access · refresh required", systemImage: "clock")
-                    .font(compact ? .caption : .callout).foregroundStyle(.secondary)
-            }
         }
     }
 
@@ -295,13 +271,9 @@ struct LiveLibraryView: View {
                                status: (art.images[artworkID]?.cover ?? game.cover) == nil ? .absent : .available)
         } status: {
             information(id: game.id, compact: true)
-            if !game.owned && !game.gamePass {
-                Label("Access not verified", systemImage: "exclamationmark.shield").font(.caption)
-            }
             if game.installed != nil { Label("Installed", systemImage: "internaldrive").font(.caption) }
             LibraryGameSizeView(installed: game.installed, downloadBytes: art.images[artworkID]?.facts.downloadBytes,
                                 allowsMeasurement: artworkAllowed)
-            GameCompatibilityBadge(operations: operations, productID: artworkID, allowsLoading: allowsStartupTasks)
             if let match = game.installed { InstalledPlayError(library: installed, game: match) }
         } actions: {
             LibraryGlassCluster {
@@ -311,32 +283,34 @@ struct LiveLibraryView: View {
                     InstalledGameActions(library: installed, operations: operations, game: match, usesGlass: true)
                 } else if game.owned {
                     Button {
-                        if let pc = game.pc { Task { await operations.prepareInstall(pc) } }
+                        if let pc = game.pc { Task { await operations.install(pc) } }
                         else if let product = game.product {
-                            Task { await operations.prepareInstall(PCGame(product: product)) }
+                            Task { await operations.install(PCGame(product: product)) }
                         }
                     } label: {
-                        Label("Download", systemImage: "icloud.and.arrow.down")
+                        Label("Install", systemImage: "icloud.and.arrow.down")
                     }
                     .labelStyle(.iconOnly)
-                    .help("Download \(game.title)")
+                    .help("Install \(game.title)")
                     .modifier(LibraryActionStyle(primary: false))
-                    .disabled(!operations.canStartMutation || !library.accessIsCurrent)
-                    .accessibilityLabel("Download \(game.title)")
+                    .disabled(!allowsStartupTasks || !operations.canStartMutation)
+                    .accessibilityLabel("Install \(game.title)")
                     .accessibilityIdentifier("xodus.pcGames.download")
                 } else if game.gamePass {
-                    Button("Check Game Pass access") {
+                    Button {
                         if let product = game.product {
-                            Task { await operations.prepareInstall(PCGame(product: product)) }
+                            Task { await operations.install(PCGame(product: product)) }
                         }
+                    } label: {
+                        Label("Install", systemImage: "icloud.and.arrow.down")
                     }
                     .modifier(LibraryActionStyle(primary: false))
                     .disabled(!allowsStartupTasks || !operations.canStartMutation ||
                         !DiscoverBrowse.canReviewInstall(owned: false, accessIsCurrent: false,
                             gamePass: true, subscriptionActive: operations.gamePassActive,
                             pcCandidate: game.product?.pcCatalogCandidate == true))
-                    .help("Check package access and Mac support. No download starts before confirmation.")
-                    .accessibilityLabel("Check Game Pass access for \(game.title)")
+                    .help("Install \(game.title)")
+                    .accessibilityLabel("Install \(game.title)")
                     .accessibilityIdentifier("xodus.pcGames.install")
                 }
             }

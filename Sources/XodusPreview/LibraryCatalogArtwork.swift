@@ -21,7 +21,32 @@ final class LibraryCatalogArtwork: ObservableObject {
     private var requested = Set<String>()
     private var pending: Task<Void, Never>?
     private var scope: String?
+    private let transport: any PCGamesTransport
     private let logger = Logger(subsystem: "io.github.dragoshont.xodus", category: "catalog-detail")
+
+    init(transport: any PCGamesTransport = PCGamesHTTP()) {
+        self.transport = transport
+    }
+
+    func loadDetail(id: String, market: String, language: String) async {
+        let nextScope = "\(PCGamesClient.market(market)):\(PCGamesClient.language(language).lowercased())"
+        guard PCGamesClient.validProductID(id) else { return }
+        if scope == nextScope, images[id]?.detail != nil { return }
+        if scope != nextScope {
+            scope = nextScope
+            images = [:]
+            detailErrors = [:]
+            requested = []
+        }
+        let detailLoader = LibraryCatalogArtwork(transport: transport)
+        await detailLoader.load(ids: [id], market: market, language: language)
+        guard !Task.isCancelled, scope == nextScope else { return }
+        if let image = detailLoader.images[id] {
+            images[id] = image
+            requested.insert(id)
+        }
+        detailErrors[id] = detailLoader.detailErrors[id] ?? detailLoader.error
+    }
 
     func load(ids: [String], market: String, language: String) async {
         if let pending { await pending.value }
@@ -36,7 +61,6 @@ final class LibraryCatalogArtwork: ObservableObject {
         guard !ids.isEmpty else { return }
         let task = Task {
             do {
-                let transport = PCGamesHTTP()
                 for start in stride(from: 0, to: ids.count, by: 20) {
                     try Task.checkCancellation()
                     let batch = Array(ids[start..<min(start + 20, ids.count)])
@@ -48,6 +72,7 @@ final class LibraryCatalogArtwork: ObservableObject {
                     var request = URLRequest(url: endpoint)
                     request.httpShouldHandleCookies = false
                     let response = try await transport.send(request)
+                    guard scope == nextScope else { return }
                     guard response.status == 200 else { throw PCGamesError.http(response.status) }
                     let products = try JSONDecoder().decode(PCGamesCatalog.self, from: response.data).Products
                     guard products.count <= batch.count, Set(products.map(\.ProductId)).count == products.count,

@@ -69,7 +69,8 @@ enum LibraryAccessChecks {
             gamePass: [consoleOverlap], active: true).first?.gamePass == false,
               "SDD-LIB-03: console catalogue flag cannot become PC Game Pass membership")
         let refusal = GameScriptError.failed(11).localizedDescription
-        check(refusal.contains("authorization") && refusal.contains("accounts match")
+        check(refusal.contains("account") && refusal.contains("sign-in")
+              && refusal.contains("try again")
               && !refusal.contains("don't own") && !refusal.contains("isn't supported"),
               "SDD-LIB-07: authorization failure is distinct from ownership and unsupported package")
         check(GameScriptError.failed(12).localizedDescription != refusal,

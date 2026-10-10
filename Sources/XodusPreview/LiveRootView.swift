@@ -174,6 +174,10 @@ struct LiveRootView: View {
             do { try await Task.sleep(for: .milliseconds(250)) }
             catch { return }
             await session.loadCatalogOnEntry(state.query)
+            if state.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               session.supports(.discover), !session.catalogStopped {
+                await session.loadGamePassCatalog()
+            }
         }
         .sheet(isPresented: $state.showingAccount, onDismiss: {
             state.showingSetup = false
@@ -185,21 +189,10 @@ struct LiveRootView: View {
             LiveAccountView()
 #endif
         }
-        .sheet(item: $session.selectedProduct, onDismiss: {
-            if let game = state.pendingDetailInstall {
-                state.pendingDetailInstall = nil
-                if startupAllowed {
-                    Task { await state.gameOperations.prepareInstall(game) }
-                }
-            }
-        }) { product in
+        .sheet(item: $session.selectedProduct) { product in
             LiveProductView(product: product, library: state.pcGames,
                             installedLibrary: state.installedGames, operations: state.gameOperations,
-                            allowsStartupTasks: startupAllowed, allowsArtworkLoading: libraryArtworkAllowed) { game in
-                guard startupAllowed, state.gameOperations.canStartMutation else { return }
-                state.pendingDetailInstall = game
-                session.selectedProduct = nil
-            }
+                            allowsStartupTasks: startupAllowed, allowsArtworkLoading: libraryArtworkAllowed)
         }
         .background { GameOperationPresentation(operations: state.gameOperations) }
         .background {
@@ -328,6 +321,9 @@ struct LiveActivityView: View {
             }
             .padding(.horizontal, 30).padding(.vertical, 24)
             List {
+                if operations.installingDirectly {
+                    Section("Current") { GameOperationProgressView(operations: operations) }
+                }
                 if let operation = operations.operation {
                     Section("Current") {
                         HStack(alignment: .top, spacing: 16) {

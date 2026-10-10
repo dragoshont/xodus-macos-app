@@ -30,16 +30,23 @@ final class CatalogTrailerPlayback: ObservableObject {
     @Published private(set) var error: String?
     private var observation: AnyCancellable?
     private var endObservation: AnyCancellable?
+    private var wantsPlayback = false
 
-    func pause() { player?.pause() }
-    func resume() { player?.play() }
+    func pause() { wantsPlayback = false; player?.pause() }
+    func resume() { wantsPlayback = true; player?.play() }
 
-    func play(_ trailer: CatalogTrailer, muted: Bool = false, loops: Bool = false) {
+    static func previewStart(duration: Double) -> Double {
+        guard duration.isFinite, duration > 10 else { return 0 }
+        return min(60, duration * 0.35)
+    }
+
+    func play(_ trailer: CatalogTrailer, muted: Bool = false, loops: Bool = false, preview: Bool = false) {
         stop()
+        wantsPlayback = true
         let asset = AVURLAsset(url: trailer.url, options: [AVURLAssetHTTPCookiesKey: []])
         let item = AVPlayerItem(asset: asset)
         if muted {
-            item.preferredPeakBitRate = 1_500_000
+            item.preferredPeakBitRate = 6_000_000
             item.preferredForwardBufferDuration = 5
         }
         let player = AVPlayer(playerItem: item)
@@ -48,21 +55,27 @@ final class CatalogTrailerPlayback: ObservableObject {
             if status == .failed {
                 self?.player?.pause()
                 self?.error = "The trailer couldn't be played. Try again or view the screenshots."
+            } else if status == .readyToPlay, preview, self?.player === player {
+                let start = Self.previewStart(duration: item.duration.seconds)
+                player.seek(to: CMTime(seconds: start, preferredTimescale: 600))
+                if self?.wantsPlayback == true { player.play() }
             }
         }
         if loops {
             endObservation = NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime, object: item)
                 .receive(on: DispatchQueue.main).sink { [weak self] _ in
                     guard let player = self?.player, player.currentItem === item else { return }
-                    player.seek(to: .zero)
-                    player.play()
+                    let start = preview ? Self.previewStart(duration: item.duration.seconds) : 0
+                    player.seek(to: CMTime(seconds: start, preferredTimescale: 600))
+                    if self?.wantsPlayback == true { player.play() }
                 }
         }
         self.player = player
-        player.play()
+        if !preview { player.play() }
     }
 
     func stop() {
+        wantsPlayback = false
         observation = nil
         endObservation = nil
         player?.pause()

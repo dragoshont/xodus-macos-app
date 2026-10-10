@@ -36,6 +36,7 @@ final class GameOperationsController: ObservableObject {
     @Published var uninstallConsent: InstalledGame?
     @Published private(set) var preparingConsent = false
     @Published private(set) var checkingCompatibility = false
+    @Published private(set) var installingDirectly = false
     @Published private(set) var compatibility: [String: GameCompatibilityResult] = [:]
     @Published private(set) var compatibilityErrors: [String: String] = [:]
     @Published private(set) var operation: GameOperationRecord?
@@ -65,13 +66,17 @@ final class GameOperationsController: ObservableObject {
     private var setupRefreshPending = false
     private var restored = false
     private var terminating = false
+    private var directInstallCancelled = false
     private var installedObservation: AnyCancellable?
 
     var isBusy: Bool {
         operation != nil || checkingCompatibility || gamePassBusy || setupBusy || installed.stoppingGameID != nil
     }
     var hasDownloadStatus: Bool {
-        operation != nil || error != nil || notice != nil
+        operation != nil || error != nil || notice != nil || installingDirectly
+    }
+    var presentedInstallConsent: GameInstallConsent? {
+        installingDirectly ? nil : installConsent
     }
     var canSignIn: Bool {
         !serviceBusy && !isBusy && !recoveryRequired && !installed.mutationActive
@@ -82,7 +87,8 @@ final class GameOperationsController: ObservableObject {
             && !installed.editing && !installed.choosing && !terminating
     }
     var canQuit: Bool {
-        mutationTask == nil && compatibilityTask == nil && gamePassTask == nil && stopTask == nil
+        !installingDirectly && !preparingConsent
+            && mutationTask == nil && compatibilityTask == nil && gamePassTask == nil && stopTask == nil
             && setupTask == nil && !serviceSigningIn
     }
     var canConfirmInstall: Bool {
@@ -389,6 +395,23 @@ final class GameOperationsController: ObservableObject {
         }
     }
 
+    func install(_ game: PCGame) async {
+        guard canStartMutation, !installingDirectly else { return }
+        installingDirectly = true
+        directInstallCancelled = false
+        defer { installingDirectly = false }
+        await prepareInstall(game)
+        guard !directInstallCancelled else { installConsent = nil; return }
+        guard let consent = installConsent else { return }
+        if consent.compatibility?.supported == true {
+            confirmInstall(consent)
+        } else {
+            error = consent.checkError ?? consent.compatibility?.explanation
+                ?? "This game couldn't be installed. Try again."
+            installConsent = nil
+        }
+    }
+
     func prepareInstall(_ game: PCGame, repairing: InstalledGame? = nil) async {
         guard canStartMutation, PCGamesClient.validProductID(game.id) else { return }
         if let repairing {
@@ -401,7 +424,7 @@ final class GameOperationsController: ObservableObject {
             let destination = try repairing.map { URL(fileURLWithPath: $0.folder, isDirectory: true) }
                 ?? paths.destination(title: game.title, productID: game.id)
             let free = try await Task.detached { try GameScriptFiles.availableSpace(for: destination) }.value
-            guard !terminating, !isBusy else { return }
+            guard !terminating, !isBusy, !(installingDirectly && directInstallCancelled) else { return }
             if repairing == nil, installed.games.contains(where: { $0.folder == destination.path }) {
                 throw GameScriptError.invalidDestination
             }
@@ -464,6 +487,7 @@ final class GameOperationsController: ObservableObject {
     }
 
     func cancelInstallConsent() async {
+        if installingDirectly { directInstallCancelled = true }
         installConsent = nil
         guard let runID = compatibilityRunID else { return }
         await mutationRunner.cancel(runID: runID)

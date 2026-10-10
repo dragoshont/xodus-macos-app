@@ -96,6 +96,7 @@ enum NativeChecks {
                 return failures == 0
             }
             try await InstalledGameChecks.run(check: check)
+            try await CatalogDetailLoadingChecks.run(check: check)
             try await PCGamesChecks.run(check: check)
             try await GameOperationChecks.run(check: check)
             func observationFailure(_ message: String, code: String = "AUTH_INVALID",

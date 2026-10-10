@@ -116,7 +116,7 @@ enum NativeUIChecks {
                         market: "US", language: "en-US", source: "synthetic-detail-layout", pcCandidate: true)
                     let detail = NSHostingView(rootView: LiveProductView(product: product, library: state.pcGames,
                         installedLibrary: state.installedGames, operations: state.gameOperations,
-                        allowsStartupTasks: false, allowsArtworkLoading: false, beginInstall: { _ in })
+                        allowsStartupTasks: false, allowsArtworkLoading: false)
                         .environmentObject(session))
                     detail.sizingOptions = []
                     detail.appearance = NSAppearance(named: appearance)
@@ -300,7 +300,7 @@ enum NativeUIChecks {
             for size in [CGSize(width: 820, height: 600), CGSize(width: 1040, height: 780), CGSize(width: 1200, height: 850)] {
                 let host = NSHostingView(rootView: LiveProductView(product: product, library: state.pcGames,
                     installedLibrary: state.installedGames, operations: state.gameOperations,
-                    allowsStartupTasks: false, allowsArtworkLoading: false, beginInstall: { _ in })
+                    allowsStartupTasks: false, allowsArtworkLoading: false)
                     .environmentObject(session))
                 host.sizingOptions = []
                 host.frame = CGRect(origin: .zero, size: size)

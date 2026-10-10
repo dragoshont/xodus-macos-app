@@ -1,24 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import SwiftUI
 
-struct GameCompatibilityBadge: View {
-    @ObservedObject var operations: GameOperationsController
-    let productID: String
-    var allowsLoading = true
-
-    var body: some View {
-        Group {
-            if let result = operations.compatibility[productID] {
-                Text(result.badge).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-            } else if let error = operations.compatibilityErrors[productID] {
-                Text(error).font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .task(id: productID) { if allowsLoading { await operations.loadCompatibility(productID: productID) } }
-    }
-}
-
 struct GameServiceAccountView: View {
     @ObservedObject var operations: GameOperationsController
     @ObservedObject var library: PCGamesController
@@ -146,6 +128,11 @@ struct GameOperationProgressView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if operations.installingDirectly {
+                ProgressView("Preparing installation…")
+                    .accessibilityIdentifier("xodus.install.preparing")
+                Button("Cancel") { Task { await operations.cancelInstallConsent() } }
+            }
             if let operation = operations.operation {
                 Text(operation.title).font(.headline)
                 if operations.recoveryRequired {
@@ -233,13 +220,12 @@ struct GameInstallConsentView: View {
                     }
                     LabeledContent("Staging and expansion", value: "Calculated during setup")
                 }
-                Section("Mac support") {
+                Section {
                     if operations.checkingCompatibility {
-                        ProgressView("Checking the selected PC package…").controlSize(.small)
+                        ProgressView("Preparing installation…").controlSize(.small)
                             .accessibilityIdentifier("xodus.install.checking")
-                    } else if let result = consent.compatibility {
-                        Label(result.explanation,
-                              systemImage: result.supported ? "checkmark.circle" : "exclamationmark.circle")
+                    } else if let result = consent.compatibility, !result.supported {
+                        Label(result.explanation, systemImage: "exclamationmark.circle")
                             .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("xodus.install.compatibility")
                     } else if let error = consent.checkError {
@@ -297,7 +283,8 @@ struct GameOperationPresentation: View {
 
     var body: some View {
         Color.clear
-            .sheet(item: $operations.installConsent) { consent in
+            .sheet(item: Binding(get: { operations.presentedInstallConsent },
+                                set: { operations.installConsent = $0 })) { consent in
                 GameInstallConsentView(operations: operations, consent: consent)
                     .interactiveDismissDisabled(operations.checkingCompatibility)
             }

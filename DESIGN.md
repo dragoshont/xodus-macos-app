@@ -17,11 +17,30 @@ to restyle Discover, detail, installation consent or Downloads.
 
 ## Surfaces
 
+**Streamlined gamer flow (10 October, owner-directed):** cards offer Install or
+open details; installed games offer Play. Choosing Install is the user's download
+intent and starts the existing guarded installation without a second confirmation
+sheet. Entitlement/package/storage validation remains internal and runs before
+transfer. Preparing, progress, cancellation and actual failures remain visible;
+no success or compatibility is invented. Repair/removal retain their separate
+protected flows. Game Pass membership comes from the catalogue, separately from
+the subscription/account's actual download rights.
+
+Details present existing title/art immediately and request selected-game metadata
+independently of bulk catalogue artwork. They do not read package checks first
+or expose access-verification/PC-package/Mac-support diagnostics. Hero trailers
+are muted hover previews, respecting all existing motion/power/visibility fences.
+Known-duration previews begin 35 percent into the trailer (at most 60 seconds);
+unknown/short duration starts normally. Discover paging uses centered clickable
+dots, no previous/next hero controls and no scrollbar. A bottom-only dark scrim
+protects text without washing out the entire clip.
+
 **Launcher feedback follow-up (10 October, candidate):** retain each tab's search
 and the loaded Discover continuation rather than clearing the catalogue on
 revisit. Discover features a manually controlled horizontal hero carousel with
-up to five real catalogue titles; Continue Playing has native previous/next
-controls. Only the selected, visible hero may stream a muted trailer. Account,
+up to five real catalogue titles, selected through centered dots; Continue Playing
+uses native trackpad scrolling with hidden indicators. Only the hovered,
+selected, visible hero may stream a muted trailer. Account,
 detail and consent sheets, game launch, inactive scenes, Reduce Motion and Low
 Power Mode suppress hero playback. Pausing retains the current player rather
 than restarting the trailer. Missing trailers retain artwork.
@@ -51,8 +70,10 @@ column count, not clip controls or invent horizontal page scrolling.
 Use a labels-hidden native segmented All / Installed / Owned / Game Pass Picker,
 with its accessibility label retained, and a fixed-size trailing native Sort
 Menu. Exact Store IDs join installed, account and Game Pass evidence once.
-Importing never proves purchase; feed presence only participates with active
-saved subscription status. The Library loads a known saved PC collection once
+Importing never proves purchase; catalogue membership is independent of
+subscription status, while installation still requires actual download rights.
+Discover fills the available Game Pass catalogue in the background without a
+per-game access check. The Library loads a known saved PC collection once
 on appearance only after presence/migration checks succeed. Migration remains
 explicit, errors preserve the last complete collection, and Refresh is in the
 toolbar with Command-R. PC-library Sign out belongs in Account, not above the
@@ -84,11 +105,12 @@ The user approved the native regular-glass treatment. This source freeze does
 not authorize installing/replacing the shipping app or forcing opaque chrome.
 
 Play remains launch-only for a registered installed entry. An uninstalled owned
-or Game Pass title says Install, opens compatibility/space/consent review and
-never auto-plays on completion. Public positive PC package
+or eligible Game Pass title says Install, performs package/space validation
+internally, and never auto-plays on completion. Public positive PC package
 `MaxDownloadSizeInBytes` maxima appear as approximate download estimates, not
 verified architecture/edition/package authorization. The install review uses
-the backend's selected `packageBytes` or explicit unknown-size copy instead.
+the backend's selected `packageBytes` or explicit unknown-size copy instead when
+reviewing a repair; a new installation goes directly to progress.
 Installed sizes are metadata-only filesystem measurements off the main thread,
 with symlinks excluded, hardlinks counted once, overflow checks and a
 100,000-entry/15-second traversal bound. Allocated and logical bytes are kept

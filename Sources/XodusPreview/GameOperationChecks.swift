@@ -244,7 +244,7 @@ enum GameOperationChecks {
             {"storeId":"\(game.id)","packageBytes":null,"supported":true,"reason":null,"checkedAt":"2026-10-07T00:00:00.123Z"}
             """
         let compatible = try GameCompatibilityResult.parse(Data(compatibilityData.utf8), productID: game.id)
-        check(compatible.supported && compatible.packageBytes == nil && compatible.badge == "Plays on Mac",
+        check(compatible.supported && compatible.packageBytes == nil && compatible.badge == "Available to install",
               "B3: Support receipt preserves unknown size and validates fractional ISO dates")
         for invalid in [
             compatibilityData.replacingOccurrences(of: game.id, with: "OTHER0000001"),
@@ -514,13 +514,13 @@ enum GameOperationChecks {
                   "B3: \(mode) leaves consent visible, Install disabled and no held mutation")
             if mode == "checkunsupported" {
                 check(operations.installConsent?.compatibility?.explanation == "Neutral package is not supported."
-                      && operations.compatibility[game.id]?.badge == "Not supported on Mac",
+                      && operations.compatibility[game.id]?.badge == "Installation unavailable",
                       "B3: Unsupported package shows the exact bounded product reason and negative badge")
             } else {
                 check(operations.installConsent?.checkError != nil && operations.log != nil,
                       "B3: Failed/mismatched check surfaces failure and generated-run Show log")
                 if mode == "check11" {
-                    check(operations.installConsent?.checkError?.contains("authorization") == true
+                    check(operations.installConsent?.checkError?.contains("account") == true
                           && operations.compatibility[game.id] == priorSupport
                           && game.acquisitionKind == .unknown,
                           "SDD-LIB-07: actual package refusal preserves collection and prior support facts")
@@ -530,6 +530,11 @@ enum GameOperationChecks {
             check(!FileManager.default.fileExists(atPath: root.appendingPathComponent("arguments").path),
                   "B3: Failed/unsupported consent cannot invoke installation")
             await operations.cancelInstallConsent()
+            await operations.install(game)
+            check(operations.installConsent == nil && !operations.installingDirectly
+                  && operations.error != nil && !installed.mutationActive
+                  && !FileManager.default.fileExists(atPath: root.appendingPathComponent("arguments").path),
+                  "Direct Install refuses \(mode) before transfer and surfaces a real failure without a check sheet")
         }
         try writeMode("checkslow")
         let checking = Task { await operations.prepareInstall(game) }
@@ -547,6 +552,17 @@ enum GameOperationChecks {
         check(!operations.checkingCompatibility && !installed.mutationActive && operations.canQuit
               && operations.installConsent == nil && installed.games.isEmpty,
               "B3: Consent cancellation joins its check and releases the fence without registration or game files")
+        let directCheck = Task { await operations.install(game) }
+        try await wait { operations.checkingCompatibility }
+        check(operations.installingDirectly && operations.presentedInstallConsent == nil
+              && operations.hasDownloadStatus && !operations.canQuit,
+              "Direct Install has cancellable preparation without presenting an internal-check sheet")
+        await operations.install(game)
+        await operations.cancelInstallConsent()
+        await directCheck.value
+        check(!operations.installingDirectly && !installed.mutationActive && operations.installConsent == nil
+              && !FileManager.default.fileExists(atPath: root.appendingPathComponent("arguments").path),
+              "Cancelling direct preparation joins the check and prevents a duplicate or subsequent download")
         func install(_ candidate: PCGame = game) async throws {
             await operations.prepareInstall(candidate)
             guard let consent = operations.installConsent else { throw GameScriptError.invalidDestination }
@@ -595,7 +611,10 @@ enum GameOperationChecks {
               && operations.log != nil && installed.games.isEmpty,
               "S5 SIGTERM joins the script, consumes code 14 and keeps partial files unregistered")
         try writeMode("success")
-        try await install()
+        await operations.install(game)
+        check(operations.operation != nil && operations.installConsent == nil && !operations.installingDirectly,
+              "One Install action starts the checked download without a second user confirmation")
+        await operations.waitForMutation()
         guard let imported = installed.games.first else { throw GameScriptError.invalidReceipt }
         check(imported.storeId == game.id && imported.title == "Fixture Game"
               && imported.folder == consent.destination.path && imported.launcher == launcher.path

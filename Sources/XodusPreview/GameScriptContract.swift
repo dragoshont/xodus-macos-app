@@ -40,8 +40,8 @@ enum GameScriptError: Error, LocalizedError, Equatable {
         case .failed(let code):
             switch code {
             case 10: "There isn't enough free space. Free up storage and try again."
-            case 11: "Package authorization or game sign-in couldn't be confirmed. Check that your PC Store and game-service accounts match, then verify the selected edition. This doesn't change your library ownership or Mac support."
-            case 12: "This game's package isn't supported on Mac yet."
+            case 11: "This account couldn't download the game. Check your game sign-in and subscription, then try again."
+            case 12: "This game can't be installed with Xodus yet."
             case 13: "The download couldn't be verified. Try installing again."
             case 14: "Installation cancelled. Partial files are kept; installing again resumes the download."
             case 21: "Xodus couldn't find a running environment for this game. Check the log."
@@ -117,9 +117,9 @@ struct GameCompatibilityResult: Decodable, Equatable, Sendable {
     let reason: String?
     let checkedAt: String
 
-    var badge: String { supported ? "Plays on Mac" : "Not supported on Mac" }
+    var badge: String { supported ? "Available to install" : "Installation unavailable" }
     var explanation: String {
-        supported ? "Plays on Mac" : reason ?? "This game isn't supported on Mac yet."
+        supported ? "Available to install" : reason ?? "This game can't be installed with Xodus yet."
     }
     var checkedDate: Date? {
         Self.parseDate(checkedAt)

@@ -25,7 +25,7 @@ enum DiscoverBrowse {
     static func canReviewInstall(owned: Bool, accessIsCurrent: Bool, gamePass: Bool,
                                  subscriptionActive: Bool, pcCandidate: Bool) -> Bool {
         guard pcCandidate else { return false }
-        if owned { return accessIsCurrent }
+        if owned { return true }
         return gamePass && subscriptionActive
     }
 }
@@ -204,7 +204,7 @@ struct LiveCatalogView: View {
 
     private var featuredCarousel: some View {
         GeometryReader { geometry in
-            ZStack(alignment: .bottomTrailing) {
+            ZStack(alignment: .bottom) {
                 ScrollView(.horizontal) {
                     LazyHStack(spacing: 0) {
                         ForEach(featuredGames) { product in
@@ -217,18 +217,24 @@ struct LiveCatalogView: View {
                 .scrollIndicators(.hidden).scrollTargetBehavior(.paging)
                 .scrollPosition(id: $selection.featuredID)
                 if featuredGames.count > 1 {
-                    HStack(spacing: 12) {
-                        Button("Previous featured game", systemImage: "chevron.left") { moveFeatured(-1) }
-                            .disabled(featuredIndex == 0)
-                        Text("\(featuredIndex + 1) of \(featuredGames.count)")
-                            .font(.caption).monospacedDigit()
-                            .accessibilityLabel("Featured game \(featuredIndex + 1) of \(featuredGames.count)")
-                        Button("Next featured game", systemImage: "chevron.right") { moveFeatured(1) }
-                            .disabled(featuredIndex == featuredGames.count - 1)
+                    HStack(spacing: 10) {
+                        ForEach(featuredGames) { product in
+                            Button {
+                                withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
+                                    selection.featuredID = product.id
+                                }
+                            } label: {
+                                Circle().fill(selection.featuredID == product.id ? Color.white : Color.white.opacity(0.55))
+                                    .frame(width: 7, height: 7)
+                                    .frame(width: 24, height: 24)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Show \(product.title)")
+                            .accessibilityAddTraits(selection.featuredID == product.id ? .isSelected : [])
+                        }
                     }
-                    .buttonBorderShape(.circle)
-                    .modifier(LibraryActionStyle(primary: false))
-                    .padding(24)
+                    .padding(.bottom, 12)
                 }
             }
         }
@@ -240,18 +246,6 @@ struct LiveCatalogView: View {
         }
     }
 
-    private var featuredIndex: Int {
-        featuredGames.firstIndex { $0.id == selection.featuredID } ?? 0
-    }
-
-    private func moveFeatured(_ offset: Int) {
-        let index = featuredIndex + offset
-        guard featuredGames.indices.contains(index) else { return }
-        withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
-            selection.featuredID = featuredGames[index].id
-        }
-    }
-
     private func hero(_ game: LibraryGame, selected: Bool) -> some View {
         ZStack(alignment: .bottomLeading) {
             LibraryHeroMedia(trailer: art.images[game.id]?.detail?.trailers.first,
@@ -260,9 +254,9 @@ struct LiveCatalogView: View {
                 LibraryLandscapeView(references: landscape(game), installed: game.installed,
                                      allowsLoading: allowsArtworkLoading)
             }
-            LinearGradient(colors: [.clear, Color(nsColor: .windowBackgroundColor).opacity(0.5),
-                                    Color(nsColor: .windowBackgroundColor)],
+            LinearGradient(colors: [.clear, .black.opacity(0.15), .black.opacity(0.8)],
                            startPoint: .top, endPoint: .bottom)
+                .frame(height: 210)
                 .allowsHitTesting(false)
             VStack(alignment: .leading, spacing: 14) {
                 LibraryLogoTitle(title: game.title, references: art.images[game.id]?.logos ?? [],
@@ -280,6 +274,7 @@ struct LiveCatalogView: View {
             }
             .frame(maxWidth: 800, alignment: .leading)
             .padding(.horizontal, 56).padding(.bottom, 28)
+            .foregroundStyle(.white)
         }
         .frame(height: 340).clipped().modifier(LibraryBackgroundExtension())
         .accessibilityElement(children: .contain)
@@ -335,7 +330,6 @@ struct LiveCatalogView: View {
             if game.installed != nil { Label("Installed", systemImage: "internaldrive").font(.caption) }
             LibraryGameSizeView(installed: game.installed, downloadBytes: facts[game.id]?.downloadBytes,
                                 allowsMeasurement: allowsArtworkLoading)
-            GameCompatibilityBadge(operations: operations, productID: game.id, allowsLoading: allowsStartupTasks)
             if let match = game.installed { InstalledPlayError(library: installed, game: match) }
             if game.product?.freshness == "cached" { Text("Offline details").font(.caption) }
         } actions: {
@@ -358,23 +352,23 @@ struct LiveCatalogView: View {
                                 usesGlass: true, prominent: primary)
         } else if canReviewInstall(game) {
             Button {
-                if let pc = game.pc { Task { await operations.prepareInstall(pc) } }
-                else if let product = game.product { Task { await operations.prepareInstall(PCGame(product: product)) } }
+                if let pc = game.pc { Task { await operations.install(pc) } }
+                else if let product = game.product { Task { await operations.install(PCGame(product: product)) } }
             } label: {
                 if game.owned {
                     if primary {
-                        Label("Download", systemImage: "icloud.and.arrow.down")
+                        Label("Install", systemImage: "icloud.and.arrow.down")
                     } else {
                         Image(systemName: "icloud.and.arrow.down").accessibilityHidden(true)
                     }
                 } else {
-                    Text("Check Game Pass access")
+                    Label("Install", systemImage: "icloud.and.arrow.down")
                 }
             }
             .modifier(LibraryActionStyle(primary: primary))
-            .help(game.owned ? "Review download for \(game.title)" : "Check package access and Mac support for \(game.title). No download starts before confirmation.")
+            .help("Install \(game.title)")
             .disabled(!allowsStartupTasks || !operations.canStartMutation)
-            .accessibilityLabel(game.owned ? "Download \(game.title)" : "Check Game Pass access for \(game.title)")
+            .accessibilityLabel("Install \(game.title)")
             .accessibilityIdentifier(game.owned ? "xodus.pcGames.download" : "xodus.pcGames.install")
         }
     }
