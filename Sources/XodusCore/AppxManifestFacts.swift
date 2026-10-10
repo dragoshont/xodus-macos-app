@@ -18,7 +18,7 @@ public struct AppxManifestFacts: Equatable, Sendable {
             throw AppxManifestError.invalid
         }
         return Self(targetDeviceFamilies: reader.families, fullTrust: reader.fullTrust,
-                    uwpApplication: reader.uwpApplication)
+                    uwpApplication: reader.uwpApplication && !reader.classicApplication)
     }
 }
 
@@ -29,6 +29,7 @@ private final class AppxManifestReader: NSObject, XMLParserDelegate {
     var families: [String] = []
     var fullTrust = false
     var uwpApplication = false
+    var classicApplication = false
     var applications = 0
     var invalid = false
     private var path: [String] = []
@@ -81,14 +82,19 @@ private final class AppxManifestReader: NSObject, XMLParserDelegate {
                 invalid = true; parser.abortParsing(); return
             }
             if behavior == "windowsApp" && trust == "mediumIL"
-                || (behavior == "win32App" || behavior == "packagedClassicApp") && trust == "appContainer" {
+                || behavior == "win32App" && trust == "appContainer" {
                 invalid = true; parser.abortParsing(); return
             }
-            if entryPoint == "Windows.FullTrustApplication" || trust == "mediumIL"
-                || behavior == "win32App" || behavior == "packagedClassicApp" {
+            let legacyClassic = ["windows.fulltrustapplication", "windows.partialtrustapplication"]
+                .contains(entryPoint?.lowercased() ?? "")
+            if legacyClassic || behavior == "win32App" || behavior == "packagedClassicApp" {
+                classicApplication = true
+            }
+            if entryPoint?.lowercased() == "windows.fulltrustapplication" || trust == "mediumIL" {
                 fullTrust = true
-            } else if behavior == "windowsApp" || trust == "appContainer"
-                || (behavior == nil && trust == nil && entryPoint?.isEmpty == false) {
+            } else if !legacyClassic && behavior != "win32App" && behavior != "packagedClassicApp"
+                && (behavior == "windowsApp" || trust == "appContainer"
+                    || (behavior == nil && trust == nil && entryPoint?.isEmpty == false)) {
                 uwpApplication = true
             }
         }

@@ -48,6 +48,8 @@ Bounded Appx manifests derive application-model facts from application entry
 points and runtime/trust declarations, not `Windows.Universal` device targeting.
 Desktop-only UWP applications are included; full-trust/hybrid applications are
 classified Appx. Malformed/unreadable manifests are inspection errors.
+Classic applications with the documented `appContainer` trust combination or
+legacy `windows.partialTrustApplication` entry point remain Appx, not UWP.
 Recognized application-model attributes must resolve to the Microsoft UAP10
 namespace; unrelated extension attributes/elements cannot invent an application
 model. Prefix rebinding is tracked, and ambiguous or contradictory recognized
