@@ -200,17 +200,6 @@ struct PCGamesTokens: Sendable {
     let refresh: String
 }
 
-enum PCGameAcquisitionKind: String, Sendable {
-    case unknown, purchased, subscription
-
-    // A purchase outranks a subscription grant for the same product.
-    static func merged(_ current: Self?, _ next: Self) -> Self {
-        guard let current else { return next }
-        if current == .purchased || next == .purchased { return .purchased }
-        return current == .subscription || next == .subscription ? .subscription : .unknown
-    }
-}
-
 struct PCGame: Identifiable, Sendable {
     let id: String
     let title: String

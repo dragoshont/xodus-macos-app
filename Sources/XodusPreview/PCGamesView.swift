@@ -171,7 +171,10 @@ struct PCGameTile: View {
             Text(game.title).font(.headline)
                 .lineLimit(2).frame(minHeight: 40, alignment: .topLeading)
             if let badge {
-                Text(badge.rawValue).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Text(accessIsCurrent
+                     ? (game.acquisitionKind == .subscription ? "Subscription (plan unknown)" : badge.rawValue)
+                     : "Saved library - refresh required")
+                    .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             }
             if let match = PCGamesController.installedMatch(game, in: installed.games) {
                 InstalledPlayButton(library: installed, operations: operations, game: match)
@@ -183,7 +186,7 @@ struct PCGameTile: View {
                 } label: {
                     Label("Install", systemImage: "icloud.and.arrow.down")
                 }
-                    .disabled(!operations.canStartMutation)
+                    .disabled(!accessIsCurrent || !operations.canStartMutation)
                     .help("Install \(game.title)")
                     .accessibilityLabel("Install \(game.title)")
                     .accessibilityIdentifier("xodus.pcGames.download")

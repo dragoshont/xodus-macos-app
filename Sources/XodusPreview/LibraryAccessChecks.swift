@@ -24,9 +24,11 @@ enum LibraryAccessChecks {
             artwork: nil, acquisitionKind: .subscription)], products: [], gamePass: [], active: false)
         check(granted.first.flatMap(LibraryAccess.init) == .subscription
               && granted.first.map(LibraryAccess.badges) == [.subscription]
+              && granted.first?.owned == false && granted.first?.eligibility == .gamePass
+              && LibraryGame.visible(granted, query: "", filter: .owned, sort: .title).isEmpty
               && PCGameAcquisitionKind.merged(.subscription, .purchased) == .purchased
               && PCGameAcquisitionKind.merged(nil, .subscription) == .subscription,
-              "Game Pass-granted library games show the Game Pass mark instead of Owned; a purchase wins")
+              "M10: current subscription-held titles qualify without entering Owned or inventing a plan")
         let page = try JSONDecoder().decode(PCGamesCollectionPage.self, from: Data("""
             {"items":[{"productId":"FIXTURE00005","productKind":"Game","status":"Active","acquisitionType":"Recurring"},
             {"productId":"FIXTURE00006","productKind":"Game","status":"Active","acquisitionType":"Single"},
@@ -51,6 +53,8 @@ enum LibraryAccessChecks {
         let locals = LibraryGame.localRecords(installed: [local], qualified: collection, query: "", sort: .title)
         check(locals.count == 1 && locals[0].installed == local && !locals[0].owned && !locals[0].gamePass,
               "SDD-LIB-04: live local-record seam preserves exact registry data without access badges")
+        check(collection.first?.eligibility == .owned && locals[0].eligibility == .installedUnknown,
+              "M10: eligibility classifies held access as owned and installed-only as installedUnknown")
         check(LibraryGame.continuing(collection, launchableIDs: [local.id]).isEmpty,
               "SDD-LIB-05: local unknown access cannot become hero or Continue Playing")
         let installedHeld = InstalledGame(id: local.id, title: local.title, identityName: local.identityName,
@@ -63,6 +67,8 @@ enum LibraryAccessChecks {
         check(both.count == 1 && both[0].owned && both[0].gamePass
               && LibraryAccess.badges(both[0]) == [.owned, .gamePass],
               "SDD-LIB-02: held access and explicitly public Game Pass membership remain independent overlapping facts")
+        check(both[0].eligibility == .owned,
+              "M10: eligibility prefers owned entitlement when a title is both owned and Game Pass")
         check(LibraryGame.visible(both, query: "", filter: .owned, sort: .title).count == 1
               && LibraryGame.visible(both, query: "", filter: .gamePass, sort: .title).count == 1,
               "SDD-LIB-05: Owned and Game Pass catalog filters overlap without double counting")
@@ -72,6 +78,8 @@ enum LibraryAccessChecks {
               && LibraryAccess.badges(catalogue[0]) == [.owned, .gamePass]
               && catalogue.last?.owned == false,
               "Game Pass catalogue includes unowned PC members and independently marks overlapping held access")
+        check(catalogue.last?.eligibility == nil,
+              "M10: public Game Pass catalogue membership is not account eligibility")
         check(LibraryGame.visible(catalogue, query: "Public PC", filter: .gamePass, sort: .title).count == 1,
               "Game Pass filter searches the catalogue instead of only the owned-library overlap")
         check(LibraryGame.continuing(both, launchableIDs: [local.id]).map(\.id) == [local.id]
@@ -82,6 +90,15 @@ enum LibraryAccessChecks {
         check(LibraryGame.collection(installed: [], owned: [held], products: [],
             gamePass: [consoleOverlap], active: true).first?.gamePass == false,
               "SDD-LIB-03: console catalogue flag cannot become PC Game Pass membership")
+        let stale = LibraryGame.collection(installed: [installedHeld], owned: [held],
+            products: [], gamePass: [overlap], active: true, accessIsCurrent: false)
+        check(stale.isEmpty && LibraryGame.localRecords(installed: [installedHeld],
+            qualified: stale, query: "", sort: .title).first?.eligibility == .installedUnknown,
+              "M10: stale held evidence leaves Your Games and preserves the qualified local installation")
+        check(GameDetailFacetCopy.access(acquisition: .subscription, current: true) == "Subscription (plan unknown)"
+              && GameDetailFacetCopy.access(acquisition: .purchased, current: false).contains("refresh required")
+              && GameDetailFacetCopy.access(acquisition: nil, current: true) == "Access not verified",
+              "M10: detail facets never relabel subscription, stale or absent access as current Owned")
         let refusal = GameScriptError.failed(11).localizedDescription
         check(refusal.contains("account") && refusal.contains("sign-in")
               && refusal.contains("try again")

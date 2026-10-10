@@ -42,6 +42,7 @@ struct LibraryGame: Identifiable {
     let product: CatalogProduct?
     let owned: Bool
     let gamePass: Bool
+    var accessIsCurrent = true
     var cover: CatalogArtworkReference? {
         if let art = pc?.artwork, [.boxArt, .poster].contains(art.role),
            let width = art.width, let height = art.height, height > width { return art }
@@ -68,7 +69,9 @@ struct LibraryGame: Identifiable {
     }
 
     static func collection(installed: [InstalledGame], owned: [PCGame], products: [CatalogProduct],
-                           gamePass: [CatalogProduct], active: Bool) -> [Self] {
+                           gamePass: [CatalogProduct], active: Bool,
+                           accessIsCurrent: Bool = true) -> [Self] {
+        guard accessIsCurrent else { return [] }
         var result: [Self] = []
         var seen = Set<String>()
         let catalog = Dictionary(products.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
@@ -82,13 +85,13 @@ struct LibraryGame: Identifiable {
             let id = game.storeId.isEmpty ? game.id.uuidString : game.storeId
             guard let entitlement = held[id], seen.insert(id).inserted else { continue }
             result.append(Self(id: id, title: game.title, installed: game, pc: entitlement,
-                               product: catalog[id] ?? pass[id], owned: true,
-                               gamePass: active && pass[id] != nil))
+                               product: catalog[id] ?? pass[id], owned: entitlement.acquisitionKind != .subscription,
+                               gamePass: entitlement.acquisitionKind == .subscription || pass[id] != nil))
         }
         for game in owned where seen.insert(game.id).inserted {
             result.append(Self(id: game.id, title: game.title, installed: nil, pc: game,
-                               product: catalog[game.id] ?? pass[game.id], owned: true,
-                               gamePass: active && pass[game.id] != nil))
+                               product: catalog[game.id] ?? pass[game.id], owned: game.acquisitionKind != .subscription,
+                               gamePass: game.acquisitionKind == .subscription || pass[game.id] != nil))
         }
         return result
     }
@@ -111,7 +114,8 @@ struct LibraryGame: Identifiable {
         var seen = Set<String>()
         return products.filter { $0.pcCatalogCandidate && seen.insert($0.id).inserted }.map {
             Self(id: $0.id, title: $0.title, installed: local[$0.id], pc: held[$0.id],
-                 product: $0, owned: held[$0.id] != nil, gamePass: true)
+                 product: $0, owned: held[$0.id].map { $0.acquisitionKind != .subscription } ?? false,
+                 gamePass: true)
         }
     }
 
@@ -124,6 +128,13 @@ struct LibraryGame: Identifiable {
                 }
                 return $0.id.uuidString < $1.id.uuidString
             }
+    }
+
+    var eligibility: LibraryEligibility? {
+        LibraryEligibility.evaluate(
+            entitlement: pc?.acquisitionKind ?? (owned ? .unknown : nil),
+            accessIsCurrent: accessIsCurrent && (pc != nil || owned),
+            verifiedGamePassAccess: false, installed: installed != nil)
     }
 
     static func visible(_ games: [Self], query: String, filter: LibraryFilter, sort: LibrarySort) -> [Self] {
@@ -232,23 +243,27 @@ struct LibraryHero<Artwork: View, Poster: View, Information: View, Actions: View
 }
 
 enum LibraryAccess: String {
-    case owned = "Owned", gamePass = "Game Pass catalog", subscription = "Game Pass"
+    case owned = "Owned", gamePass = "Game Pass catalog", subscription = "Subscription"
     var symbol: String { self == .owned ? "checkmark.seal" : "ticket" }
     var help: String {
         switch self {
         case .owned: "In your Microsoft PC game library."
-        case .subscription: "In your PC library through your PC Game Pass subscription."
+        case .subscription: "Current subscription grant in your PC library. The provider and plan are not identified."
         case .gamePass: "Included in the PC Game Pass catalogue. A subscription is required to install."
         }
     }
     init?(_ game: LibraryGame) {
-        if game.owned { self = game.pc?.acquisitionKind == .subscription ? .subscription : .owned }
-        else if game.gamePass { self = .gamePass }
-        else { return nil }
+        switch game.eligibility {
+        case .owned: self = .owned
+        case .gamePass: self = .subscription
+        case .installedUnknown, nil:
+            guard game.gamePass else { return nil }
+            self = .gamePass
+        }
     }
     static func badges(_ game: LibraryGame) -> [Self] {
-        if game.owned, game.pc?.acquisitionKind == .subscription { return [.subscription] }
-        return (game.owned ? [.owned] : []) + (game.gamePass ? [.gamePass] : [])
+        if game.eligibility == .gamePass { return [.subscription] }
+        return (game.eligibility == .owned ? [.owned] : []) + (game.gamePass ? [.gamePass] : [])
     }
     static func summary(owned: Bool, catalogMembership: Bool, current: Bool) -> String {
         let access = owned ? (current ? "Owned" : "Saved Owned · refresh required") : "Access not verified"
@@ -260,7 +275,13 @@ struct LibraryAccessBadge: View {
     let access: LibraryAccess
     var compact = false
     var body: some View {
-        if access != .owned {
+        if access == .subscription {
+            Label(access.rawValue, systemImage: "ticket")
+                .font((compact ? Font.caption : .callout).weight(.semibold))
+                .padding(.horizontal, compact ? 8 : 10).padding(.vertical, 4)
+                .modifier(LibraryBadgeMaterial())
+                .accessibilityLabel(access.rawValue)
+        } else if access == .gamePass {
             Label("Game Pass", systemImage: "xbox.logo")
                 .font((compact ? Font.caption : .callout).weight(.semibold))
                 .foregroundStyle(.white)

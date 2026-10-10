@@ -25,7 +25,7 @@ enum DiscoverBrowse {
     static func canReviewInstall(owned: Bool, accessIsCurrent: Bool, gamePass: Bool,
                                  subscriptionActive: Bool, pcCandidate: Bool) -> Bool {
         guard pcCandidate else { return false }
-        if owned { return true }
+        if owned && accessIsCurrent { return true }
         return gamePass && subscriptionActive
     }
 }
@@ -168,15 +168,18 @@ struct LiveCatalogView: View {
         LibraryGame(id: product.id, title: product.title,
             installed: installed.games.first { $0.storeId == product.id },
             pc: results.ownedGame(for: product.id), product: product,
-            owned: results.badge(for: product.id) == .owned,
-            gamePass: session.gamePassProductIDs.contains(product.id))
+            owned: results.ownedGame(for: product.id).map { $0.acquisitionKind != .subscription } ?? false,
+            gamePass: session.gamePassProductIDs.contains(product.id),
+            accessIsCurrent: library.accessIsCurrent)
     }
 
     private func game(_ owned: PCGame) -> LibraryGame {
         LibraryGame(id: owned.id, title: owned.title,
             installed: installed.games.first { $0.storeId == owned.id }, pc: owned,
-            product: session.products.first { $0.id == owned.id }, owned: true,
-            gamePass: session.gamePassProductIDs.contains(owned.id))
+            product: session.products.first { $0.id == owned.id },
+            owned: owned.acquisitionKind != .subscription,
+            gamePass: session.gamePassProductIDs.contains(owned.id),
+            accessIsCurrent: library.accessIsCurrent)
     }
 
     private func open(_ game: LibraryGame) {
@@ -195,7 +198,7 @@ struct LiveCatalogView: View {
     }
 
     private func canReviewInstall(_ game: LibraryGame) -> Bool {
-        DiscoverBrowse.canReviewInstall(owned: game.owned, accessIsCurrent: library.accessIsCurrent,
+        DiscoverBrowse.canReviewInstall(owned: game.pc != nil, accessIsCurrent: library.accessIsCurrent,
             gamePass: game.gamePass, subscriptionActive: operations.gamePassActive,
             pcCandidate: game.pc != nil || game.product?.pcCatalogCandidate == true)
     }
@@ -357,7 +360,7 @@ struct LiveCatalogView: View {
                 if let pc = game.pc { Task { await operations.install(pc) } }
                 else if let product = game.product { Task { await operations.install(PCGame(product: product)) } }
             } label: {
-                if game.owned {
+                if game.pc != nil {
                     if primary {
                         Label("Install", systemImage: "icloud.and.arrow.down")
                     } else {

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import SwiftUI
+import XodusManagement
 
 struct GameServiceAccountView: View {
     @ObservedObject var operations: GameOperationsController
@@ -7,6 +8,7 @@ struct GameServiceAccountView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            AccountTierView(entitlements: operations.accountEntitlements(library: library))
             GroupBox("Microsoft PC games") {
                 VStack(alignment: .leading, spacing: 10) {
                     if library.hasSavedSignIn {
@@ -119,6 +121,46 @@ struct GamePassAccountView: View {
                         .accessibilityIdentifier("xodus.gamePass.showLog")
                 }
             }
+        }
+    }
+}
+
+struct AccountTierView: View {
+    let entitlements: AccountEntitlements
+
+    var body: some View {
+        GroupBox("Account tier") {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Text(entitlements.summary).font(.headline)
+                        .accessibilityIdentifier("xodus.account.tier")
+                    Spacer()
+                }
+                if entitlements.signedIn {
+                    HStack(spacing: 8) {
+                        ForEach(entitlements.tiers, id: \.label) { tier in
+                            Label(tier.label, systemImage: tier.symbol)
+                                .font(.callout).padding(.horizontal, 10).padding(.vertical, 4)
+                                .background(.quaternary, in: Capsule())
+                                .accessibilityIdentifier("xodus.account.tier.badge")
+                        }
+                    }
+                }
+                if entitlements.gamePassPlanUndetermined {
+                    Text("Your PC library contains a current subscription grant. Its provider and plan aren't identified by the collection.")
+                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                if !entitlements.accessIsCurrent, entitlements.signedIn {
+                    Text("Load or refresh your PC library to verify account access. Saved sign-in and stale library data don't establish a tier.")
+                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                } else if entitlements.signedIn, entitlements.gamePass == .unknown {
+                    Text("The PC-library account's subscription status isn't verified. The separate game-service probe doesn't identify the same account.")
+                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                Text("Owned games stay in your library. Game Pass access requires an active subscription and is checked separately.")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.top, 2).frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }

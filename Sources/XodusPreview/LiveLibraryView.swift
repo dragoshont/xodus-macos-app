@@ -31,14 +31,15 @@ struct LiveLibraryView: View {
     private var collection: [LibraryGame] {
         LibraryGame.collection(installed: installed.games, owned: library.representedGames,
                                products: session.products, gamePass: session.gamePassProducts,
-                               active: operations.gamePassActive)
+                               active: operations.gamePassActive, accessIsCurrent: library.accessIsCurrent)
     }
     private var visible: [LibraryGame] {
         LibraryGame.visible(filter == .gamePass ? gamePassCatalog : collection,
                             query: query, filter: filter, sort: sort)
     }
     private var gamePassCatalog: [LibraryGame] {
-        LibraryGame.gamePassCatalog(installed: installed.games, owned: library.representedGames,
+        LibraryGame.gamePassCatalog(installed: installed.games,
+                                    owned: library.accessIsCurrent ? library.representedGames : [],
                                     products: session.gamePassProducts)
     }
     private var continuing: [InstalledGame] {
@@ -289,7 +290,7 @@ struct LiveLibraryView: View {
     private var precheckIDs: [String] {
         let shown = heroGames + (filter == .gamePass ? [] : Array(visible.prefix(12)))
         var seen = Set<String>()
-        return shown.filter { $0.installed == nil && $0.owned && seen.insert($0.id).inserted }.map(\.id)
+        return shown.filter { $0.installed == nil && $0.pc != nil && seen.insert($0.id).inserted }.map(\.id)
     }
 
     private var continuePlaying: some View {
@@ -377,6 +378,9 @@ struct LiveLibraryView: View {
                 }
                 if game.installed != nil {
                     Label("Installed", systemImage: "internaldrive")
+                    if game.eligibility == .installedUnknown {
+                        Label("Access not verified", systemImage: "questionmark.circle")
+                    }
                 } else if let reason = unsupportedReason(game) {
                     Label("Not on Mac yet", systemImage: "laptopcomputer.slash").help(reason)
                 } else {
@@ -392,9 +396,9 @@ struct LiveLibraryView: View {
                     InstalledPlayButton(library: installed, operations: operations, game: match,
                                         usesGlass: true, prominent: false)
                     InstalledGameActions(library: installed, operations: operations, game: match, usesGlass: true)
-                } else if game.owned, unsupportedReason(game) != nil {
+                } else if game.pc != nil, unsupportedReason(game) != nil {
                     EmptyView()
-                } else if game.owned {
+                } else if game.pc != nil {
                     Button {
                         if let pc = game.pc { Task { await operations.install(pc) } }
                         else if let product = game.product {
