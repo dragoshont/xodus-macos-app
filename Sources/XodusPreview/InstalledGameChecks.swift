@@ -504,5 +504,17 @@ enum InstalledGameChecks {
         check(nonDefault.playErrors[selected.id] == nil
               && recordedSelector == "gptk4\n",
               "M3: Observed non-default override reaches the launch script, not only the pure decision")
+        let uiState = AppState()
+        let uiSession = LiveSession()
+        let uiOperations = GameOperationsController(installed: nonDefault)
+        let liveLibrary = NSHostingView(rootView: LiveLibraryView(library: uiState.pcGames,
+            installed: nonDefault, operations: uiOperations, query: "",
+            allowsStartupTasks: false, allowsArtworkLoading: false, allowsHeroAnimation: false,
+            browse: {}, recentActivity: {}).environmentObject(uiSession))
+        liveLibrary.sizingOptions = []
+        liveLibrary.frame = CGRect(x: 0, y: 0, width: 820, height: 874)
+        liveLibrary.layoutSubtreeIfNeeded()
+        check(liveLibrary.window == nil && uiSession.phase == .disconnected && !uiOperations.isBusy,
+              "M1/M3: The real live Library lays out a detected installation and override without network or process startup")
     }
 }

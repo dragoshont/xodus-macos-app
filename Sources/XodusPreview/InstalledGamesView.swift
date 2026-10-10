@@ -157,16 +157,17 @@ struct InstalledEngineOverride: View {
         .accessibilityIdentifier("xodus.installed.engineOverride")
     }
 
-    struct InstalledPackageTypeLabel: View {
-        let game: InstalledGame
+}
 
-        var body: some View {
-            if let type = game.packageType, type != .unknown {
-                Text("Detected: \(type.label)")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .help("Format detected from installed files, not a compatibility verdict.")
-                    .accessibilityIdentifier("xodus.installed.packageType")
-            }
+struct InstalledPackageTypeLabel: View {
+    let game: InstalledGame
+
+    var body: some View {
+        if let type = game.packageType, type != .unknown {
+            Text("Detected: \(type.label)")
+                .font(.caption).foregroundStyle(.secondary)
+                .help("Format detected from installed files, not a compatibility verdict.")
+                .accessibilityIdentifier("xodus.installed.packageType")
         }
     }
 }
