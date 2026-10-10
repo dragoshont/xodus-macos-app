@@ -23,13 +23,11 @@ enum PackageInspector {
             if name.hasSuffix(".eappx") || name.hasSuffix(".eappxbundle") {
                 evidence.encryptedPackageMarker = true
             }
-            if name.hasSuffix(".msixvc") {
-                evidence.hasMSIXVCHeader = evidence.hasMSIXVCHeader ||
-                    PackageType.hasMSIXVCHeader(try readPrefix(entry, maximumBytes: 4096))
+            if name.hasSuffix(".msixvc"), !evidence.hasMSIXVCHeader {
+                evidence.hasMSIXVCHeader = PackageType.hasMSIXVCHeader(try readPrefix(entry, maximumBytes: 4096))
             }
-            if name.hasSuffix(".exe") {
-                evidence.hasWin32Executable = evidence.hasWin32Executable ||
-                    PackageType.hasPEHeader(try readPrefix(entry, maximumBytes: 1_048_576))
+            if name.hasSuffix(".exe"), !evidence.hasWin32Executable {
+                evidence.hasWin32Executable = PackageType.hasPEHeader(try readPrefix(entry, maximumBytes: 1_048_576))
             }
         }
         guard manifests.count <= 1 else { throw InstalledGameError.invalidConfig }
