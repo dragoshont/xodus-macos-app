@@ -614,6 +614,24 @@ enum GameOperationChecks {
         check(!operations.isBusy && !installed.mutationActive && operations.error == GameScriptError.failed(14).localizedDescription
               && operations.log != nil && installed.games.isEmpty,
               "S5 SIGTERM joins the script, consumes code 14 and keeps partial files unregistered")
+        // M7: a queue-originated pause/cancel also stops the engine with code 14, but unlike an
+        // interactive cancel it must NOT leave the shared failure banner populated — the per-job
+        // queue UI is authoritative, so the Downloads screen must not show a spurious failure for
+        // a job the user merely paused or cancelled.
+        try writeMode("slow")
+        let queuedDestination = try paths.destination(title: game.title, productID: game.id).path
+        let queuedRecord = GameOperationRecord(id: InstalledGamesController.runID(), kind: .install,
+            productID: game.id, title: game.title, destination: queuedDestination, installedID: nil)
+        let queuedRun = Task { await operations.runQueuedOperation(queuedRecord, onProgress: { _ in }) }
+        try await wait { operations.operation?.id == queuedRecord.id && operations.progress?.bytesDone == 20 }
+        check(operations.operation?.id == queuedRecord.id && installed.mutationActive
+              && operations.error == nil,
+              "M7 a queued install reserves the single mutation slot through the shared controller")
+        await operations.cancelQueuedRun(runID: queuedRecord.id)
+        let queuedOutcome = await queuedRun.value
+        check(queuedOutcome == .cancel && operations.error == nil && operations.failureCode == nil
+              && !installed.mutationActive && installed.games.isEmpty,
+              "M7 a queue-originated code-14 stop clears the shared failure banner and registers nothing")
         try writeMode("success")
         await operations.install(game)
         check(operations.operation != nil && operations.installConsent == nil && !operations.installingDirectly,

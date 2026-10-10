@@ -52,6 +52,18 @@ enum DownloadQueueChecks {
         func stop(runID: String) async { await engine.stop(runID) }
     }
 
+    /// A driver whose `stop` lands too late to interrupt the run: it models the race where the
+    /// engine already finished on disk, so the in-flight run still resolves with its natural
+    /// terminal and the stop request is a no-op.
+    struct LateStopDriver: InstallQueueDriver {
+        let engine: Engine
+        func run(runID: String, job: InstallJob, destination: String,
+                 onProgress: @escaping @Sendable (InstallActivity, InstallProgress) async -> Void) async -> InstallEvent {
+            await engine.begin(runID, onProgress)
+        }
+        func stop(runID: String) async { /* engine already finishing; stop lands too late */ }
+    }
+
     static func run(check: (Bool, String) -> Void) async throws {
         let engine = Engine()
         let controller = DownloadQueueController(driver: Driver(engine: engine), maxConcurrent: 1)
@@ -113,5 +125,21 @@ enum DownloadQueueChecks {
         await engine.failRun(runC, code: 11)
         try await settle { controller.job(id: c)?.phase == .failed }
         check(controller.job(id: c)?.failureCode == 11, "A failed engine result records the exit code on the job")
+
+        // Race: the engine finishes naturally at the instant the user taps Pause. The stop
+        // request arrives too late (the run already resolved with .complete), so the controller
+        // must let that natural terminal win instead of stranding the job in `paused` — otherwise
+        // a later resume would re-install an already-installed title.
+        let raceEngine = Engine()
+        let raceController = DownloadQueueController(driver: LateStopDriver(engine: raceEngine), maxConcurrent: 1)
+        let x = raceController.enqueue(productID: "9NBLGGH1234X", title: "Xray", destination: "/games/Xray")
+        try await settle { await raceEngine.activeRuns.count == 1 }
+        let runX = await raceEngine.activeRuns.first ?? ""
+        raceController.pause(x)
+        check(raceController.job(id: x)?.phase == .paused, "Pause is recorded while the engine run is still open")
+        await raceEngine.complete(runX)
+        try await settle { raceController.job(id: x)?.phase == .completed }
+        check(raceController.job(id: x)?.phase == .completed,
+              "A natural completion delivered after a late pause wins, so the job is not stranded paused")
     }
 }

@@ -117,15 +117,22 @@ final class DownloadQueueController: ObservableObject {
     }
 
     private func finish(_ id: UUID, runID: String, terminal: InstallEvent) {
-        // A newer run (resume) or a user interruption (pause/cancel) takes precedence over a
-        // run's natural terminal: only apply it when this run is still the active, slot-holding
-        // one. If a pause/cancel lands in the narrow window after the engine already finished,
-        // the user's intent (paused/cancelled) deliberately wins here and the stale terminal is
-        // dropped — the job is re-driven from its kept partial files on the next resume.
+        // A newer run (resume) always supersedes a stale terminal, so a run that is no longer
+        // the active one is discarded outright.
         guard activeRunID[id] == runID else { return }
         activeRunID[id] = nil
         runTasks[id] = nil
-        guard queue.job(id: id)?.phase.occupiesSlot == true else { return }
+        // A run's *natural* terminal (.complete/.fail) reflects work the engine already did on
+        // disk, so it must win even if a pause/cancel raced in just after the engine finished —
+        // otherwise a completed install would show as paused and be re-driven on resume. An
+        // interrupted terminal (.cancel, emitted when the engine is stopped) stays absorbed: the
+        // user's paused/cancelled intent is already recorded and the job keeps its partial files.
+        let isNaturalTerminal: Bool
+        switch terminal {
+        case .complete, .fail: isNaturalTerminal = true
+        default: isNaturalTerminal = false
+        }
+        guard queue.job(id: id)?.phase.occupiesSlot == true || isNaturalTerminal else { return }
         launch(queue.apply(terminal, to: id))
     }
 

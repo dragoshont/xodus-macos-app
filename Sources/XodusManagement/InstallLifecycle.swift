@@ -129,8 +129,12 @@ public enum InstallLifecycle {
             switch event {
             case .resume: return .queued
             case .cancel: return .cancelled
+            // A paused job's engine run may still resolve on its own if the stop request
+            // raced a natural terminal: honour both outcomes symmetrically so a finished
+            // install is never re-run and a failed one is never silently retried.
+            case .complete: return .completed
             case .fail: return .failed
-            case .start, .report, .pause, .complete: return nil
+            case .start, .report, .pause: return nil
             }
         case .completed, .cancelled, .failed:
             return nil

@@ -707,7 +707,19 @@ final class GameOperationsController: ObservableObject {
         begin(record)
         guard operation?.id == record.id else { return .fail(code: -1) }
         await mutationTask?.value
-        if let code = failureCode { return code == 14 ? .cancel : .fail(code: code) }
+        if let code = failureCode {
+            guard code != 14 else {
+                // A queue-originated pause/cancel stops the engine with code 14 (partial files
+                // kept). That is the user's intent, not a failure, and the per-job queue UI
+                // already reflects it — so clear the shared operation banner that `complete()`
+                // populated instead of surfacing a spurious "download stopped / failed" notice.
+                failureCode = nil
+                error = nil
+                log = nil
+                return .cancel
+            }
+            return .fail(code: code)
+        }
         // `begin` resets `error` to nil for each run, so a non-nil value here means
         // the async install task threw (journal/mutation failure) without setting a
         // numeric failure code. Report it as a failure instead of a false `.complete`.
