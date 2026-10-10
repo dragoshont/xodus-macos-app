@@ -472,6 +472,14 @@ enum InstalledGameChecks {
         peHeader[0x3c] = 64
         peHeader.replaceSubrange(64..<68, with: Data([0x50, 0x45, 0, 0]))
         try peHeader.write(to: routingFolder.appendingPathComponent("game.exe"))
+        let placeholder = routingFolder.appendingPathComponent("partial.eappx")
+        try Data().write(to: placeholder)
+        check(try PackageInspector.detect(folder: routingFolder) == .win32,
+              "M1: Empty encrypted-download placeholders cannot override verified PE evidence")
+        try Data("unrelated data".utf8).write(to: placeholder)
+        check(try PackageInspector.detect(folder: routingFolder) == .win32,
+              "M1: A filename without encrypted-header content cannot override verified PE evidence")
+        try FileManager.default.removeItem(at: placeholder)
         await routing.importGame(folder: routingFolder, launcher: routingLauncher)
         check(routing.games.first?.packageType == .win32 && routing.games.first?.engineOverride == .gptk4,
               "M1/M3: Reimport refreshes changed package facts without dropping the user's override")
@@ -516,5 +524,51 @@ enum InstalledGameChecks {
         liveLibrary.layoutSubtreeIfNeeded()
         check(liveLibrary.window == nil && uiSession.phase == .disconnected && !uiOperations.isBusy,
               "M1/M3: The real live Library lays out a detected installation and override without network or process startup")
+        let interleaving = PackageInspectionInterleaving()
+        let concurrent = InstalledGamesController(store: routingStore, defaultEngine: { nil },
+            detectAvailability: { RunnerAvailability([.gptk4]) },
+            inspectPackage: { try interleaving.inspect($0) })
+        let suspendedLoad = Task { await concurrent.load() }
+        defer { interleaving.release() }
+        try await wait { interleaving.isWaiting }
+        await concurrent.importGame(folder: routingFolder, launcher: selectorLauncher)
+        check(concurrent.games.first?.packageType == .msixvc,
+              "M1: A new reimport observation completes while the old load observation is suspended")
+        interleaving.release()
+        await suspendedLoad.value
+        let afterConcurrentImport = try await routingStore.load()
+        check(concurrent.games.first?.packageType == .msixvc
+              && concurrent.packageErrors[routed.id] == nil
+              && concurrent.launchableIDs.contains(routed.id)
+              && afterConcurrentImport.first?.packageType == .msixvc,
+              "M1: Superseded observations cannot overwrite newer format, errors, launchability or persisted facts")
     }
+}
+
+private final class PackageInspectionInterleaving: @unchecked Sendable {
+    private let lock = NSLock()
+    private let resume = DispatchSemaphore(value: 0)
+    private var first = true
+    private var waiting = false
+
+    var isWaiting: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return waiting
+    }
+
+    func inspect(_ folder: URL) throws -> PackageType {
+        lock.lock()
+        let suspend = first
+        first = false
+        if suspend { waiting = true }
+        lock.unlock()
+        if suspend {
+            guard resume.wait(timeout: .now() + 10) == .success else { throw InstalledGameError.invalidConfig }
+            return .win32
+        }
+        return try PackageInspector.detect(folder: folder)
+    }
+
+    func release() { resume.signal() }
 }

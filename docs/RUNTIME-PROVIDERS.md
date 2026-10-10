@@ -36,14 +36,30 @@ observed 4096-byte MSFT-XVD header in a regular `.msixvc` file (including the
 existing streaming marker). A loose GDK build with validated DOS/PE headers is
 Win32; otherwise absent format evidence is Unknown. Filenames alone do not
 establish PE or MSIXVC, and directories/symlinks are ignored.
+Encrypted Appx recognition requires an `EXPH` signature and a fully available,
+bounded header; empty `.eappx`/`.eappxbundle` download placeholders are not
+evidence. Other encrypted-container signatures remain Unknown until validated.
+This is signature/header recognition, not decryption or integrity validation.
+Header reads check descriptor/path identity, size and modification/change times
+before accepting an observation. MSFT-XVD recognition likewise does not verify
+the complete container, entitlement or payload.
 
 Bounded Appx manifests derive application-model facts from application entry
 points and runtime/trust declarations, not `Windows.Universal` device targeting.
 Desktop-only UWP applications are included; full-trust/hybrid applications are
 classified Appx. Malformed/unreadable manifests are inspection errors.
+Classic applications with the documented `appContainer` trust combination or
+legacy `windows.partialTrustApplication` entry point remain Appx, not UWP.
+Recognized application-model attributes must resolve to the Microsoft UAP10
+namespace; unrelated extension attributes/elements cannot invent an application
+model. Prefix rebinding is tracked, and ambiguous or contradictory recognized
+declarations are refused.
 Observations are refreshed on load and reimport, including prior Unknown
 records; temporary unavailability preserves the last saved type and exposes an
 error. Reimport changes format facts without discarding a user engine override.
+Observation generations fence asynchronous refreshes; an old load inspection
+cannot replace newer reimport observations. Store updates additionally compare
+the observed import date before writing refreshed package facts.
 No UWP/EAppx support status or installation policy is changed.
 
 Official, separately installed CrossOver is the first-release dependency.

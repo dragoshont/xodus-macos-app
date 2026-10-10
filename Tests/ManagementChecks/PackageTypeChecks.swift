@@ -47,7 +47,10 @@ extension Checks {
             check(PackageType.classify(evidence) == expected, "Actual manifest XML: \(name)")
         }
         for xml in ["", "<Other/>", "<Package/>", "<Package><Applications>",
-                    "<!DOCTYPE Package [<!ENTITY e 'expanded'>]><Package><Applications><Application EntryPoint='Fixture.App'/></Applications>&e;</Package>"] {
+                    "<!DOCTYPE Package [<!ENTITY e 'expanded'>]><Package><Applications><Application EntryPoint='Fixture.App'/></Applications>&e;</Package>",
+                    "<Package xmlns='urn:foreign'><Applications><Application EntryPoint='Fake.App'/></Applications></Package>",
+                    "<Package xmlns:m='http://schemas.microsoft.com/appx/manifest/uap/windows10/10' xmlns:n='http://schemas.microsoft.com/appx/manifest/uap/windows10/10'><Applications><Application m:RuntimeBehavior='windowsApp' n:RuntimeBehavior='win32App'/></Applications></Package>",
+                    "<Package xmlns:m='http://schemas.microsoft.com/appx/manifest/uap/windows10/10'><Applications><Application m:RuntimeBehavior='windowsApp' m:TrustLevel='mediumIL'/></Applications></Package>"] {
             do { _ = try AppxManifestFacts.parse(Data(xml.utf8)); check(false, "Invalid manifest refused") }
             catch { check(error is AppxManifestError, "Invalid manifest refused") }
         }
@@ -65,5 +68,12 @@ extension Checks {
         check(PackageType.hasPEHeader(pe), "Win32 file evidence requires DOS and PE headers")
         pe[0x3f] = 0xff
         check(!PackageType.hasPEHeader(pe), "Out-of-bounds PE header offset is refused")
+        var encrypted = Data(repeating: 0, count: 64)
+        encrypted.replaceSubrange(0..<4, with: Data("EXPH".utf8))
+        encrypted[4] = 64
+        check(PackageType.hasEncryptedAppxHeader(encrypted), "Encrypted Appx requires content signature and bounded header")
+        encrypted[4] = 65
+        check(!PackageType.hasEncryptedAppxHeader(encrypted), "Truncated encrypted Appx header is not format evidence")
+        check(!PackageType.hasEncryptedAppxHeader(Data()), "Empty encrypted-package placeholder is not evidence")
     }
 }

@@ -21,7 +21,10 @@ enum PackageInspector {
             if name == "microsoftgame.config" { evidence.hasMicrosoftGameConfig = true }
             if name == "appxmanifest.xml" { manifests.append(entry) }
             if name.hasSuffix(".eappx") || name.hasSuffix(".eappxbundle") {
-                evidence.encryptedPackageMarker = true
+                if !evidence.encryptedPackageMarker {
+                    evidence.encryptedPackageMarker = PackageType.hasEncryptedAppxHeader(
+                        try readPrefix(entry, maximumBytes: 65_536))
+                }
             }
             if name.hasSuffix(".msixvc"), !evidence.hasMSIXVCHeader {
                 evidence.hasMSIXVCHeader = PackageType.hasMSIXVCHeader(try readPrefix(entry, maximumBytes: 4096))
@@ -32,8 +35,8 @@ enum PackageInspector {
         }
         guard manifests.count <= 1 else { throw InstalledGameError.invalidConfig }
         if let manifest = manifests.first {
-            let facts = try AppxManifestFacts.parse(
-                InstalledGameFiles.readRegular(manifest, maximumBytes: 1_048_576))
+            let bytes = try readPrefix(manifest, maximumBytes: 1_048_577)
+            let facts = try AppxManifestFacts.parse(bytes)
             evidence.hasAppxManifest = true
             evidence.targetDeviceFamilies = facts.targetDeviceFamilies
             evidence.declaresFullTrustEntryPoint = facts.fullTrust
@@ -51,6 +54,19 @@ enum PackageInspector {
         guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG else {
             throw InstalledGameError.invalidConfig
         }
-        return try handle.read(upToCount: maximumBytes) ?? Data()
+        let bytes = try handle.read(upToCount: maximumBytes) ?? Data()
+        var after = stat(), current = stat()
+        guard fstat(descriptor, &after) == 0, lstat(url.path, &current) == 0,
+              info.st_dev == after.st_dev, info.st_ino == after.st_ino,
+              current.st_dev == after.st_dev, current.st_ino == after.st_ino,
+              info.st_size == after.st_size, info.st_mode == after.st_mode,
+              info.st_mtimespec.tv_sec == after.st_mtimespec.tv_sec,
+              info.st_mtimespec.tv_nsec == after.st_mtimespec.tv_nsec,
+              info.st_ctimespec.tv_sec == after.st_ctimespec.tv_sec,
+              info.st_ctimespec.tv_nsec == after.st_ctimespec.tv_nsec,
+              bytes.count == min(Int(info.st_size), maximumBytes) else {
+            throw InstalledGameError.invalidConfig
+        }
+        return bytes
     }
 }
