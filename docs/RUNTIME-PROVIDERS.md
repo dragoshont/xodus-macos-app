@@ -1,5 +1,51 @@
 # Runtime provider configuration v1
 
+## Persisted launch selection (M3)
+
+Launch selection is separate from the configuration-only planning contract below.
+`Xodus.defaultEngine` persists the optional default. The private installed-game
+list persists each game's optional `engineOverride`; override, default, then
+first available runner is the selection order. A missing selected runner is an
+explicit refusal, never a substitution.
+
+Availability does not read `Xodus.developerBackendPath`: that preference names a
+management build, not a runtime. CrossOver availability uses the signed-bundle
+check below. Each Experimental provider has its own user registration at
+`Xodus.runner.PROVIDER.executable`. Detection independently checks every
+registered absolute path for a regular executable file, irrespective of the
+default or override. These registrations declare provider identity; observed
+file availability does not verify GPTK provenance/version, a license, compatible
+prefix, graphics, or gameplay. No standard GPTK3/4 installation layout is guessed.
+Blank, relative, missing, linked or non-executable runner files are unavailable.
+
+The live Library's installed cards, hero and game menus expose overrides and
+detected format labels. Selecting a provider hands its identifier to the saved
+game launcher as argument two and `XODUS_ENGINE`. **This is a selector-handoff
+contract, not proof that a private launcher actually invokes that runner.**
+Registration paths are availability inputs, not an applied runtime command.
+The private launcher must implement provider selection while preserving its
+bottle/prefix, streaming, service, stop and save behavior. That integration and
+actual game execution remain in the separate authorized Mac runtime lane.
+CI checks distinguish selector handoff from successful gameplay.
+
+## Installed package facts (M1)
+
+`PackageType` is a format fact, not a support or compatibility verdict.
+`MicrosoftGame.config` alone does not prove MSIXVC. The inspector requires an
+observed 4096-byte MSFT-XVD header in a regular `.msixvc` file (including the
+existing streaming marker). A loose GDK build with validated DOS/PE headers is
+Win32; otherwise absent format evidence is Unknown. Filenames alone do not
+establish PE or MSIXVC, and directories/symlinks are ignored.
+
+Bounded Appx manifests derive application-model facts from application entry
+points and runtime/trust declarations, not `Windows.Universal` device targeting.
+Desktop-only UWP applications are included; full-trust/hybrid applications are
+classified Appx. Malformed/unreadable manifests are inspection errors.
+Observations are refreshed on load and reimport, including prior Unknown
+records; temporary unavailability preserves the last saved type and exposes an
+error. Reimport changes format facts without discarding a user engine override.
+No UWP/EAppx support status or installation policy is changed.
+
 Official, separately installed CrossOver is the first-release dependency.
 GPTK3/GPTK4 and user-selected standalone/source-built Wine remain Experimental
 tracks; any explicit graphics override is also Experimental. The UI requires

@@ -4,6 +4,7 @@ import Combine
 import Darwin
 import Foundation
 import SwiftUI
+import XodusCore
 import XodusManagement
 
 @MainActor
@@ -213,7 +214,9 @@ enum GameOperationChecks {
         _ = try GameScriptFiles.script(.serviceStatus, paths: paths)
         _ = try GameScriptFiles.read(paths.journal, missingAllowed: true)
         let store = InstalledGameStore(file: root.appendingPathComponent("registry/installed-games.json"))
-        let installed = InstalledGamesController(store: store, launchingDuration: .milliseconds(50))
+        let installed = InstalledGamesController(store: store, launchingDuration: .milliseconds(50),
+                                                 defaultEngine: { nil },
+                                                 detectAvailability: { RunnerAvailability([.crossover]) })
         let operations = GameOperationsController(installed: installed, paths: paths)
         check(operations.serviceStatus == nil && !operations.serviceBusy && operations.operation == nil
               && operations.gamePassStatus == nil && !operations.gamePassActive

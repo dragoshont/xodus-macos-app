@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import SwiftUI
+import XodusCore
 
 struct InstalledGamesView: View {
     @ObservedObject var library: InstalledGamesController
@@ -68,8 +69,15 @@ struct InstalledGamesView: View {
                         InstalledArtworkView(game: game, allowsLoading: allowsArtworkLoading)
                             .frame(width: 60, height: 60)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
-                        Text(game.title).font(.headline).fixedSize(horizontal: false, vertical: true)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(game.title).font(.headline).fixedSize(horizontal: false, vertical: true)
+                            if let format = game.packageType, format != .unknown {
+                                Text(format.label).font(.caption).foregroundStyle(.secondary)
+                                    .accessibilityIdentifier("xodus.installed.packageType")
+                            }
+                        }
                         Spacer()
+                        InstalledEngineOverride(library: library, game: game)
                         InstalledGameActions(library: library, operations: operations, game: game)
                         InstalledPlayButton(library: library, operations: operations, game: game)
                     }
@@ -97,6 +105,11 @@ struct InstalledPlayError: View {
     let game: InstalledGame
 
     var body: some View {
+        if let error = library.packageErrors[game.id] {
+            Text(error).font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("xodus.installed.packageError")
+        }
         if let error = library.playErrors[game.id] {
             Text(error).font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -109,6 +122,52 @@ struct InstalledPlayError: View {
         } else if let notice = library.playNotices[game.id] {
             Text(notice).font(.callout).foregroundStyle(.secondary)
                 .accessibilityIdentifier("xodus.installed.playResult")
+        }
+    }
+}
+
+struct InstalledEngineOverride: View {
+    @ObservedObject var library: InstalledGamesController
+    let game: InstalledGame
+
+    var body: some View {
+        Menu {
+            Picker("Engine", selection: Binding(
+                get: { game.engineOverride },
+                set: { value in Task { await library.setEngineOverride(value, for: game) } })) {
+                Text("Use default engine").tag(Optional<RuntimeProviderKind>.none)
+                ForEach(RuntimeProviderSettings.providerChoices, id: \.self) { provider in
+                    Text(RuntimeProviderSettings.providerLabel(provider)).tag(Optional(provider))
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Label(game.engineOverride.map(RuntimeProviderSettings.providerLabel) ?? "Default engine",
+                  systemImage: "gearshape")
+                .labelStyle(.iconOnly)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .disabled(library.runningGameID == game.id || library.editing || library.choosing
+                  || library.mutationActive || library.applicationTerminating)
+        .accessibilityLabel("Engine for \(game.title)")
+        .accessibilityValue(game.engineOverride.map(RuntimeProviderSettings.providerLabel) ?? "Use default engine")
+        .help(game.engineOverride.map { "Engine override: \(RuntimeProviderSettings.providerLabel($0))" }
+              ?? "Launch with the default engine")
+        .accessibilityIdentifier("xodus.installed.engineOverride")
+    }
+
+}
+
+struct InstalledPackageTypeLabel: View {
+    let game: InstalledGame
+
+    var body: some View {
+        if let type = game.packageType, type != .unknown {
+            Text("Detected: \(type.label)")
+                .font(.caption).foregroundStyle(.secondary)
+                .help("Format detected from installed files, not a compatibility verdict.")
+                .accessibilityIdentifier("xodus.installed.packageType")
         }
     }
 }

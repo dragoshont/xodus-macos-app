@@ -1,0 +1,22 @@
+{
+  "cases": [
+    {"name":"GDK configuration alone is not a container","expected":"unknown","evidence":{"hasMicrosoftGameConfig":true,"hasAppxManifest":false,"encryptedPackageMarker":false,"targetDeviceFamilies":[],"declaresFullTrustEntryPoint":false,"hasWin32Executable":false}},
+    {"name":"loose GDK executable","expected":"win32","evidence":{"hasMicrosoftGameConfig":true,"hasAppxManifest":false,"encryptedPackageMarker":false,"targetDeviceFamilies":[],"declaresFullTrustEntryPoint":false,"hasWin32Executable":true}},
+    {"name":"validated MSIXVC container without GDK config","expected":"msixvc","evidence":{"hasMSIXVCHeader":true,"hasMicrosoftGameConfig":false,"hasAppxManifest":false,"encryptedPackageMarker":false,"targetDeviceFamilies":[],"declaresFullTrustEntryPoint":false,"hasWin32Executable":false}},
+    {"name":"bare PE executable","expected":"win32","evidence":{"hasMicrosoftGameConfig":false,"hasAppxManifest":false,"encryptedPackageMarker":false,"targetDeviceFamilies":[],"declaresFullTrustEntryPoint":false,"hasWin32Executable":true}},
+    {"name":"desktop-only UWP application","expected":"uwp","evidence":{"hasMicrosoftGameConfig":false,"hasAppxManifest":true,"encryptedPackageMarker":false,"targetDeviceFamilies":["Windows.Desktop"],"declaresFullTrustEntryPoint":false,"declaresUWPApplication":true,"hasWin32Executable":true}},
+    {"name":"full trust outranks UWP application","expected":"appx","evidence":{"hasMicrosoftGameConfig":false,"hasAppxManifest":true,"encryptedPackageMarker":false,"targetDeviceFamilies":["Windows.Universal"],"declaresFullTrustEntryPoint":true,"declaresUWPApplication":true,"hasWin32Executable":true}},
+    {"name":"Universal device targeting does not prove UWP","expected":"appx","evidence":{"hasMicrosoftGameConfig":false,"hasAppxManifest":true,"encryptedPackageMarker":false,"targetDeviceFamilies":["Windows.Universal"],"declaresFullTrustEntryPoint":false,"hasWin32Executable":false}},
+    {"name":"encrypted package","expected":"eappx","evidence":{"hasMicrosoftGameConfig":false,"hasAppxManifest":false,"encryptedPackageMarker":true,"targetDeviceFamilies":[],"declaresFullTrustEntryPoint":false,"hasWin32Executable":false}},
+    {"name":"no evidence","expected":"unknown","evidence":{"hasMicrosoftGameConfig":false,"hasAppxManifest":false,"encryptedPackageMarker":false,"targetDeviceFamilies":[],"declaresFullTrustEntryPoint":false,"hasWin32Executable":false}},
+    {"name":"manifest outranks executable","expected":"appx","evidence":{"hasMicrosoftGameConfig":true,"hasAppxManifest":true,"encryptedPackageMarker":false,"targetDeviceFamilies":[],"declaresFullTrustEntryPoint":true,"hasWin32Executable":true}}
+  ],
+  "manifests": [
+    {"name":"desktop-only UWP","xml":"<Package><Dependencies><TargetDeviceFamily Name=\"Windows.Desktop\"/></Dependencies><Applications><Application EntryPoint=\"Fixture.App\"/></Applications></Package>","expected":"uwp"},
+    {"name":"universal without application-model evidence","xml":"<Package><Dependencies><TargetDeviceFamily Name=\"Windows.Universal\"/></Dependencies><Applications><Application/></Applications></Package>","expected":"appx"},
+    {"name":"full-trust entry point","xml":"<Package><Applications><Application EntryPoint=\"Windows.FullTrustApplication\"/></Applications></Package>","expected":"appx"},
+    {"name":"modern UWP attributes","xml":"<Package xmlns:uap10=\"http://schemas.microsoft.com/appx/manifest/uap/windows10/10\"><Applications><Application uap10:RuntimeBehavior=\"windowsApp\" uap10:TrustLevel=\"appContainer\"/></Applications></Package>","expected":"uwp"},
+    {"name":"modern packaged classic attributes","xml":"<Package xmlns:uap10=\"http://schemas.microsoft.com/appx/manifest/uap/windows10/10\"><Applications><Application EntryPoint=\"Fixture.App\" uap10:RuntimeBehavior=\"packagedClassicApp\" uap10:TrustLevel=\"mediumIL\"/></Applications></Package>","expected":"appx"},
+    {"name":"hybrid full-trust capability","xml":"<Package xmlns:rescap=\"http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities\"><Applications><Application EntryPoint=\"Fixture.App\"/></Applications><Capabilities><rescap:Capability Name=\"runFullTrust\"/></Capabilities></Package>","expected":"appx"}
+  ]
+}

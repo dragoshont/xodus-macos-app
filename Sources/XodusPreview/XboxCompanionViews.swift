@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import SwiftUI
+import XodusCore
 
 enum XboxCompanionCopy {
     static let accountScope =
@@ -373,6 +374,8 @@ struct XboxConsolesView: View {
 struct EnginesView: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var session: LiveSession
+    @State private var defaultEngine: RuntimeProviderKind? = EngineDefaults.defaultEngine()
+    @State private var runnerPaths = EngineDefaults.runnerPaths()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -381,6 +384,34 @@ struct EnginesView: View {
                 .font(.callout).foregroundStyle(.secondary)
             Form {
                 RuntimeProviderSection(settings: state.runtimeSettings, backendPath: session.backendPath)
+                Section("Launch routing") {
+                    Picker("Default engine", selection: Binding(
+                        get: { defaultEngine },
+                        set: { value in
+                            defaultEngine = value
+                            EngineDefaults.setDefaultEngine(value)
+                        })) {
+                        Text("Automatic (first installed runner)").tag(Optional<RuntimeProviderKind>.none)
+                        ForEach(RuntimeProviderSettings.providerChoices, id: \.self) { provider in
+                            Text(RuntimeProviderSettings.providerLabel(provider)).tag(Optional(provider))
+                        }
+                    }
+                    Text("Selects the provider sent to the game's launch script. A per-game override takes precedence. An unavailable selection refuses launch rather than substituting another runner. The launcher must support this selector; the handoff alone is not gameplay proof.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    DisclosureGroup("Experimental runner executables") {
+                        ForEach(RuntimeProviderSettings.providerChoices.filter { $0 != .crossover }, id: \.self) { kind in
+                            TextField("\(kind.label) executable path", text: Binding(
+                                get: { runnerPaths[kind] ?? "" },
+                                set: { path in
+                                    runnerPaths[kind] = path
+                                    EngineDefaults.setRunnerPath(path, for: kind)
+                                }))
+                            .accessibilityIdentifier("xodus.engine.path.\(kind.rawValue)")
+                        }
+                        Text("Register each provider's absolute runner path separately, not the Xodus management build. File availability is checked; toolkit identity and version are your declarations. These Experimental paths are not compatibility or gameplay proof.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
             }
             .formStyle(.grouped)
             .frame(minHeight: 440)
