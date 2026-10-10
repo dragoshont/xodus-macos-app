@@ -58,6 +58,11 @@ final class GameOperationsController: ObservableObject {
     private var serviceTask: Task<Void, Never>?
     private var compatibilityTask: Task<Void, Never>?
     private var compatibilityRunID: String?
+    @Published private(set) var precheckingProductID: String?
+    private let precheckRunner: GameScriptRunner
+    private var precheckTask: Task<Void, Never>?
+    private var precheckRunID: String?
+    private var precheckAttempted = Set<String>()
     private var gamePassTask: Task<Void, Never>?
     private var stopTask: Task<Void, Never>?
     private var gamePassGeneration = 0
@@ -118,6 +123,7 @@ final class GameOperationsController: ObservableObject {
         mutationRunner = GameScriptRunner(paths: paths)
         serviceRunner = GameScriptRunner(paths: paths)
         setupRunner = GameScriptRunner(paths: paths)
+        precheckRunner = GameScriptRunner(paths: paths)
         journal = GameOperationJournal(file: paths.journal)
         installedObservation = installed.objectWillChange.sink { [weak self] in
             self?.objectWillChange.send()
@@ -266,6 +272,7 @@ final class GameOperationsController: ObservableObject {
                 installed.releaseMutation()
             }
             do {
+                await cancelPrecheck()
                 for productID in candidates { await loadCompatibility(productID: productID) }
                 guard !terminating else { return }
                 let probes = Self.gamePassProbes(discoveryProducts: discoveryProducts, ownedGames: ownedGames,
@@ -382,6 +389,7 @@ final class GameOperationsController: ObservableObject {
                 installed.releaseMutation()
             }
             do {
+                await cancelPrecheck()
                 let outcome = try await mutationRunner.run(command: .setup, runID: runID, arguments: ["repair"])
                 setupLog = outcome.log
                 guard outcome.code == 0, let data = outcome.result else { throw GameScriptError.failed(outcome.code) }
@@ -412,7 +420,45 @@ final class GameOperationsController: ObservableObject {
         }
     }
 
+    /// Answers "can this play on Mac?" before the user presses Install. Reads cached verdicts, then
+    /// checks uncached games one at a time while idle. Any user action cancels it first.
+    func precheck(_ productIDs: [String]) {
+        guard precheckTask == nil, !terminating else { return }
+        let ids = productIDs.filter { PCGamesClient.validProductID($0) && !precheckAttempted.contains($0) }
+        guard !ids.isEmpty else { return }
+        precheckTask = Task {
+            defer { precheckTask = nil; precheckRunID = nil; precheckingProductID = nil }
+            for id in ids {
+                if compatibility[id] == nil { await loadCompatibility(productID: id) }
+                guard compatibility[id] == nil, compatibilityErrors[id] == nil else { continue }
+                guard !Task.isCancelled, canStartMutation, installConsent == nil, uninstallConsent == nil,
+                      installed.runningGameID == nil, serviceStatus?.signedIn != false else { return }
+                precheckAttempted.insert(id)
+                let runID = InstalledGamesController.runID()
+                precheckRunID = runID
+                precheckingProductID = id
+                guard let outcome = try? await precheckRunner.run(command: .check, runID: runID, arguments: [id]),
+                      !Task.isCancelled else { return }
+                // Sign-in or network failures stop the pass; Install still runs the full check.
+                guard outcome.code == 0, let data = outcome.result,
+                      let result = try? GameCompatibilityResult.parse(data, productID: id) else { return }
+                if compatibility[id] == nil { compatibility[id] = result }
+            }
+        }
+    }
+
+    func cancelPrecheck() async {
+        guard let task = precheckTask else { return }
+        task.cancel()
+        if let runID = precheckRunID {
+            precheckAttempted.remove(precheckingProductID ?? "")
+            await precheckRunner.cancel(runID: runID)
+        }
+        await task.value
+    }
+
     func prepareInstall(_ game: PCGame, repairing: InstalledGame? = nil) async {
+        await cancelPrecheck()
         guard canStartMutation, PCGamesClient.validProductID(game.id) else { return }
         if let repairing {
             guard repairing.storeId == game.id, installed.games.contains(repairing),
@@ -540,6 +586,7 @@ final class GameOperationsController: ObservableObject {
         mutationTask = Task {
             do {
                 try await journal.save(record)
+                await cancelPrecheck()
                 if cancelling {
                     try await complete(record, outcome: GameScriptOutcome(code: 14, result: nil, log: nil))
                     mutationTask = nil
@@ -657,7 +704,10 @@ final class GameOperationsController: ObservableObject {
     func waitForSetup() async {
         while let task = setupTask { await task.value }
     }
-    func beginTermination() { terminating = true }
+    func beginTermination() {
+        terminating = true
+        Task { await cancelPrecheck() }
+    }
     func resumeAfterTerminationRefusal() { terminating = false }
 
     private func scriptLog(_ runID: String) async -> URL? {

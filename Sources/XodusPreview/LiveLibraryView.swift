@@ -155,6 +155,12 @@ struct LiveLibraryView: View {
             .padding(.horizontal, 56).padding(.vertical, 22)
         }
         .task { if allowsStartupTasks { await library.loadOnAppear() } }
+        .task(id: "\(precheckIDs.joined(separator: ",")):\(operations.canStartMutation)") {
+            guard allowsStartupTasks, operations.canStartMutation, !precheckIDs.isEmpty else { return }
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            operations.precheck(precheckIDs)
+        }
         .task(id: "\(filter.rawValue):\(session.isReady):\(session.market):\(session.language)") {
             guard allowsStartupTasks, filter == .gamePass else { return }
             await session.loadGamePassCatalog()
@@ -257,6 +263,9 @@ struct LiveLibraryView: View {
                                     usesGlass: true, heroStyle: true)
                 InstalledGameActions(library: installed, operations: operations, game: match,
                                      usesGlass: true, heroStyle: true)
+            } else if let reason = unsupportedReason(game) {
+                LibraryUnsupportedLabel(reason: reason, heroStyle: true)
+                Button("View game") { open(game) }.modifier(LibraryActionStyle(primary: false))
             } else {
                 Button {
                     if let pc = game.pc { Task { await operations.install(pc) } }
@@ -264,8 +273,22 @@ struct LiveLibraryView: View {
                 .modifier(LibraryActionStyle(primary: true))
                 .disabled(game.pc == nil || !allowsStartupTasks || !operations.canStartMutation)
                 Button("View game") { open(game) }.modifier(LibraryActionStyle(primary: false))
+                if operations.precheckingProductID == game.id {
+                    ProgressView().controlSize(.small).help("Checking whether this game runs on Mac")
+                }
             }
         }
+    }
+
+    private func unsupportedReason(_ game: LibraryGame) -> String? {
+        guard game.installed == nil, let result = operations.compatibility[game.id], !result.supported else { return nil }
+        return result.reason ?? "This game isn't supported on Mac yet."
+    }
+
+    private var precheckIDs: [String] {
+        let shown = heroGames + (filter == .gamePass ? [] : Array(visible.prefix(12)))
+        var seen = Set<String>()
+        return shown.filter { $0.installed == nil && $0.owned && seen.insert($0.id).inserted }.map(\.id)
     }
 
     private var continuePlaying: some View {
@@ -348,6 +371,8 @@ struct LiveLibraryView: View {
         } status: {
             if game.installed != nil {
                 Label("Installed", systemImage: "internaldrive")
+            } else if let reason = unsupportedReason(game) {
+                Label("Not on Mac yet", systemImage: "laptopcomputer.slash").help(reason)
             } else {
                 LibraryGameSizeView(installed: nil, downloadBytes: art.images[artworkID]?.facts.downloadBytes,
                                     allowsMeasurement: artworkAllowed)
@@ -359,6 +384,8 @@ struct LiveLibraryView: View {
                     InstalledPlayButton(library: installed, operations: operations, game: match,
                                         usesGlass: true, prominent: false)
                     InstalledGameActions(library: installed, operations: operations, game: match, usesGlass: true)
+                } else if game.owned, unsupportedReason(game) != nil {
+                    EmptyView()
                 } else if game.owned {
                     Button {
                         if let pc = game.pc { Task { await operations.install(pc) } }

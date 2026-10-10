@@ -232,20 +232,23 @@ struct LibraryHero<Artwork: View, Poster: View, Information: View, Actions: View
 }
 
 enum LibraryAccess: String {
-    case owned = "Owned", gamePass = "Game Pass catalog"
+    case owned = "Owned", gamePass = "Game Pass catalog", subscription = "Game Pass"
     var symbol: String { self == .owned ? "checkmark.seal" : "ticket" }
     var help: String {
-        self == .owned
-            ? "In your Microsoft PC game library."
-            : "Included in the PC Game Pass catalogue. A subscription is required to install."
+        switch self {
+        case .owned: "In your Microsoft PC game library."
+        case .subscription: "In your PC library through your PC Game Pass subscription."
+        case .gamePass: "Included in the PC Game Pass catalogue. A subscription is required to install."
+        }
     }
     init?(_ game: LibraryGame) {
-        if game.owned { self = .owned }
+        if game.owned { self = game.pc?.acquisitionKind == .subscription ? .subscription : .owned }
         else if game.gamePass { self = .gamePass }
         else { return nil }
     }
     static func badges(_ game: LibraryGame) -> [Self] {
-        (game.owned ? [.owned] : []) + (game.gamePass ? [.gamePass] : [])
+        if game.owned, game.pc?.acquisitionKind == .subscription { return [.subscription] }
+        return (game.owned ? [.owned] : []) + (game.gamePass ? [.gamePass] : [])
     }
     static func summary(owned: Bool, catalogMembership: Bool, current: Bool) -> String {
         let access = owned ? (current ? "Owned" : "Saved Owned · refresh required") : "Access not verified"
@@ -257,7 +260,7 @@ struct LibraryAccessBadge: View {
     let access: LibraryAccess
     var compact = false
     var body: some View {
-        if access == .gamePass {
+        if access != .owned {
             Label("Game Pass", systemImage: "xbox.logo")
                 .font((compact ? Font.caption : .callout).weight(.semibold))
                 .foregroundStyle(.white)
@@ -321,7 +324,7 @@ struct LibraryGameInformation: View {
                 if let access {
                     LibraryAccessBadge(access: access, compact: compact).help(access.help)
                 }
-                if gamePass, access != .gamePass {
+                if gamePass, access == nil || access == .owned {
                     LibraryAccessBadge(access: .gamePass, compact: compact).help(LibraryAccess.gamePass.help)
                 }
                 if let facts, !facts.genres.isEmpty {
@@ -414,6 +417,24 @@ struct LibraryActionStyle: ViewModifier {
             else { content.buttonStyle(.glass) }
         } else if primary { content.buttonStyle(.borderedProminent) }
         else { content.buttonStyle(.bordered) }
+    }
+}
+
+/// Shown instead of Install when the Mac-support check already knows the game can't run.
+struct LibraryUnsupportedLabel: View {
+    let reason: String
+    var heroStyle = false
+    var body: some View {
+        Label("Not on Mac yet", systemImage: "laptopcomputer.slash")
+            .font(heroStyle ? .body.weight(.semibold) : .callout)
+            .foregroundStyle(heroStyle ? Color.white.opacity(0.92) : .secondary)
+            .shadow(color: heroStyle ? .black.opacity(0.5) : .clear, radius: 3, y: 1)
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .modifier(LibraryBadgeMaterial())
+            .help(reason)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Not on Mac yet. \(reason)")
+            .accessibilityIdentifier("xodus.library.unsupported")
     }
 }
 

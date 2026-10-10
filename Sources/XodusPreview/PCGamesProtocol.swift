@@ -201,7 +201,14 @@ struct PCGamesTokens: Sendable {
 }
 
 enum PCGameAcquisitionKind: String, Sendable {
-    case unknown
+    case unknown, purchased, subscription
+
+    // A purchase outranks a subscription grant for the same product.
+    static func merged(_ current: Self?, _ next: Self) -> Self {
+        guard let current else { return next }
+        if current == .purchased || next == .purchased { return .purchased }
+        return current == .subscription || next == .subscription ? .subscription : .unknown
+    }
 }
 
 struct PCGame: Identifiable, Sendable {
@@ -240,7 +247,17 @@ struct PCGamesCollectionPage: Decodable, Sendable {
         let productKind: String?
         let status: String?
         let isTrial: Bool?
+        let acquisitionType: String?
         private let trialFieldUsable: Bool
+
+        // "Recurring" is a subscription grant such as PC Game Pass; "Single" is a purchase or redemption.
+        var acquisitionKind: PCGameAcquisitionKind {
+            switch acquisitionType?.lowercased() {
+            case "recurring": .subscription
+            case "single": .purchased
+            default: .unknown
+            }
+        }
 
         var isCandidate: Bool {
             productKind == "Game" && status == "Active" && isTrial != true
@@ -248,7 +265,7 @@ struct PCGamesCollectionPage: Decodable, Sendable {
         }
 
         private enum CodingKeys: String, CodingKey {
-            case productId, ProductId, productKind, status, isTrial
+            case productId, ProductId, productKind, status, isTrial, acquisitionType
         }
 
         init(from decoder: Decoder) throws {
@@ -258,6 +275,7 @@ struct PCGamesCollectionPage: Decodable, Sendable {
             productKind = try? container.decode(String.self, forKey: .productKind)
             status = try? container.decode(String.self, forKey: .status)
             isTrial = try? container.decode(Bool.self, forKey: .isTrial)
+            acquisitionType = try? container.decode(String.self, forKey: .acquisitionType)
             trialFieldUsable = !container.contains(.isTrial)
                 || (try? container.decodeNil(forKey: .isTrial)) == true || isTrial != nil
         }
@@ -556,6 +574,7 @@ struct PCGamesClient: Sendable {
               xid.utf8.allSatisfy({ (48...57).contains($0) }) else { throw PCGamesError.invalidResponse }
         guard expectedAccountID == nil || expectedAccountID == xid else { throw PCGamesError.identityMismatch }
         var candidates = Set<String>(), candidateIDs = Set<String>(), cursors = Set<String>()
+        var kinds: [String: PCGameAcquisitionKind] = [:]
         var cursor: String?
         for index in 0..<Self.maximumPages {
             var body: [String: Any] = [
@@ -575,6 +594,7 @@ struct PCGamesClient: Sendable {
                     guard item.isCandidate, let id = item.productId else { continue }
                     candidateIDs.insert(id)
                     if Self.validProductID(id) { candidates.insert(id) }
+                    kinds[id] = PCGameAcquisitionKind.merged(kinds[id], item.acquisitionKind)
                 }
                 cursor = page.continuationToken
                 if cursor == "" { cursor = nil }
@@ -609,7 +629,9 @@ struct PCGamesClient: Sendable {
                 guard products.count <= batch.count,
                       Set(products.map(\.ProductId)).count == products.count,
                       products.allSatisfy({ batch.contains($0.ProductId) }) else { throw PCGamesError.invalidResponse }
-                games += products.compactMap(\.game)
+                games += products.compactMap(\.game).map {
+                    PCGame(id: $0.id, title: $0.title, artwork: $0.artwork, acquisitionKind: kinds[$0.id] ?? .unknown)
+                }
             } catch is CancellationError { throw CancellationError() }
             catch { throw PCGamesError.incompleteCatalog(start) }
         }

@@ -20,6 +20,20 @@ enum LibraryAccessChecks {
               "SDD-LIB-01/03: only held PC access enters Your Games; installation/public/global status is not a grant")
         check(collection.first?.pc?.acquisitionKind == .unknown,
               "SDD-LIB-01: held does not imply paid acquisition")
+        let granted = LibraryGame.collection(installed: [], owned: [PCGame(id: "FIXTURE00005", title: "Pass grant",
+            artwork: nil, acquisitionKind: .subscription)], products: [], gamePass: [], active: false)
+        check(granted.first.flatMap(LibraryAccess.init) == .subscription
+              && granted.first.map(LibraryAccess.badges) == [.subscription]
+              && PCGameAcquisitionKind.merged(.subscription, .purchased) == .purchased
+              && PCGameAcquisitionKind.merged(nil, .subscription) == .subscription,
+              "Game Pass-granted library games show the Game Pass mark instead of Owned; a purchase wins")
+        let page = try JSONDecoder().decode(PCGamesCollectionPage.self, from: Data("""
+            {"items":[{"productId":"FIXTURE00005","productKind":"Game","status":"Active","acquisitionType":"Recurring"},
+            {"productId":"FIXTURE00006","productKind":"Game","status":"Active","acquisitionType":"Single"},
+            {"productId":"FIXTURE00007","productKind":"Game","status":"Active"}]}
+            """.utf8))
+        check(page.items.map(\.acquisitionKind) == [.subscription, .purchased, .unknown],
+              "Collections acquisitionType maps Recurring to a subscription grant and Single to a purchase")
         check(LibraryGame.visible(collection, query: "", filter: .all, sort: .title).count == 1,
               "SDD-LIB-05: Your Games count uses the qualified join")
         check(LibraryGame.visible(collection, query: "Local", filter: .all, sort: .recentlyPlayed).isEmpty,
