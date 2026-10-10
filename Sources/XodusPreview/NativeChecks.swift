@@ -99,6 +99,8 @@ enum NativeChecks {
             try await CatalogDetailLoadingChecks.run(check: check)
             try await PCGamesChecks.run(check: check)
             try await GameOperationChecks.run(check: check)
+            try await DownloadQueueChecks.run(check: check)
+            try await InstalledGameUpdateChecks.run(check: check)
             func observationFailure(_ message: String, code: String = "AUTH_INVALID",
                                     reason: String = "pipelineFailed") throws -> WireFailure {
                 let value = JSONValue.object([

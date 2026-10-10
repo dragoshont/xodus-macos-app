@@ -59,7 +59,7 @@ struct LiveRootView: View {
         ScrollViewReader { proxy in
         Group {
             if state.destination == .downloads {
-                LiveActivityView(operations: state.gameOperations) { state.navigate(.discover) }
+                LiveActivityView(operations: state.gameOperations, queue: state.downloadQueue) { state.navigate(.discover) }
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 28) {
@@ -306,6 +306,7 @@ struct LiveRootView: View {
 
 struct LiveActivityView: View {
     @ObservedObject var operations: GameOperationsController
+    @ObservedObject var queue: DownloadQueueController
     var browseGames: () -> Void = {}
     @EnvironmentObject private var session: LiveSession
     @ObservedObject private var artwork = LibraryCatalogArtwork.shared
@@ -321,6 +322,7 @@ struct LiveActivityView: View {
             }
             .padding(.horizontal, 30).padding(.vertical, 24)
             List {
+                DownloadQueueView(queue: queue)
                 if operations.installingDirectly {
                     Section("Current") { GameOperationProgressView(operations: operations) }
                 }
@@ -371,7 +373,7 @@ struct LiveActivityView: View {
                               systemImage: "arrow.clockwise").foregroundStyle(.secondary)
                     }
                 }
-                if session.activity.jobs.isEmpty && !operations.hasDownloadStatus {
+                if session.activity.jobs.isEmpty && !operations.hasDownloadStatus && queue.jobs.isEmpty {
                     ContentUnavailableView {
                         Label("No downloads", systemImage: "arrow.down.circle")
                     } description: {

@@ -2,6 +2,7 @@
 import AppKit
 import Foundation
 import XodusCore
+import XodusManagement
 
 enum InstalledGamePlayState: Equatable {
     case launching, playing
@@ -27,6 +28,11 @@ final class InstalledGamesController: ObservableObject {
     @Published private(set) var launchableIDs: Set<UUID> = []
     @Published private(set) var mutationGameID: UUID?
     @Published private(set) var mutationActive = false
+    /// Per-game update availability, recomputed from installed versions vs. `availableVersions`.
+    @Published private(set) var updateStatuses: [UUID: UpdateStatus] = [:]
+    /// Available package versions keyed by store id. Integration point for the catalog /
+    /// package-type + engine-routing workstream (M1/M3); set via `applyAvailableVersions`.
+    @Published private(set) var availableVersions: [String: String] = [:]
     @Published var serviceSignInActive = false
     @Published var runtimeRepairActive = false
     var applicationTerminating = false
@@ -414,6 +420,28 @@ final class InstalledGamesController: ObservableObject {
             merged.lastSessionSeconds = current.lastSessionSeconds
             return merged
         }
+        recomputeUpdateStatuses()
+    }
+
+    /// Records the latest known available versions (keyed by store id) and recomputes update
+    /// availability for every installed game.
+    func applyAvailableVersions(_ versions: [String: String]) {
+        availableVersions = versions
+        recomputeUpdateStatuses()
+    }
+
+    /// Update availability for a single installed game against the known available version.
+    func updateStatus(for game: InstalledGame) -> UpdateStatus {
+        UpdateDetector.status(installed: game.version, available: availableVersions[game.storeId])
+    }
+
+    private func recomputeUpdateStatuses() {
+        var result: [UUID: UpdateStatus] = [:]
+        for game in games {
+            result[game.id] = UpdateDetector.status(installed: game.version,
+                                                    available: availableVersions[game.storeId])
+        }
+        updateStatuses = result
     }
 
     private func refreshLaunchableGames() async {

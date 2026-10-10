@@ -72,6 +72,7 @@ final class GameOperationsController: ObservableObject {
     private var restored = false
     private var terminating = false
     private var directInstallCancelled = false
+    private var queueProgressObserver: ((GameScriptProgress) -> Void)?
     private var installedObservation: AnyCancellable?
 
     var isBusy: Bool {
@@ -679,6 +680,36 @@ final class GameOperationsController: ObservableObject {
     private func publishProgress(_ value: GameScriptProgress, runID: String) {
         guard operation?.id == runID else { return }
         progress = value
+        queueProgressObserver?(value)
+    }
+
+    /// Queue bridge. Runs a single prepared `install` record to its terminal using the
+    /// standard `begin()`/`complete()` machinery (reserve → run → register → release) and
+    /// streams engine progress to `onProgress`. Additive: the interactive consent-driven path
+    /// is untouched; the download queue is the only caller. Waits for any in-flight mutation
+    /// to release so sequential queued jobs never collide on the single mutation slot.
+    func runQueuedOperation(_ record: GameOperationRecord,
+                            onProgress: @escaping (GameScriptProgress) -> Void) async -> InstallEvent {
+        guard record.kind == .install, (try? record.validate()) != nil else { return .fail(code: -1) }
+        while !canStartMutation || operation != nil || mutationTask != nil {
+            if terminating { return .fail(code: -1) }
+            try? await Task.sleep(for: .milliseconds(30))
+        }
+        queueProgressObserver = onProgress
+        defer { queueProgressObserver = nil }
+        begin(record)
+        guard operation?.id == record.id else { return .fail(code: -1) }
+        await mutationTask?.value
+        if let code = failureCode { return code == 14 ? .cancel : .fail(code: code) }
+        return .complete
+    }
+
+    /// Queue bridge. Stops the active queued run identified by `runID`; the engine keeps
+    /// partial files (exit code 14) so a later resume can continue.
+    func cancelQueuedRun(runID: String) async {
+        guard let operation, operation.id == runID, operation.kind != .uninstall, !cancelling else { return }
+        cancelling = true
+        await mutationRunner.cancel(runID: runID)
     }
 
     func cancelInstall() async {

@@ -50,6 +50,8 @@ final class AppState: ObservableObject {
     let installedGames = InstalledGamesController()
     let pcGames = PCGamesController()
     lazy var gameOperations = GameOperationsController(installed: installedGames)
+    lazy var downloadQueue = DownloadQueueController(
+        driver: GameOperationsInstallDriver(operations: gameOperations))
 #if !XODUS_SHIPPING
     @Published var fixtureMode = CommandLine.arguments.contains("--fixture")
         || CommandLine.arguments.contains("--export-preview") || LibraryPreviewExporter.fixtureRequested

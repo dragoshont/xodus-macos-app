@@ -336,7 +336,8 @@ enum NativeUIChecks {
                   && scrollViews.allSatisfy { !$0.hasHorizontalScroller },
                   "D4 install review uses a bounded native Form with reachable Cancel and Install actions")
         }
-        let downloads = NSHostingView(rootView: LiveActivityView(operations: state.gameOperations)
+        let downloads = NSHostingView(rootView: LiveActivityView(operations: state.gameOperations,
+                                                                 queue: state.downloadQueue)
             .environmentObject(session))
         downloads.sizingOptions = []
         downloads.frame = CGRect(x: 0, y: 0, width: 820, height: 600)
